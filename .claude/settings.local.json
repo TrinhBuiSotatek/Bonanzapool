@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Edit(/.claude/skills/qc-uc-read/**)",
+      "Edit(/.claude/skills/qc-func-tc-design/**)",
+      "Edit(/.claude/skills/qc-context-master/**)",
+      "Edit(/.claude/skills/qc-project-onboarding/**)",
+      "Bash(echo \"---EXIT $?\")",
+      "PowerShell(Remove-Item -Path .agent -Recurse -Force; if \\($?\\) { New-Item -ItemType Junction -Path .agent -Target \\(Resolve-Path .claude\\).Path | Out-Null; Get-Item .agent | Format-List Name, LinkType, Target })",
+      "Edit(/.claude/skills/qc-func-scenario-design/**)",
+      "Edit(/.claude/skills/qc-qna/**)",
+      "Edit(/.claude/skills/qc-context-master-02/**)",
+      "Edit(/.claude/skills/qc-dashboard-sync/**)",
+      "Edit(/.claude/skills/qc-site-map/**)",
+      "Bash(git config *)",
+      "Bash(git check-ignore *)",
+      "Bash(git rm *)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\Admin\\Desktop\\qc-kit\\.claude\\skills\\qc-uc-read\\process-logging\\UC1",
+      "c:\\Users\\Admin\\Desktop\\qc-kit\\.claude\\skills\\qc-uc-read\\process-logging",
+      "c:\\Users\\Admin\\Desktop\\qc-kit\\.claude\\skills\\qc-uc-read\\process-logging\\UC45-51",
+      "c:\\Users\\Admin\\Desktop\\qc-kit\\.claude\\skills\\qc-func-tc-design\\references",
+      "c:\\Users\\Admin\\Desktop\\qc-kit\\.claude\\skills\\qc-dashboard-sync\\inbox",
+      "c:\\Users\\Admin\\Desktop\\qc-kit\\docs\\qc-lead"
+    ]
+  }
+}

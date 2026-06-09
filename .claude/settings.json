@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git mv *)",
+      "Edit(.claude/skills/*/process-logging/**)",
+      "Write(.claude/skills/*/process-logging/**)",
+      "Edit(.claude/skills/qc-context-master/state/**)",
+      "PowerShell($claude = Get-Item \"c:\\\\Users\\\\Admin\\\\Desktop\\\\qc-kit\\\\.claude\"; $agent = Get-Item \"c:\\\\Users\\\\Admin\\\\Desktop\\\\qc-kit\\\\.agent\"; \"$\\($claude.LinkType\\) $\\($claude.Target\\)\"; \"$\\($agent.LinkType\\) $\\($agent.Target\\)\")",
+      "Bash(rm .claude/skills/qc-uc-read/workflows/first-audit-workflow.md .claude/skills/qc-uc-read/workflows/re-audit-workflow.md)",
+      "Bash(rm .agent/skills/qc-uc-read/workflows/first-audit-workflow.md .agent/skills/qc-uc-read/workflows/re-audit-workflow.md)",
+      "Bash(xargs wc *)",
+      "Bash(cp c:/Users/Admin/Desktop/qc-kit/.claude/skills/qc-func-tc-design/SKILL.md c:/Users/Admin/Desktop/qc-kit/.agent/skills/qc-func-tc-design/SKILL.md)",
+      "Bash(cp c:/Users/Admin/Desktop/qc-kit/.claude/skills/qc-func-tc-design/workflows/generate-test-cases.md c:/Users/Admin/Desktop/qc-kit/.agent/skills/qc-func-tc-design/workflows/generate-test-cases.md)",
+      "Bash(cp c:/Users/Admin/Desktop/qc-kit/.claude/skills/qc-func-tc-design/workflows/update-test-cases.md c:/Users/Admin/Desktop/qc-kit/.agent/skills/qc-func-tc-design/workflows/update-test-cases.md)",
+      "Bash(cp c:/Users/Admin/Desktop/qc-kit/.claude/skills/qc-func-tc-design/workflows/convert-md-to-xlsx.md c:/Users/Admin/Desktop/qc-kit/.agent/skills/qc-func-tc-design/workflows/convert-md-to-xlsx.md)",
+      "Bash(cp c:/Users/Admin/Desktop/qc-kit/.claude/skills/qc-dashboard-sync/SKILL.md c:/Users/Admin/Desktop/qc-kit/.agent/skills/qc-dashboard-sync/SKILL.md)",
+      "Bash(mkdir -p \"c:/Users/Admin/Desktop/qc-kit/.claude/skills/qc-dashboard-sync/templates\")",
+      "Bash(mkdir -p \"c:/Users/Admin/Desktop/qc-kit/.agent/skills/qc-dashboard-sync/templates\")",
+      "Bash(mv \"c:/Users/Admin/Desktop/qc-kit/.claude/skills/qc-context-master/templates/qc-dashboard-template.md\" \"c:/Users/Admin/Desktop/qc-kit/.claude/skills/qc-dashboard-sync/templates/qc-dashboard-template.md\")",
+      "Bash(mv \"c:/Users/Admin/Desktop/qc-kit/.agent/skills/qc-context-master/templates/qc-dashboard-template.md\" \"c:/Users/Admin/Desktop/qc-kit/.agent/skills/qc-dashboard-sync/templates/qc-dashboard-template.md\")",
+      "Edit(docs/qc-lead/*.md)",
+      "Write(docs/qc-lead/*.md)",
+      "Edit(docs/qc-lead/agent-work-log.local/**)",
+      "Write(docs/qc-lead/agent-work-log.local/**)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\Admin\\Desktop\\qc-kit\\docs\\qc-lead"
+    ]
+  }
+}

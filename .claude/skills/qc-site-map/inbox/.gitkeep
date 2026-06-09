@@ -1,0 +1,9 @@
+# Inbox folder for qc-site-map
+
+Skill `qc-dashboard-sync` writes `dashboard-orphans.md` into this folder when
+bottom-up adds a UC row that is not present in the current site-map handoff.
+
+Skill `qc-site-map` Mode 3 consumes (and deletes) that file when it reconciles
+each orphan UC against the existing site-map.
+
+This `.gitkeep` is the only file committed; the inbox is otherwise transient.
