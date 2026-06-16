@@ -2,85 +2,99 @@
 source_skill: qc-site-map
 handoff_type: site-map-feature-coverage
 mode: initialization
-generated_at: 2026-05-15T00:00:00+07:00
+generated_at: 2026-06-15T00:00:00+07:00
 ---
 
-# Site Map Handoff for Dashboard
+# Site Map Handoff for qc-dashboard-sync
 
-Site map vừa được tạo lần đầu (`docs/qc-lead/qc-site-map.md`). Handoff này chỉ chứa thông tin cấp **feature/UC** để `qc-dashboard-sync` cross-check/cập nhật note nếu cần. **Không** đề xuất ghi đè vào cột `Files stt`, `UC review stt`, `Scenario design stt`, `TC design stt`, `Execute stt`.
+Site map vừa được tạo lần đầu (`docs/qc-lead/qc-site-map.md`) — Bonanzapool BNZA Ecosystem.  
+Handoff này chứa thông tin cấp **feature/UC** để `qc-dashboard-sync` tạo dashboard rows (top-down Initialization).  
+**Không** ghi đè vào cột `UC review stt`, `Scenario design stt`, `TC design stt`, `Execute stt` khi các cột đó đã có giá trị.
+
+---
 
 ## Feature-level site map coverage
 
 | Feature ID | Feature name | Site / Portal | Module | Mapped screen(s) | Folder alias(es) | In scope? | Site map status | Notes |
 |---|---|---|---|---|---|---|---|---|
-| UC1 | Trang chủ Dashboard | Mobile | B. Trang chủ & Điều hướng | SCR-020, 021, 022, 023 | — | Yes | Mapped | Sidebar (SCR-022) = Confirmed; còn lại Derived |
-| UC2 | Tra cứu KCN/KKT/TMTD/PTQ/Mô hình (UC2-UC31) | Mobile | D. Tra cứu KCN/KKT | SCR-040..047 | — | Yes | Partial | SCR-047 (tab Hạ tầng/Nhà đầu tư) chờ BA — AI-UC-02 |
-| UC40 | Tra cứu quỹ đất KCN | Mobile | D. Tra cứu KCN/KKT | SCR-048, 049 | — | Yes | Mapped | NV-06 trạng thái; KT-04 không export |
-| UC42-44 | Quản lý đặt lịch | Mobile | C. Hồ sơ & Dịch vụ | SCR-030, 031 | — | Yes | Mapped | NV-01/02 no tạo/huỷ; SCR-031 detail Need confirm |
-| UC45-51 | Quản lý hồ sơ | Mobile | C. Hồ sơ & Dịch vụ | SCR-032, 033 | — | Yes | Mapped | UX-05 search + tab; KT-06 PDF in-app |
-| UC52 | Kho tài liệu cá nhân | Mobile | C. Hồ sơ & Dịch vụ | SCR-034, 035 | — | Yes | Mapped | NV-04 read-only; KT-07 |
-| UC53_63-65 | Phản ánh kiến nghị | Mobile | C. Hồ sơ & Dịch vụ | SCR-036, 037, 038 | — | Yes | Mapped | UX-06 state; UX-07 auto-fill |
-| UC54 | Báo cáo đã nộp | Mobile | C. Hồ sơ & Dịch vụ | SCR-039 | — | Yes | Mapped | NV-05 |
-| UC55 | Tin tức / Chuyên trang đầu tư | Mobile | E. Tin tức / Hỗ trợ | SCR-064, 065, 066 | — | Yes | Partial | SCR-066 form đăng ký tư vấn — AI-UC55-01 chờ KH |
-| UC56-57_66_68 | Tin tức (UC56-57, UC66, UC68) | Mobile | E. Tin tức / Hỗ trợ | SCR-060, 061, 062 | — | Yes | Mapped | KT-09 WebView |
-| UC58 | Tin tức UC58 | Mobile | E. Tin tức / Hỗ trợ | SCR-060/061/062 (gom hub) | — | Need confirm | Need confirm | Q-013: gom row chưa khớp 1-1 |
-| UC59 | Tin tức UC59 | Mobile | E. Tin tức / Hỗ trợ | SCR-060/061/062 (gom hub) | — | Need confirm | Need confirm | Q-013 |
-| UC60-61 | Tin tức UC60-61 | Mobile | E. Tin tức / Hỗ trợ | SCR-060, 061, 062 | — | Yes | Mapped | |
-| UC62 | Tin tức UC62 | Mobile | E. Tin tức / Hỗ trợ | SCR-060/061/062 (gom hub) | — | Need confirm | Need confirm | Q-013 |
-| UC67 | Tin tức UC67 | Mobile | E. Tin tức / Hỗ trợ | SCR-060/061/062 (gom hub) | — | Need confirm | Need confirm | Q-013 |
-| UC69 | Văn bản pháp luật | Mobile | E. Tin tức / Hỗ trợ | SCR-067, 068 | — | Yes | Mapped | KT-09 |
-| UC71-82 | Hướng dẫn & FAQ | Mobile | E. Tin tức / Hỗ trợ | SCR-075 | — | Yes | Mapped | UX-11 multi-expand |
-| UC73 | Tra cứu TTHC | Mobile | E. Tin tức / Hỗ trợ | SCR-069, 070 | — | Need confirm | **Conflict** | UC73 vs UC70 Removed (Q-014) — cần BA + QC Lead xác nhận |
-| UC83-86 | Điều khoản / Chính sách / Liên hệ / Giới thiệu | Mobile | E. Tin tức / Hỗ trợ | SCR-076, 077, 078, 079 | — | Yes | Mapped | KT-12/13 Liên hệ external; NV-10 Giới thiệu chờ BA |
-| UC87 | Xúc tiến UC87 | Mobile | E. Tin tức / Hỗ trợ | SCR-071/072/073 (gom hub) | — | Need confirm | Need confirm | Q-013 |
-| UC88 | Xúc tiến UC88 | Mobile | E. Tin tức / Hỗ trợ | SCR-071/072/073 (gom hub) | — | Need confirm | Need confirm | Q-013 |
-| UC89 | Xúc tiến UC89 | Mobile | E. Tin tức / Hỗ trợ | SCR-071/072/073 (gom hub) | — | Need confirm | Need confirm | Q-013 |
-| UC90 | Xúc tiến UC90 | Mobile | E. Tin tức / Hỗ trợ | SCR-071, 072, 073 | — | Yes | Mapped | KT-15 lazy 20 |
-| UC91 | Xúc tiến UC91 | Mobile | E. Tin tức / Hỗ trợ | SCR-071/072/073 (gom hub) | — | Need confirm | Need confirm | Q-013 |
-| UC92 | Xúc tiến UC92 (login required) | Mobile | E. Tin tức / Hỗ trợ | SCR-074 | — | Yes | Mapped | PQ-07 exception — high regression |
-| UC93 | Xúc tiến UC93 | Mobile | E. Tin tức / Hỗ trợ | SCR-071/072/073 (gom hub) | — | Need confirm | Need confirm | Q-013 |
-| UC94 | Xúc tiến UC94 | Mobile | E. Tin tức / Hỗ trợ | SCR-071/072/073 (gom hub) | — | Need confirm | Need confirm | Q-013 |
-| UC95 | Xúc tiến UC95 | Mobile | E. Tin tức / Hỗ trợ | SCR-071/072/073 (gom hub) | — | Need confirm | Need confirm | Q-013 |
-| UC249 | Cấu hình & QL TK | Mobile | A. Xác thực & QL TK | SCR-010, 011, 013 | — | Yes | Mapped | BS-07 invalidation; UX-12 no Avatar |
-| UC250-254 | Đăng ký / Quên MK / Cập nhật DN | Mobile | A. Xác thực & QL TK | SCR-004..009, 012 | — | Yes | Mapped | BS-09/10/11; UX-13/14 |
-| UC256 | Đăng nhập Mobile | Mobile | A. Xác thực & QL TK | SCR-001, 002, 003 | — | Yes | Mapped | BS-01 VNeID dependency |
-| UC257 | Đăng xuất Mobile | Mobile | A. Xác thực & QL TK | SCR-014 | — | Yes | Mapped | BS-05 |
-| UC258_UC259 | Thông báo hệ thống | Mobile | F. Thông báo | SCR-080, 081, 082 | — | Yes | Mapped | NV-09 chờ BA; KT-16/17/18 |
+| FM-ADM-01 | WL Partner Onboarding | PTL-02 ADMIN | WL Partners | SCR-ADM-02, SCR-ADM-02a, SCR-ADM-02b, SCR-ADM-02c | | Yes | Partial | Wireframe chưa có. Screen tree Derived từ nav schema. Regression: Member Lifecycle (2-phase leave), Master Wallets (rotation). |
+| FM-ADM-02 | PF Distribution | PTL-02 ADMIN | PF Distribution | SCR-ADM-04 | | Yes | Partial | Wireframe chưa có. |
+| FM-ADM-03 | IB Management | PTL-02 ADMIN | IB Management | SCR-ADM-05 | | Yes | Partial | Wireframe chưa có. Real D1 data (replace mockIBs). |
+| FM-ADM-04 | Bot Type Config | PTL-02 ADMIN | Bot Config | SCR-ADM-06 | | Yes | Partial | Wireframe chưa có. Regression: zen-provided EXBOT params (hedge_ratio, leverage, stop_safety_factor). |
+| FM-ADM-05 | Dashboard (Admin) | PTL-02 ADMIN | Dashboard | SCR-ADM-01 | | Yes | Partial | KPI list từ OPERATOR /api/admin/stats. KV cache 5min TTL. |
+| FM-ADM-06 | Reports | PTL-02 ADMIN | Reports | SCR-ADM-11 | | Yes | Partial | Date-range query schema cần confirm. |
+| FM-ADM-07 | TOKEN Management | PTL-02 ADMIN | TOKEN | SCR-ADM-08 | | Yes | Partial | Mock data only. Low priority (T3). |
+| FM-ADM-08 | System Settings | PTL-02 ADMIN | System | SCR-ADM-09 | | Yes | Partial | Regression: global_bot_enabled kill switch (BR-ADM-028). safe_mode requires zen approval (BR-ADM-029). |
+| FM-ADM-09 | Relayer Monitor | PTL-02 ADMIN | System | SCR-ADM-10 | | Yes | Partial | Balance threshold alert. Wireframe chưa có. |
+| FM-ADM-10 | WL Bot Lifecycle Monitor | PTL-02 ADMIN | WL Partners | SCR-ADM-03 | | Yes | Partial | Regression: force-normalize 2-phase (BR-ADM-031). Auto-normalize >48h (BR-ADM-033). |
+| FM-ADM-11 | User Management | PTL-02 ADMIN | Users | SCR-ADM-07 | | Yes | Partial | RBAC-based. Read-only Phase A. |
+| FM-EX-01 | TradingView Integration | PTL-03 EX | Trading | SCR-EX-01 | | Yes | Partial | TradingView license cần confirm. chartingLibraryAdapter.js. |
+| FM-EX-02 | Chart Data Feed | PTL-03 EX | Trading | SCR-EX-01 | | Yes | Partial | HL WebSocket data feed. |
+| FM-EX-03 | Order Placement | PTL-03 EX | Trading | SCR-EX-02, SCR-EX-03, SCR-EX-04 | | Yes | Partial | Regression: agent key ký (no MetaMask popup — BR-EX-04). Builder fee approval required (BR-EX-03). |
+| FM-EX-04 | i18n (BNZA-EX) | PTL-03 EX | Trading | SCR-EX-01..04 (shared) | | Yes | Partial | 5 languages. No TypeScript (BR-EX-08). |
+| FM-XB-01 | D1 Schema | PTL-04 EXBOT | Backend | — (backend-only) | | Yes | Mapped | 9 tables. No UI. |
+| FM-XB-02 | Queue Topology | PTL-04 EXBOT | Backend | QUE-XB-01..10 | | Yes | Mapped | 10 queues confirmed. Regression: user_redeem highest prio SLA 5min. light-check zero HL calls. |
+| FM-XB-03 | Durable Objects | PTL-04 EXBOT | Backend | DO-XB-01, DO-XB-02, DO-XB-03 | | Yes | Mapped | Regression: HLRateLimitDO 800wt/min sliding window. UserLockDO lease 90s prevents nonce collision. |
+| FM-XB-04 | Cron Jobs | PTL-04 EXBOT | Backend | QUE-XB-05 (deep-audit) | | Yes | Mapped | deep-audit 6h interval. Hourly metrics-rollup. 6h stop-integrity check. |
+| FM-XB-05 | HL Adapter | PTL-04 EXBOT | Backend | QUE-XB-03, QUE-XB-04 | | Yes | Mapped | Delta-only. cloid idempotency (NV-5 Q-013). Reconcile. |
+| FM-XB-06 | OPERATOR Facade API | PTL-04 EXBOT | Backend | API-XB-01..05 | | Yes | Mapped | 5 endpoints confirmed from SRS. |
+| FM-XB-07 | Lifecycle State Machine | PTL-04 EXBOT | Backend | API-XB-01, QUE-XB-01, QUE-XB-02 | | Yes | Mapped | 18 states (FR-EXBOT-003). Regression: all state transitions. NV-1/NV-3 gate for §19.5 stop impl. |
+| FM-XB-08 | Close/Redeem Operations | PTL-04 EXBOT | Backend | API-XB-03, QUE-XB-08 | | Yes | Mapped | Regression: LP-first, SLA 5min, idempotency (close_operations ledger). |
+| FM-XB-09 | Phase A1 Dry Run | PTL-04 EXBOT | Backend | API-XB-01..05 | | Yes | Mapped | Blocked on Phase 0 Gate (4 conditions). Cannot test HL integration until gate passes. |
+| FM-XB-12 | Envelope Encryption | PTL-04 EXBOT | Backend | API-XB-04 | | Yes | Mapped | Regression: no raw key in D1/logs. AES-GCM confirmed. |
+| FM-PL-01 | Step 7 Multi-Bot | PTL-05 POOL | AI Bot | SCR-POOL-01, SCR-POOL-02, SCR-POOL-02a, SCR-POOL-02b, SCR-POOL-03, SCR-POOL-04 | | Yes | Partial | Nav schema confirmed. Wireframe chi tiết cần BA. Regression: invested_amount immutable (BR-PL-24). P&L = Evaluation − invested_amount. atomic-start 3 retry (BR-PL-16). |
+| FM-PL-02 | Step 8 plan_specs | PTL-05 POOL | OPS (Admin) | SCR-POOL-05 | | Yes | Partial | Simultaneous deploy POOL+OPERATOR+ADMIN. Version immutability. |
+| FM-OPW-01 | DB Migrations 0024–0027 | PTL-04 EXBOT (backend) | Backend | — (backend-only) | | Yes | Mapped | DB migrations. No UI. |
+| FM-OPW-02 | Ledger API | PTL-04 EXBOT (backend) | Backend | — (API) | | Yes | Mapped | GET /wl/ledger/* HMAC-SHA256 auth. Schema cần full SRS. |
+| FM-OPW-03 | Bot API | PTL-04 EXBOT (backend) | Backend | — (API) | | Yes | Mapped | POST /wl/bot/* two-phase commits. |
+| FM-OPW-04 | Post-Record Webhook | PTL-04 EXBOT (backend) | Backend | — (API) | | Yes | Mapped | POST to tenant wl_codes.post_record_url. |
+| FM-OPW-05 | WlNetSent Scanner | PTL-04 EXBOT (backend) | Backend | — (Cron/Queue) | | Yes | Mapped | Scan WlNetSent events 5min. |
+| FM-OPW-06 | Reconcilers | PTL-04 EXBOT (backend) | Backend | — (Cron) | | Yes | Mapped | setBotWlMaster reconciler + wlMaster invariant. |
+| FM-OPW-07 | fee_collections Exclusion | PTL-04 EXBOT (backend) | Backend | — (code change) | | Yes | Mapped | 7 OPERATOR files. |
+| FM-WLC-01 | WL Contract Upgrades (A–K) | Smart Contract | Blockchain | — (Smart Contract) | | Yes | Mapped | 11 contract changes. Phase 2. Blocked until Phase 1 stable. |
+| FM-WLA-01 | WL Admin — Module 1 | PTL-06 WL Admin [OOS] | WL Admin OOS | [OOS — Helix] | | No | Missing | OOS — Helix scope. Không tạo test cases. |
+| FM-WLA-02 | WL Admin — Module 2 | PTL-06 WL Admin [OOS] | WL Admin OOS | [OOS — Helix] | | No | Missing | OOS — Helix scope. |
+| FM-WLA-03 | WL Admin — Module 3 | PTL-06 WL Admin [OOS] | WL Admin OOS | [OOS — Helix] | | No | Missing | OOS — Helix scope. |
+| FM-WLA-04 | WL Admin — Module 4 | PTL-06 WL Admin [OOS] | WL Admin OOS | [OOS — Helix] | | No | Missing | OOS — Helix scope. |
+| FM-WLA-05 | WL Admin — Module 5 | PTL-06 WL Admin [OOS] | WL Admin OOS | [OOS — Helix] | | No | Missing | OOS — Helix scope. |
+| FM-WLA-06 | WL Admin — Module 6 | PTL-06 WL Admin [OOS] | WL Admin OOS | [OOS — Helix] | | No | Missing | OOS — Helix scope. |
+| FM-WLA-07 | WL Admin — Module 7 | PTL-06 WL Admin [OOS] | WL Admin OOS | [OOS — Helix] | | No | Missing | OOS — Helix scope. |
+| FM-MOB-01 | WL Mobile — Module 1 | PTL-01 WL Mobile [OOS] | WL Mobile OOS | [OOS — Helix] | | No | Missing | OOS — Helix scope. Không tạo test cases. |
+| FM-MOB-02 | WL Mobile — Module 2 | PTL-01 WL Mobile [OOS] | WL Mobile OOS | [OOS — Helix] | | No | Missing | OOS — Helix scope. |
+| FM-MOB-03 | WL Mobile — Module 3 | PTL-01 WL Mobile [OOS] | WL Mobile OOS | [OOS — Helix] | | No | Missing | OOS — Helix scope. |
+| FM-MOB-04 | WL Mobile — Module 4 | PTL-01 WL Mobile [OOS] | WL Mobile OOS | [OOS — Helix] | | No | Missing | OOS — Helix scope. |
+| FM-MOB-05 | WL Mobile — Module 5 | PTL-01 WL Mobile [OOS] | WL Mobile OOS | [OOS — Helix] | | No | Missing | OOS — Helix scope. |
+| FM-MOB-06 | WL Mobile — Module 6 | PTL-01 WL Mobile [OOS] | WL Mobile OOS | [OOS — Helix] | | No | Missing | OOS — Helix scope. |
+| FM-MOB-07 | WL Mobile — Module 7 | PTL-01 WL Mobile [OOS] | WL Mobile OOS | [OOS — Helix] | | No | Missing | OOS — Helix scope. |
+| FM-MOB-08 | WL Mobile — Module 8 | PTL-01 WL Mobile [OOS] | WL Mobile OOS | [OOS — Helix] | | No | Missing | OOS — Helix scope. |
+| FM-MOB-09 | WL Mobile — Module 9 | PTL-01 WL Mobile [OOS] | WL Mobile OOS | [OOS — Helix] | | No | Missing | OOS — Helix scope. |
+| FM-MOB-10 | WL Mobile — Module 10 | PTL-01 WL Mobile [OOS] | WL Mobile OOS | [OOS — Helix] | | No | Missing | OOS — Helix scope. |
+| FM-MOB-11 | WL Mobile — Module 11 | PTL-01 WL Mobile [OOS] | WL Mobile OOS | [OOS — Helix] | | No | Missing | OOS — Helix scope. |
+
+---
 
 ## Feature-level gaps
 
 | Feature ID | Feature name | Gap | Impact to QC | Owner | Priority |
 |---|---|---|---|---|---|
-| UC2 | Chi tiết KCN — tab Hạ tầng/Nhà đầu tư | Tab structure + KT-03 (bảng/biểu đồ) chưa rõ | Không design được scenario chi tiết tab | BA | High |
-| UC55 | Đăng ký tư vấn đầu tư | Form spec / màn đích chưa có | FLOW-CONSULT không design được | KH (qua BA) | High |
-| UC73 | Tra cứu TTHC | **Conflict** UC73 vs UC70 Removed | Có thể tạo/bỏ sót màn TTHC | BA + QC Lead | High |
-| UC58 / UC59 / UC62 / UC67 | Tin tức UC riêng | Gom hub không có evidence riêng | Coverage tracking sai số | QC Lead + BA | Medium |
-| UC87 / UC88 / UC89 / UC91 / UC93 / UC94 / UC95 | Xúc tiến UC riêng | Gom hub không có evidence riêng | Coverage tracking sai số | QC Lead + BA | Medium |
-| UC83-86 (UC86) | Giới thiệu | NV-10 tĩnh/CMS chưa rõ | Test offline vs CMS-driven khác nhau | BA | Low |
-| UC258_UC259 | Thông báo | NV-09 loại thông báo + deep-link routing | Cold-start mapping cho push chưa có | BA | Medium |
-| (cross) | Auth + Token lifecycle | BS-07 đổi MK → bắt buộc logout — regression critical | High regression risk | Tech Lead + QC | High |
+| FM-ADM-* (all 11) | BNZA-ADMIN module | Không có SRS/module doc. Chỉ có feature-map.md mô tả ngắn. | Không thể viết scenario chi tiết cho ADMIN trước khi có SRS. | BA | High |
+| FM-PL-01/02 | POOL Steps 7-8 | Wireframe chi tiết Step 7-8 chưa có. | BotCard edge cases, Create Bot flow detail cần confirm. | BA | Medium |
+| FM-XB-09 | Phase A1 Dry Run | Phase 0 Gate chưa pass. | QC không test HL integration. D1 schema + Queue skeleton only. | zen / SOTATEK | High |
+| FM-XB-07 | Lifecycle + Stop §19.5 | NV-1/NV-3 chưa confirm (Q-011). | §19.5 stop impl blocked. Scenario cho stop cases chưa design được. | SOTATEK | High |
+| FM-PL-01 + FM-XB-07 | Dual-chain wethIndex | NV-12 chưa confirm (Q-012). Pool address Base+OP + wethIndex chưa xác nhận. | Chain switch test + LP calc test bị block. | zen (BNZA) | High |
+
+---
 
 ## Unmapped screens
 
-| Screen ID | Screen / Page | Why unmapped | Suggested action |
-|---|---|---|---|
-| SCR-050 | Quản lý cho thuê đất | UC41 chưa có row dashboard (AI-UC-01 chờ BA) | Khi BA hoàn tất UC41 → bổ sung row dashboard `Mobile / UC41 / D / Cho thuê đất KCN / Need confirm`. **KHÔNG** tự thêm row UC41 ngay vì BA chưa cấp content. |
-| SCR-090 | Toast messages | Cross-cutting, AI-UX-01 chưa thiết kế | Khi UI/UX team có design → review tích hợp; không tạo row dashboard riêng |
-| SCR-091 | Empty — Search NULL | AI-UX-02 chưa thiết kế | Same |
-| SCR-092 | Empty — List rỗng | AI-UX-03 chưa thiết kế | Same |
-| SCR-093 | Error — Network/500/404/Timeout | AI-UX-04 chưa thiết kế | Same |
+Không có. Tất cả screens đều map được tới ít nhất 1 Feature ID.
 
-## Dashboard update recommendation
+---
 
-`qc-dashboard-sync` **không cần thay đổi cấu trúc dashboard** (cột `Files stt`, `UC review stt`, `Scenario design stt`, `TC design stt`, `Execute stt` không ảnh hưởng bởi site map). Đây chỉ là handoff thông tin cấp feature để cross-check.
+## Handoff notes for qc-dashboard-sync
 
-| Feature ID | Recommended dashboard note/status | Reason |
-|---|---|---|
-| UC73 | Cân nhắc đánh `Conflict` hoặc giữ `Need confirm` cho tới khi BA + QC Lead resolve UC73 vs UC70 | Site map: Conflict |
-| UC55 | Giữ `Yes` nhưng note "SCR-066 chờ KH (AI-UC55-01)" | Site map: Partial |
-| UC2 | Giữ `Yes` nhưng note "SCR-047 chờ BA (AI-UC-02)" | Site map: Partial |
-| UC58/59/62/67 | Giữ `Need confirm` (đã đúng) | Site map: Need confirm |
-| UC87/88/89/91/93/94/95 | Giữ `Need confirm` (đã đúng) | Site map: Need confirm |
-| UC41 (chưa có row) | **KHÔNG** auto-add. Đợi BA cấp content UC41 (AI-UC-01) | Site map: Unmapped — pending |
-
-**Lưu ý cho QC Lead:** Sau khi BA cung cấp lại folder `docs/BA/<UC-ID>/` (Q-015) — `qc-dashboard-sync` chạy lại sẽ tự cập nhật cột `Files stt` (hiện đang stale toàn bộ `Missing`).
+- **In scope = Yes:** 35 features (toàn bộ Sotatek builds).
+- **In scope = No:** 18 OOS features (FM-WLA-01..07 + FM-MOB-01..11).
+- **EXBOT Phase 0 Gate chưa pass:** FM-XB-09 bị block — đánh dấu rõ trong dashboard.
+- **NV-1/NV-3 + NV-12 chưa confirm:** Ảnh hưởng FM-XB-07 + FM-PL-01. Xem Q-011/Q-012 trong project-context-master.md.
+- **Không có qc-dashboard.md hiện tại** — đây là Initialization, tạo fresh từ handoff này.

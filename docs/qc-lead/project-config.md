@@ -1,9 +1,9 @@
 # Project Configuration
 
-> **Project:** Monanzapool
+> **Project:** Bonanzapool
 > **Created:** 2026-05-10
 > **Author:** QC Lead
-> **Version:** v3
+> **Version:** v4
 
 Tệp này đóng vai trò là biểu mẫu cấu hình cho dự án thực tế sử dụng Framework JOYs. Hãy điền các thông tin chi tiết dưới đây để các BA, QA và các AI Agent hiểu được bối cảnh, các liên kết và môi trường của dự án đang được kiểm thử.
 
@@ -11,7 +11,7 @@ Tệp này đóng vai trò là biểu mẫu cấu hình cho dự án thực tế
 
 ## 1. Project Overview
 
-> **Project name:** Monanzapool
+> **Project name:** Bonanzapool
 > **Description:** test bot hoạt động
 > **Domain:** blockchain
 > **Target Audience:** (chưa có)
