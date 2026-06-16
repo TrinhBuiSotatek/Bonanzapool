@@ -10,11 +10,14 @@ Read the `path-registry.md` file to find the below file's location:
 
 - `.claude/skills/qc-uc-read/references/input-files-format.md` — for file format description of the input files
 - `project-context-master`
-- `qc-site-map` (optional) — if present, read §5/§6/§7/§8 for screen-coverage cross-check and reverse traceability (see Phase 1 Step 1 + scoring-rubric Cross-Artefact Conflict Check). If missing, skip cross-check and warn once.
-- `requirement-common-files` — read first; resolve any code/ID reference (error codes, business rule IDs, common function names) appearing in the UC to its exact text from these files and inline that text into the audit output (see Common Reference Resolution rule in the phase files).
-- `requirement-files`
+- `qc-site-map` (optional) — if present, read §5/§6/§7 for API/Queue/DO coverage cross-check and reverse traceability (see Phase 1 Step 1 + scoring-rubric Cross-Artefact Conflict Check). If missing, skip cross-check and warn once.
+- `requirement-common-files` — backbone.md (portal/actor IDs), feature-map.md (FM-\* IDs + priority tiers), common-rules.md (BR-\* rule text). Read first; resolve any BR-\* / FR-EXBOT-\* reference appearing in the UC to its exact verbatim text from these files and inline that text into the audit output (see Common Reference Resolution rule in the phase files).
+- `requirement-files` — for Bonanzapool EXBOT: points to `03_modules/exbot/usecases/`. Other modules (ADMIN, EX, POOL) do not yet have per-UC folders — use feature-map.md + backbone.md as the only spec source. See input-files-format.md §2 for per-UC folder structure.
 - `question-backlog`
 - Important: Check the input directory for existing versions, read the highest version of the files.
+
+**OOS guard (check at Phase 0 before generating run_id):** If the UC's Feature ID belongs to `FM-WLA-*` or `FM-MOB-*`, STOP immediately:
+> "Feature [ID] là OOS (Helix scope). qc-uc-read không tạo review report cho OOS features. Xem qc-dashboard.md — cột In scope? = No."
 
 ## Output Contract
 
