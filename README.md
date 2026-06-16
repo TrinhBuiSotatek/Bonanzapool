@@ -1,2 +1,2 @@
-# Bonanzapool
+# Bonanzapool project
 
