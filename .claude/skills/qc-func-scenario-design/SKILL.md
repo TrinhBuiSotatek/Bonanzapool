@@ -6,7 +6,7 @@ description: Designs test scenarios from a finalized, reviewed UC (Use Case) req
 
 ## Purpose
 
-Transform a finalized UC requirement (ideally reviewed and approved by `qc-uc-read`) into ready-to-use **test scenarios** grouped by UC, covering Functional / Integration / UI / End-to-End / Acceptance testing for web applications and APIs.
+Transform a finalized UC requirement (ideally reviewed and approved by `qc-uc-read`) into ready-to-use **test scenarios** grouped by UC, covering Functional / Integration / API / End-to-End / Acceptance testing for backend-only services (APIs, queues, Durable Objects).
 
 Scenarios describe **what** must be verified at a meaningful level of intent (one scenario = one distinct test intent). They are the bridge between an audited requirement and atomic test cases — they are NOT atomic, executable test cases (those belong to `qc-func-tc-design`).
 
@@ -19,10 +19,10 @@ Scenarios describe **what** must be verified at a meaningful level of intent (on
 
 Resolve via `path-registry.md`:
 
-- `project-context-master` — read §1 **Product Platform Type** (informs UI/E2E scenario phrasing — Tap vs Click, Swipe vs Hover, Hardware back vs browser back, etc.).
-- `qc-site-map` (optional) — if present, read §6 Navigation (pre/post-condition + E2E paths), §7 Role/access (permission scenarios), §8 Screen ↔ Feature mapping (screens touched by this UC's feature → coverage matrix), §9 Data/API/Integration/State touchpoints (integration + state edge cases), §10 Regression anchors (risk emphasis). If missing, skip site-map-derived scenarios and warn once.
+- `project-context-master` — read §1 for project domain and actor definitions.
+- `qc-site-map` (optional) — if present, read §5 API/Queue/DO inventory, §6 Navigation, §7 Role/access, §9 Integration/State touchpoints, §10 Regression anchors. If missing, skip site-map-derived scenarios and warn once.
 - `uc-review-report` — latest version of the audited UC document for `<UC-ID>`.
-- `requirement-common-files` — for verbatim business rules, error codes/messages, and common functions referenced by the UC.
+- `requirement-common-files` — for verbatim business rules (BR-\*), error codes/messages, and FR-EXBOT-\* text referenced by the UC.
 - `qc-dashboard` — precheck only (auto-trigger `qc-dashboard-sync` if the UC row is missing).
 
 ## Output Contract
@@ -78,18 +78,18 @@ Resolve via `path-registry.md`:
 
 Read fully before writing anything.
 
-1. Read `project-context-master.md` §1 → Product Platform Type. Load the matching interaction vocabulary (web/desktop: Click/Hover/Right-click; mobile native: Tap/Long-press/Swipe/Pinch/Hardware-back).
-1a. **If `qc-site-map.md` exists**, read §6/§7/§8/§9/§10. Use §8 to enumerate screens touched by this UC's feature (rows for the coverage matrix in Step 4); §6 to derive pre-/post-condition states for E2E scenarios; §7 for role/permission scenarios; §9 for integration + data-state edge cases; §10 to weight risk-based emphasis. If missing → skip and warn once.
+1. Read `project-context-master.md` §1 → project domain and actor list (ACT-\* IDs).
+1a. **If `qc-site-map.md` exists**, read §5/§6/§7/§9/§10. Use §5 to enumerate API/Queue/DO entries touched by this UC's feature (rows for the coverage matrix in Step 4); §6 to derive pre-/post-condition states for E2E scenarios; §7 for role/permission scenarios; §9 for integration + data-state edge cases; §10 to weight risk-based emphasis. If missing → skip and warn once.
 2. Read the highest-version `uc-review-report` for `<UC-ID>`. Build a working understanding of:
    - All UC IDs in scope and their names
-   - All functions/features within each UC
+   - All operations within each UC
    - Main flow, alternative flows, exception/error flows
-   - Business rules and validations (with verbatim wording from common files)
+   - Business rules and validations (BR-\* and FR-EXBOT-\* with verbatim wording from common files)
    - Acceptance criteria (Section 8 of the audited report)
    - Actors / roles / permissions
-   - Pre/postconditions
-   - API endpoints + UI states (if applicable)
-3. Read `requirement-common-files` only for any error code / business-rule ID / common-function name cited in the UC — to inline the exact message text into scenario descriptions.
+   - Pre/postconditions (including NV gate status)
+   - API endpoints, queue behaviors, DO lease rules (Section 4/5 of the audited report)
+3. Read `requirement-common-files` only for any BR-\* / FR-EXBOT-\* code cited in the UC — to inline the exact text into scenario descriptions.
 4. **Build a coverage matrix in working memory:** `UC × Test Type × Coverage Area`. Rows = each UC in scope; columns = the 9 coverage areas listed in §"Scenario Coverage Rules". Mark each cell as:
    - `to-cover` — has enough info, will produce one or more scenarios
    - `blocked` — the audited report flagged the underlying KA as ⚠️ Missing / ⚡ Partial; surface in §Out-of-Scope Flags, do NOT fabricate
@@ -106,8 +106,8 @@ For every `to-cover` cell in the matrix, draft scenarios using the **Scenario Te
 
 - Have a unique ID `TS_[UC-ID]_NNN` (zero-padded sequence per UC).
 - Cite a Req-ID (UC ID + section reference — e.g., `UC-001-FR-003`).
-- Map to exactly one Test Type (Functional / Integration / UI / End-to-End / Acceptance).
-- Carry a Test Focus tag (Happy path / Alternative flow / Error/Exception / Boundary / Permission/Role / UI State / API contract).
+- Map to exactly one Test Type (Functional / Integration / API / End-to-End / Acceptance).
+- Carry a Test Focus tag (Happy path / Alternative flow / Error/Exception / Boundary / Permission/Role / System State / API contract / NV-blocked).
 - Be **independent in intent** — splitting later into atomic test cases is the next skill's job, but the scenario itself must already represent ONE meaningfully different test intent.
 
 Quality checks before writing the file (§"Quality Checks Before Finalizing"). When done, write the deliverable to the resolved `func-test-scenarios` path with the naming convention above.
@@ -128,44 +128,44 @@ Quality checks before writing the file (§"Quality Checks Before Finalizing"). W
    ### Coverage breakdown by Test Type
    - Functional: X scenarios
    - Integration: X scenarios
-   - UI: X scenarios
+   - API: X scenarios
    - End-to-End: X scenarios
    - Acceptance: X scenarios
 
    ### Notes
-   - Inferred UC IDs / function names: <list or "none">
-   - Blocked coverage cells (need BA): <list or "none">
+   - Inferred UC IDs / operation names: <list or "none">
+   - Blocked coverage cells (need BA / NV gate): <list or "none">
    - Out-of-scope items flagged: <list or "none">
    ```
 
-## Mindset (adapted from `qc-func-tc-design` so both skills share one playbook)
+## Mindset (adapted for backend-only testing)
 
-- **Risk-Based:** scenarios for core transactions (login, payment, data submit) get extra coverage (alternative + exception flows). Trivial UI scenarios stay lean.
-- **Shift-Left "What-If" Engine:** for every requirement, ask *"What if user does X / Y / Z?"*. Each meaningful "what-if" becomes its own scenario.
-- **Be Skeptical:** the UC is incomplete by default. If a flow can silently branch (e.g., session expiry mid-action), add an alternative-flow scenario.
-- **Be Domain-Driven:** Fintech/Crypto → emphasize security & transaction accuracy. Cooking/Social → emphasize UX & data sync. Tailor scenario emphasis to the domain declared in `project-context-master.md` §1.
+- **Risk-Based:** scenarios for core operations (bot-start, user-redeem, hedge-sync) get extra coverage (alternative + exception flows). Auxiliary cron/monitoring scenarios stay lean.
+- **Shift-Left "What-If" Engine:** for every operation, ask *"What if NV gate not passed / DO lease expired / queue retry exhausted / dual-chain mismatch?"*. Each meaningful "what-if" becomes its own scenario.
+- **Be Skeptical:** the UC is incomplete by default. If a state machine transition can silently fail (e.g., NV-1/NV-3 unverified), add a blocked-state scenario.
+- **Be Domain-Driven:** Bonanzapool EXBOT is a DeFi LP bot on Cloudflare Workers. Emphasize: idempotency, state machine correctness, SLA (5 min user_redeem), DO lease contention, queue retry safety, no raw keys in logs.
 
 ## MANDATORY Test Design Techniques
 
-Same set as `qc-func-tc-design` — applied at the **scenario level** (one technique application typically produces one scenario; the downstream TC-design skill expands that scenario into atomic cases).
+Applied at the **scenario level** (one technique application typically produces one scenario; the downstream TC-design skill expands that scenario into atomic cases).
 
 1. **Equivalence Partitioning (EP)** — one scenario per valid/invalid partition. Never bundle.
-   - Allowed file types `.png .jpg .svg` → one scenario per valid extension + one per representative invalid extension. Do NOT collapse "all valid extensions" into one scenario.
+   - Valid/invalid request field values → one scenario per partition. Do NOT collapse into one.
 
-2. **Boundary Value Analysis (BVA)** — for any numeric/length/size constraint, one scenario each at `Limit`, `Limit − 1`, `Limit + 1`.
-   - 255-char max → scenarios for 1, 255, 256 chars.
-   - 1MB max → scenarios for 1.00MB exactly, 1.01MB.
+2. **Boundary Value Analysis (BVA)** — for any numeric/size/time constraint, one scenario each at `Limit`, `Limit − 1`, `Limit + 1`.
+   - 800 weight/min DO rate limit → scenarios at 799, 800, 801.
+   - 5 min SLA → scenarios at 4 min, exactly 5 min, 5 min + 1 s.
 
-3. **Decision Table / Combinatorics** — for multi-filter, multi-condition, or multi-variable forms, write matrix scenarios.
-   - `Filter A valid × Filter B valid`, `A valid × B invalid`, `A invalid × B valid`, … Never test a filter in isolation if it logically interacts with another.
+3. **Decision Table / Combinatorics** — for multi-condition guards (preflight checks, NV gate conditions), write matrix scenarios.
+   - `Preflight A pass × B pass`, `A pass × B fail`, … Never test a guard condition in isolation if it interacts with others.
 
-4. **State Transition** — for UI/data with explicit states (Draft → Published → Archived), one scenario per valid transition + at least one invalid-transition attempt.
+4. **State Transition** — for lifecycle state machines (18-state EXBOT machine, FM-XB-07), one scenario per valid transition + at least one invalid-transition attempt + NV-gated transitions marked as blocked.
 
 5. **Use Case Testing** — derive Happy / Alternative / Exception flow scenarios directly from the UC's Main / Alt / Exception sections.
 
-6. **Error Guessing** — apply domain experience to add scenarios for defect-prone areas not explicitly listed in the UC (concurrent edit, race condition, network drop mid-submit, double-click on action button, paste with surrounding whitespace, etc.).
+6. **Error Guessing** — apply domain experience to add scenarios for defect-prone areas not explicitly listed in the UC (concurrent DO lease contention, queue message processed twice, NV gate not passed at deploy time, dual-chain wethIndex mismatch, AES-GCM key rotation mid-run, etc.).
 
-> Failure to apply these techniques limits scenarios to basic happy paths. Applying them correctly typically scales a CRUD feature to **20–50 distinct scenarios**.
+> Applying these techniques correctly typically scales a backend operation to **15–40 distinct scenarios**.
 
 ## Test Scenario Template
 
@@ -173,27 +173,28 @@ Same set as `qc-func-tc-design` — applied at the **scenario level** (one techn
 ### Scenario ID: TS_[UC-ID]_[SequenceNo]
 **Scenario Title:** [Short, clear description of what is being tested]
 **UC Reference:** [UC ID and UC Name]
-**Req-ID:** [Requirement ID(s) this scenario traces to — e.g., UC-001-FR-003]
-**Test Type:** [Functional | Integration | UI | End-to-End | Acceptance]
+**Req-ID:** [Requirement ID(s) this scenario traces to — e.g., FM-XB-07 / FR-EXBOT-003]
+**Test Type:** [Functional | Integration | API | End-to-End | Acceptance]
 **Description:** [One or two sentences describing the scenario — what condition or flow is being verified]
-**Test Focus:** [Happy path | Alternative flow | Error/Exception | Boundary | Permission/Role | UI State | API contract]
+**Test Focus:** [Happy path | Alternative flow | Error/Exception | Boundary | Permission/Role | System State | API contract | NV-blocked]
 ```
 
 ## Scenario Coverage Rules
 
 For each UC, generate scenarios that cover **all of the following** that apply:
 
-| Coverage Area                    | Source in UC                                        |
-| -------------------------------- | --------------------------------------------------- |
-| Happy path (main flow)           | Main Flow section                                   |
-| Each named alternative flow      | Alternative Flows section                           |
-| Each error/exception flow        | Exception & Error Flows section                     |
-| Each business rule / validation  | Business Rules section                              |
-| Boundary value cases             | Any field with min/max/format constraints           |
-| Role/permission variations       | Actors & User Roles section                         |
-| UI state transitions             | UI/UX Behaviour section (if applicable)             |
-| API contract verification        | API / Integration Behaviour section (if applicable) |
-| Acceptance criteria verification | Acceptance Criteria section (Section 8 of audited)  |
+| Coverage Area                         | Source in UC                                                  |
+| ------------------------------------- | ------------------------------------------------------------- |
+| Happy path (main flow)                | Main Flow section                                             |
+| Each named alternative flow           | Alternative Flows section                                     |
+| Each error/exception flow             | Exception & Error Flows section                               |
+| Each business rule / validation       | Business Rules section (BR-\* / FR-EXBOT-\* verbatim)        |
+| Boundary value cases                  | Any field/param with min/max/rate/SLA constraints             |
+| Role/permission variations            | Actors & User Roles section (ACT-\* IDs)                     |
+| System state transitions              | System State Model section (lifecycle transitions, DO/queue)  |
+| API contract verification             | API/Queue/State Interface Inventory (Section 4 of audited)    |
+| Acceptance criteria verification      | Acceptance Criteria section (Section 8 of audited)            |
+| NV-blocked scenarios                  | Any precondition gated on unresolved NV items                 |
 
 Do not skip a coverage area just because the UC is brief. If a UC only has a main flow and two business rules, still produce scenarios for each. **Quality over quantity** — each scenario must represent a meaningfully different test intent.
 
@@ -204,7 +205,7 @@ Do not skip a coverage area just because the UC is brief. If a UC only has a mai
 
 > Source: <uc-review-report v[N] path>
 > Generated: <YYYY-MM-DD>
-> Platform: <web-responsive | mobile-native | ...>
+> Platform: backend-only (PTL-04 EXBOT — no UI)
 
 ## [UC ID] — [UC Name]
 
@@ -240,13 +241,14 @@ Run this checklist before writing the output file:
 - [ ] Every UC in the audited report has at least one scenario (or an Out-of-Scope row explaining why not).
 - [ ] Every "to-cover" cell in the Phase 1 coverage matrix has at least one scenario.
 - [ ] Every scenario has a unique `TS_[UC-ID]_NNN` ID.
-- [ ] Every scenario cites a real Req-ID — no orphan scenarios.
-- [ ] Every Test Type is assigned from the closed list (Functional / Integration / UI / End-to-End / Acceptance).
-- [ ] Boundary scenarios exist for every numeric/length/size field mentioned in the UC.
+- [ ] Every scenario cites a real Req-ID (FM-\* / FR-EXBOT-\* / BR-\*) — no orphan scenarios.
+- [ ] Every Test Type is assigned from the closed list (Functional / Integration / API / End-to-End / Acceptance).
+- [ ] Boundary scenarios exist for every numeric/size/rate/SLA constraint mentioned in the UC.
 - [ ] EP partitions are split, not bundled.
-- [ ] Multi-filter / multi-condition features have at least one combinatoric scenario.
+- [ ] Multi-condition guards (preflight, NV gate) have at least one combinatoric scenario.
 - [ ] All test data uses realistic values (no abstract placeholders like "valid input").
-- [ ] Verbatim message text from `requirement-common-files` is inlined into scenarios that reference error codes / business-rule IDs (so the downstream TC skill has the exact text without re-opening common docs).
+- [ ] NV-blocked scenarios are explicitly marked with `Test Focus: NV-blocked` and NOT included in Phase A1 execution scope.
+- [ ] Verbatim BR-\* / FR-EXBOT-\* text from `requirement-common-files` is inlined into scenarios (so the downstream TC skill has the exact text without re-opening common docs).
 
 ## Out-of-Scope Handling
 
@@ -255,17 +257,17 @@ When a scenario area is identified as **performance**, **security beyond functio
 1. Do NOT generate scenarios for it.
 2. Add a row to the `## ⚠️ Out-of-Scope Flags` table at the end of the scenarios file with reason and recommended action.
 
-When a scenario area is **blocked** by a known audited gap (⚠️ Missing or ⚡ Partial KA):
+When a scenario area is **blocked** by a known audited gap (⚠️ Missing or ⚡ Partial KA) or an unresolved NV item:
 
 1. Do NOT fabricate scenarios from inferred content.
-2. Add a row to `## ⚠️ Out-of-Scope Flags` with reason `BLOCKED: <KA name> — needs BA answer` and recommended action `Resolve via qc-qna + re-audit before designing`.
+2. Add a row to `## ⚠️ Out-of-Scope Flags` with reason `BLOCKED: <KA name or NV-N> — <reason>` and recommended action `Resolve via qc-qna + re-audit before designing` or `Wait for NV gate pass`.
 
 ## Boundaries
 
 - This skill ONLY designs test scenarios. Atomic, executable test cases are `qc-func-tc-design`'s responsibility.
-- This skill ONLY covers Functional / Integration / UI / E2E / Acceptance. Performance / load / security beyond functional auth are out of scope — flag, do not generate.
+- This skill ONLY covers Functional / Integration / API / E2E / Acceptance. Performance / load / security beyond functional auth are out of scope — flag, do not generate.
 - Do NOT edit input files (`uc-review-report`, common files, project-context-master).
 - Every scenario MUST trace to a UC via `TS_[UC-ID]_NNN` — no orphan scenarios.
 - qc-dashboard precheck is MANDATORY before Phase 1 begins (so the dashboard always reflects on-disk reality).
-- Output language follows source-input language per `global-rules.md` (Vietnamese audited UC → Vietnamese scenarios; English audited UC → English scenarios).
+- Output language follows source-input language per `global-rules.md`.
 - This skill produces ONE file per UC (or per UC group when the audited report bundles them). It does NOT shard scenarios across multiple files.

@@ -35,52 +35,45 @@ The agent MUST detect the project's working language from the source UC document
 
 `A=ID_TC | B=Test Title/Summary of test cases | C=Pre-conditions | D=Step | E=Expected Result | F=Priority`
 
-GUI and Functional test cases are written into the **same sheet** (the `Test cases` sheet), starting from row 2, separated by section header rows. The agent MUST insert these header rows in addition to the test case rows.
+Functional test cases are written into the **`Test cases` sheet**, starting from row 2, separated by section header rows. The agent MUST insert these header rows in addition to the test case rows.
 
-**Within GUI section, sort in this order (4 buckets):**
-1. **Screen Initialization** — initial render, default state, empty / populated state of every object on the screen.
-2. **Item Interactions** — every UI object on the screen: textboxes, dropdowns, buttons, icons, labels — clickability, default state, list values, enabled / disabled, placeholder.
-3. **Common UI cases** — browser / keyboard interactions: F5 / Refresh, Back / Next browser, Tab / Shift+Tab, Enter, Backspace, zoom in / zoom out, message consistency.
-4. **UI elements verify** — visual fidelity vs design: position, color (HEX), spacing, font size, responsive across resolutions.
+**Within FUNC section, sort by logical flow:** Happy path first → API contract / validation → state transitions → exception / error cases.
 
-**Within FUNC section, sort by logical flow:** Happy path first → validation → error / exception cases.
-
-**Hierarchy (use Roman numerals I, II, III… — one per screen / sub-UC). Pick the row that matches the output language:**
+**Hierarchy (use Roman numerals I, II, III… — one per operation / sub-UC). Pick the row that matches the output language:**
 
 | Header level | VI pattern | EN pattern | Where it appears |
 |---|---|---|---|
-| Screen | `<RomanNumeral>. Màn hình: <tên màn hình>` | `<RomanNumeral>. Screen: <screen name>` | One row per screen / sub-UC |
-| GUI section | `<RomanNumeral>.1. Kiểm tra UI/UX của màn hình: <tên màn hình>` | `<RomanNumeral>.1. UI/UX verification — Screen: <screen name>` | Immediately below the screen header |
-| FUNC section | `<RomanNumeral>.2. Kiểm tra FUNC của màn hình: <tên màn hình>` | `<RomanNumeral>.2. Functional verification — Screen: <screen name>` | After all GUI test cases for that screen |
+| Operation | `<RomanNumeral>. Nghiệp vụ: <tên nghiệp vụ>` | `<RomanNumeral>. Operation: <operation name>` | One row per operation / sub-UC |
+| FUNC section | `<RomanNumeral>.1. Kiểm tra FUNC của nghiệp vụ: <tên nghiệp vụ>` | `<RomanNumeral>.1. Functional verification — Operation: <operation name>` | Immediately below the operation header |
 
 **Header row format:**
 - Header text goes in column **B** (`Test Title/Summary of test cases`).
 - All other columns on the header row stay empty (no TC ID, no Pre-condition, no Step, no Expected Result, no Priority).
 - Header rows are NOT counted as test cases — they do not consume TC ID numbers and they are not subject to Rule 2 (`TC_XXX`).
-- The screen name in the header MUST match the screen name used in Section 4 of the audited UC file. Do NOT paraphrase or translate.
+- The operation name in the header MUST match the operation name used in Section 6 of the audited UC file. Do NOT paraphrase or translate.
 
-**Example 1 — Single-screen UC:**
-
-| VI | EN |
-|---|---|
-| <pre>I. Màn hình: Danh sách báo cáo<br>I.1. Kiểm tra UI/UX của màn hình: Danh sách báo cáo<br>TC_001 \| GUI  \| Kiểm tra màn hình khởi tạo            \| …<br>TC_002 \| GUI  \| Kiểm tra trạng thái mặc định bộ lọc    \| …<br>…<br>I.2. Kiểm tra FUNC của màn hình: Danh sách báo cáo<br>TC_012 \| FUNC \| Kiểm tra hiển thị các kỳ báo cáo      \| …<br>TC_013 \| FUNC \| Kiểm tra trạng thái nộp báo cáo       \| …<br>…</pre> | <pre>I. Screen: Report List<br>I.1. UI/UX verification — Screen: Report List<br>TC_001 \| GUI  \| Verify screen initialization              \| …<br>TC_002 \| GUI  \| Verify default state of filter bar       \| …<br>…<br>I.2. Functional verification — Screen: Report List<br>TC_012 \| FUNC \| Verify display of reporting periods       \| …<br>TC_013 \| FUNC \| Verify report submission state            \| …<br>…</pre> |
-
-**Example 2 — Multi-screen UC (3 screens):**
+**Example 1 — Single-operation UC:**
 
 | VI | EN |
 |---|---|
-| <pre>I. Màn hình: Danh sách báo cáo<br>  I.1. Kiểm tra UI/UX của màn hình: Danh sách báo cáo<br>  …GUI test cases for screen I<br>  I.2. Kiểm tra FUNC của màn hình: Danh sách báo cáo<br>  …FUNC test cases for screen I<br>II. Màn hình: Tạo mới báo cáo<br>  II.1. Kiểm tra UI/UX của màn hình: Tạo mới báo cáo<br>  …GUI test cases for screen II<br>  II.2. Kiểm tra FUNC của màn hình: Tạo mới báo cáo<br>  …FUNC test cases for screen II<br>III. Màn hình: Chi tiết báo cáo<br>  III.1. Kiểm tra UI/UX của màn hình: Chi tiết báo cáo<br>  …GUI test cases for screen III<br>  III.2. Kiểm tra FUNC của màn hình: Chi tiết báo cáo<br>  …FUNC test cases for screen III</pre> | <pre>I. Screen: Report List<br>  I.1. UI/UX verification — Screen: Report List<br>  …GUI test cases for screen I<br>  I.2. Functional verification — Screen: Report List<br>  …FUNC test cases for screen I<br>II. Screen: Create Report<br>  II.1. UI/UX verification — Screen: Create Report<br>  …GUI test cases for screen II<br>  II.2. Functional verification — Screen: Create Report<br>  …FUNC test cases for screen II<br>III. Screen: Report Detail<br>  III.1. UI/UX verification — Screen: Report Detail<br>  …GUI test cases for screen III<br>  III.2. Functional verification — Screen: Report Detail<br>  …FUNC test cases for screen III</pre> |
+| <pre>I. Nghiệp vụ: Bot Start<br>I.1. Kiểm tra FUNC của nghiệp vụ: Bot Start<br>TC_001 \| FUNC \| Kiểm tra POST /api/exbot/start thành công   \| …<br>TC_002 \| FUNC \| Kiểm tra preflight thất bại → 403           \| …<br>…</pre> | <pre>I. Operation: Bot Start<br>I.1. Functional verification — Operation: Bot Start<br>TC_001 \| FUNC \| Verify POST /api/exbot/start success path  \| …<br>TC_002 \| FUNC \| Verify preflight fail → 403                  \| …<br>…</pre> |
+
+**Example 2 — Multi-operation UC (3 operations):**
+
+| VI | EN |
+|---|---|
+| <pre>I. Nghiệp vụ: Bot Start<br>  I.1. Kiểm tra FUNC của nghiệp vụ: Bot Start<br>  …FUNC TCs for operation I<br>II. Nghiệp vụ: Hedge Sync<br>  II.1. Kiểm tra FUNC của nghiệp vụ: Hedge Sync<br>  …FUNC TCs for operation II<br>III. Nghiệp vụ: User Redeem<br>  III.1. Kiểm tra FUNC của nghiệp vụ: User Redeem<br>  …FUNC TCs for operation III</pre> | <pre>I. Operation: Bot Start<br>  I.1. Functional verification — Operation: Bot Start<br>  …FUNC TCs for operation I<br>II. Operation: Hedge Sync<br>  II.1. Functional verification — Operation: Hedge Sync<br>  …FUNC TCs for operation II<br>III. Operation: User Redeem<br>  III.1. Functional verification — Operation: User Redeem<br>  …FUNC TCs for operation III</pre> |
 
 ### Test Case Writing rules:
 
-**Rule 1 — UI Notation Standard.** The Agent must utilize specific notations to differentiate on-screen components.
+**Rule 1 — Notation Standard.** The Agent must utilize specific notations to differentiate values and identifiers.
 
-`"Double Quotes"`: Use for interactive components such as Buttons, Menus, Tabs, Icons; or Labels, Placeholders, input values, or selected values from a list.
+`"Double Quotes"`: Use for field names, parameter names, error codes/messages, queue/DO identifiers, or specific values being tested.
 
 | VI example | EN example |
 |---|---|
-| Nhập email vào "Email" textbox | Enter email into the "Email" textbox |
-| "Platform" dropdown, "Select platform" placeholder | "Platform" dropdown, "Select platform" placeholder |
+| Gửi request với "user_id" thiếu | Send request with "user_id" missing |
+| Queue "QUE-XB-08" được enqueue thành công | Queue "QUE-XB-08" is enqueued successfully |
 
 **Rule 2 — Content Logic.**
 
@@ -94,46 +87,36 @@ GUI and Functional test cases are written into the **same sheet** (the `Test cas
 |---|---|
 | `Kiểm tra`, `Xác nhận` | `Verify`, `Confirm` |
 
-GUI Test Title examples:
+Functional Test Title — start with the verb plus the business action or API operation being verified.
 
-| VI | EN |
+| VI example | EN example |
 |---|---|
-| Kiểm tra màn hình khởi tạo | Verify screen initialization |
-| Kiểm tra UI của màn hình | Verify UI of the screen |
-| Kiểm tra khi zoom in/zoom out màn hình | Verify zoom in / zoom out behavior |
-| Kiểm tra dữ liệu với độ dài tối đa (maxlength) | Verify data at maximum length (maxlength) |
-| Kiểm tra nhấn phím F5 | Verify F5 key press |
-| Kiểm tra nút Back của trình duyệt | Verify browser Back button |
-| Kiểm tra nút Next của trình duyệt | Verify browser Next button |
-| Kiểm tra nút Refresh của trình duyệt | Verify browser Refresh button |
-| Kiểm tra thao tác Tab và Shift + Tab | Verify Tab and Shift+Tab navigation |
-| Kiểm tra phím Backspace | Verify Backspace key |
-| Kiểm tra phím Enter | Verify Enter key |
-| Kiểm tra tính nhất quán của message | Verify message consistency |
-
-Functional Test Title — start with the verb plus the business action being verified (e.g., `Kiểm tra <flow>` / `Verify <flow>`).
+| Kiểm tra POST /api/exbot/start khi preflight thành công | Verify POST /api/exbot/start when preflight passes |
+| Kiểm tra trạng thái IDLE → STARTING khi nhận trigger hợp lệ | Verify IDLE → STARTING state transition on valid trigger |
+| Kiểm tra lỗi 403 khi gọi endpoint không có quyền | Verify 403 error when calling endpoint without permission |
+| Kiểm tra idempotency của queue consumer khi nhận message trùng | Verify queue consumer idempotency on duplicate message |
 
 **Pre-conditions:** Must begin with an action describing what must be performed before executing the test case.
 
 | VI example | EN example |
 |---|---|
-| Đăng nhập vào hệ thống Admin tại [URL]. | Log in to the Admin system at [URL]. |
-| Điều hướng đến màn hình Danh sách Sản phẩm. | Navigate to the Product List screen. |
-| Nhấp vào nút "Tạo" và đợi cửa sổ bật lên "Tạo Sản phẩm" mở hoàn toàn. | Click the "Create" button and wait for the "Create Product" popup to fully open. |
+| Bot đang ở trạng thái IDLE trong D1. | Bot is in IDLE state in D1. |
+| UserLockDO không có lease đang hoạt động. | UserLockDO has no active lease. |
+| Gọi POST /api/exbot/start với token hợp lệ của ACT-02. | Call POST /api/exbot/start with a valid ACT-02 token. |
 
 **Test Steps (Action-Oriented):**
-- Each step must be a single, discrete action on the UI.
+- Each step must be a single, discrete action or call.
 - Use active imperative verbs.
 
 | VI — verbs | EN — verbs |
 |---|---|
-| `Truy cập`, `Nhấp vào`, `Chọn`, `Nhập`, `Di chuột qua`, `Chú ý vào` | `Access`, `Click on`, `Select`, `Enter`, `Hover over`, `Observe` |
+| `Gửi`, `Gọi`, `Kiểm tra`, `Chú ý vào`, `Truy vấn`, `Enqueue` | `Send`, `Call`, `Verify`, `Observe`, `Query`, `Enqueue` |
 
 | VI example | EN example |
 |---|---|
-| <pre>1. Tại màn hình Đăng nhập, click vào textbox "Tên đăng nhập"<br>    1.1 Nhập kí tự chữ (không phân biệt chữ hoa, chữ thường) (Eg:Thao)<br>    1.2 Nhập kí tự số (Eg:123456)<br>    1.3 Nhập kí tự đặc biệt (Eg:!@#$%^&*())<br>    1.4 Nhập kí tự chữ và số (Eg:Thao123456)<br>2. Nhấp vào "Đăng nhập" button.<br>3. Kiểm tra trường "Tên đăng nhập"</pre> | <pre>1. On the Login screen, click on the "Username" textbox<br>    1.1 Enter alphabetic characters (case-insensitive) (Eg: Thao)<br>    1.2 Enter numeric characters (Eg: 123456)<br>    1.3 Enter special characters (Eg: !@#$%^&*())<br>    1.4 Enter alphanumeric characters (Eg: Thao123456)<br>2. Click on the "Login" button.<br>3. Verify the "Username" field</pre> |
+| <pre>1. Gọi POST /api/exbot/start với body:<br>    { "user_id": "uuid-valid" }<br>2. Kiểm tra response trả về.<br>3. Truy vấn D1: SELECT status FROM bots WHERE user_id = ?</pre> | <pre>1. Call POST /api/exbot/start with body:<br>    { "user_id": "uuid-valid" }<br>2. Verify the response returned.<br>3. Query D1: SELECT status FROM bots WHERE user_id = ?</pre> |
 
-**Expected Result (UI Verification):**
+**Expected Result:**
 - MUST begin with a step number (e.g., `1. <expected result>`).
 - Do NOT write generic statements.
 
@@ -141,19 +124,13 @@ Functional Test Title — start with the verb plus the business action being ver
 |---|---|
 | "Hệ thống hoạt động bình thường" | "System works as expected" |
 
-- Must explicitly describe the changed state of the UI: messages displayed (with full text), popups/screens opened or closed, field states (enabled / disabled / placeholder), display rules (sort order, color), system reactions (allow / block input).
-
-GUI Expected Result example:
-
-| VI | EN |
-|---|---|
-| <pre>2. Hiển thị màn hình "Danh sách báo cáo" giống design (Refer Item I. Danh sách Báo cáo tại sheet WF/Design)<br>- Thanh tìm kiếm: mặc định trống, cho phép nhập dữ liệu<br>- Dropdown [Năm]: mặc định trống, cho phép chọn dữ liệu<br>- Dropdown [Trạng thái kỳ]: mặc định trống, cho phép chọn dữ liệu<br>- Dropdown [Trạng thái hồ sơ]: mặc định trống, cho phép chọn dữ liệu<br>- Danh sách các kỳ báo cáo, gồm các cột:<br> + Năm báo cáo<br> + Trạng thái kỳ báo cáo<br>- Trong từng kỳ báo cáo, gồm các cột<br> + Mã bộ hồ sơ<br> + Số báo cáo đang xử lý<br> + Trạng thái hồ sơ<br> + Ngày cập nhật/nộp<br> + Hành động<br>- Phân trang theo kỳ báo cáo:<br> + Default: 10 kỳ báo cáo / trang<br> + Dropdown chọn số kỳ hiển thị: mặc định là 10</pre> | <pre>2. The "Report List" screen is displayed per design (Refer Item I. Report List in sheet WF/Design)<br>- Search bar: empty by default, allows input<br>- Dropdown [Year]: empty by default, allows selection<br>- Dropdown [Period Status]: empty by default, allows selection<br>- Dropdown [Submission Status]: empty by default, allows selection<br>- Reporting period list with columns:<br> + Reporting year<br> + Reporting period status<br>- Within each reporting period, columns:<br> + Submission code<br> + Number of reports in progress<br> + Submission status<br> + Update/submission date<br> + Action<br>- Pagination by reporting period:<br> + Default: 10 reporting periods / page<br> + Dropdown to select page size: default is 10</pre> |
+- Must explicitly describe the changed state: HTTP status code + response body, D1 state change, queue enqueue confirmation, DO lease status, error code + message exact text.
 
 Functional Expected Result example:
 
 | VI | EN |
 |---|---|
-| 3. Hiển thị lỗi dưới chân trường dữ liệu: "Tên đăng nhập". Lỗi sẽ biến mất khi user nhập lại dữ liệu vào trường dữ liệu. | 3. An error is displayed below the "Username" field. The error disappears when the user re-enters data into the field. |
+| <pre>2. Response: 200 OK<br>   { "status": "STARTING", "bot_id": "uuid" }<br>3. D1: bots.status = "STARTING", started_at = now<br>   QUE-XB-01 enqueued với bot_id + epoch_slot</pre> | <pre>2. Response: 200 OK<br>   { "status": "STARTING", "bot_id": "uuid" }<br>3. D1: bots.status = "STARTING", started_at = now<br>   QUE-XB-01 enqueued with bot_id + epoch_slot</pre> |
 
 ### Test cases example reference (pick by output language):
 

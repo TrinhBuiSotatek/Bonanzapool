@@ -76,87 +76,105 @@
 
 ---
 
-## 4. UI Object Inventory & Mapping
+## 4. API / Queue / State Interface Inventory
 
-> **Instructions:** Extract and catalog **every atomic UI component** from the Design Mockup. **One component = one row.** Do NOT collapse multiple inputs/buttons/columns into a single row.
+> **Instructions:** Extract and catalog every endpoint, queue consumer, and Durable Object. **One entry = one row.** Do NOT collapse multiple fields into a single row (e.g., do NOT write "5 request fields" — list each individually).
 >
-> **Required columns per row:** Section grouping · exact Label (verbatim) · Component Type · Required (Yes/No) · Default value · Placeholder · Enum values (full list) · Description / constraints / source mockup file.
+> **Required columns per row:** Entry ID (API-XB-\* / QUE-XB-\* / DO-XB-\* or method+path) · trigger condition · all request fields (name/type/required/constraint) · success response shape · error codes + messages.
 >
-> **Coverage rule:** For each design image, the number of rows mapped to it must be ≥ the count of visible atomic elements in that image. If you find yourself writing "(N fields)" or "(4 values)" you are violating the granularity rule — expand them.
+> **Coverage rule:** The number of rows must equal the count of endpoints + queues + DOs declared in the UC spec §2. If a schema is absent, mark the row `[BLOCKED: no schema provided]`.
 
-| # | Screen / Section | Label (verbatim) | Type | Required | Default | Placeholder | Enum values | Description / Constraint | Source |
-|---|------------------|------------------|------|----------|---------|-------------|-------------|--------------------------|--------|
-| *(e.g., 1)* | *(e.g., Form Tạo mới > Phần I > Nhà đầu tư #1)* | *(e.g., "Email người làm báo cáo")* | *(e.g., Text input)* | *(Yes)* | *(—)* | *(e.g., "example@email.com")* | *(N/A)* | *(e.g., Auto-filled from API; editable; mandatory before submit)* | *(e.g., Tạo mới báo cáo.png)* |
-| *(e.g., 2)* | *(e.g., Form Tạo mới > Phần III)* | *(e.g., "Tiến độ thực hiện dự án")* | *(Radio group)* | *(Yes)* | *(Đúng tiến độ)* | *(—)* | *("Đúng tiến độ" / "Chậm tiến độ" / "Gặp khó khăn" / "Không có khả năng triển khai")* | *(Selecting any value ≠ default reveals the "Lý do" textarea)* | *(Tạo mới báo cáo.png)* |
-| *(e.g., 3)* | *(e.g., Danh sách > Bảng BC > Cột Hành động)* | *(e.g., Icon "Xóa")* | *(Action icon)* | *(N/A)* | *(—)* | *(—)* | *(N/A)* | *(Visible only when row status = "Lưu nháp"; opens delete confirm popup)* | *(Xem danh sách báo cáo.png)* |
+**REST Endpoints:**
 
-> Add one row per: input field · dropdown · radio option group · checkbox · date picker · button · action icon · table column (preserving multi-level headers) · table row label · tab · tooltip · badge · status chip · page title · subtitle · hint banner · empty-state message · loading spinner · toast · popup.
+| # | Entry ID / Path | Trigger Condition | Request Fields (name · type · required · constraint) | Success Response | Error Codes + Messages |
+|---|---|---|---|---|---|
+| *(e.g., 1)* | *(e.g., POST /api/exbot/start)* | *(e.g., zen calls after preflight pass)* | *(e.g., user_id: string, required, must be active LP)* | *(e.g., { status: "STARTING", bot_id: uuid })* | *(e.g., 400 ALREADY_RUNNING / 403 PREFLIGHT_FAILED)* |
+
+**Queue Consumers:**
+
+| # | Queue ID | Trigger Event | Handler Summary | DLQ Policy | Retry Count | Idempotency Key | Priority / SLA |
+|---|---|---|---|---|---|---|---|
+| *(e.g., 1)* | *(e.g., QUE-XB-01 bot-scan)* | *(e.g., enqueued by light-check cron)* | *(e.g., scans all bots, enqueues hedge-sync per delta)* | *(e.g., DLQ after 3 retries)* | *(e.g., 3)* | *(e.g., bot_id + epoch_slot)* | *(e.g., Normal)* |
+
+**Durable Objects:**
+
+| # | DO ID | State Owned | Lease Duration | Expiry Action | Contention Policy |
+|---|---|---|---|---|---|
+| *(e.g., 1)* | *(e.g., DO-XB-02 UserLockDO)* | *(e.g., per-user operation lock)* | *(e.g., 90 seconds)* | *(e.g., release lock, log timeout)* | *(e.g., second caller receives 409 LOCK_HELD)* |
 
 ---
 
-## 5. Object Attributes & Behavior Definition
+## 5. System State Model
 
-> **Instructions:** Determine the state and response of each UI object based on specific system conditions.
+> **Instructions:** Define the state and behavior of each entry from Section 4. Every Section 4 entry must have ≥ 1 row here.
 
-| Object / Component | System States | Interaction Matrix | Object Behavior (Data/State Change Context) |
-|--------------------|---------------|--------------------|---------------------------------------------|
-| *(e.g., Save Button)* | *(e.g., Disabled by default until all mandatory fields are filled.)* | *(e.g., Primary input (tap on mobile / click on web/desktop): triggers validation & submit. Secondary: tooltip on hover (web/desktop) or long-press (mobile).)* | *(e.g., Becomes disabled and shows a spinner while the API request is processing.)* |
-| *(e.g., Type Dropdown)* | *(e.g., Enabled. Default value: 'Standard'.)* | *(e.g., Primary input: expands list.)* | *(e.g., When changed to 'Custom', the 'Additional Details' text area becomes visible.)* |
-*(Add rows as needed)*
+**Lifecycle State Transitions** *(for UCs involving bot lifecycle — FM-XB-07)*:
+
+| From State | Trigger Event | Guard Condition | To State | On Guard Fail |
+|---|---|---|---|---|
+| *(e.g., IDLE)* | *(e.g., POST /start received)* | *(e.g., 5 preflight checks pass; NV-1/NV-3 not required for Phase A1)* | *(e.g., STARTING)* | *(e.g., Return 403 PREFLIGHT_FAILED, state remains IDLE)* |
+
+**DO Behavior** *(one row per DO from Section 4)*:
+
+| DO ID | State Owned | Lease Duration | On Lease Expiry | On Contention |
+|---|---|---|---|---|
+| *(e.g., DO-XB-02)* | *(e.g., user operation lock)* | *(e.g., 90s)* | *(e.g., release lock, emit timeout metric)* | *(e.g., 409 LOCK_HELD returned to second caller)* |
+
+**Queue Behavior** *(one row per queue from Section 4)*:
+
+| Queue ID | DLQ After N Retries | Backoff | Idempotency Key | Priority vs Others | SLA |
+|---|---|---|---|---|---|
+| *(e.g., QUE-XB-08 user-redeem)* | *(e.g., 3)* | *(e.g., exponential 1s/2s/4s)* | *(e.g., redeem_request_id)* | *(e.g., Highest — runs before all other queues)* | *(e.g., 5 min LP-first)* |
 
 ---
 
 ## 6. Functional Logic & Workflow Decomposition
 
-> **Instructions:** Analyze in detail the business processes of each function available on the feature screen. Duplicate the block below for each major sub-function (e.g., 6.1 View List, 6.2 Create Record).
+> **Instructions:** Analyze in detail the business processes of each operation in this feature. Duplicate the block below for each major operation (e.g., 6.1 Bot Start, 6.2 Hedge Sync).
 
-### 6.1 Function Name: *(e.g., Create New Record)*
+### 6.1 Operation Name: *(e.g., Bot Start)*
 
 **A. Workflows**
 | Step | Actor | Action | System Response (Happy Path) | Alternative Flows | Exception & Error Flows |
 |------|-------|--------|------------------------------|-------------------|-------------------------|
-| 1 | *Admin* | *Clicks 'Add' button* | *System opens the creation form.* | *N/A* | *N/A* |
-| 2 | *Admin* | *Enters data & clicks 'Save'* | *Data is saved. Popup shows "Success". List refreshes.* | *User clicks 'Cancel': Form closes without saving.* | *Mandatory field empty: Save is blocked, inline error "Field required" shown.* |
+| 1 | *OPERATOR* | *POST /api/exbot/start* | *5 preflight checks run; state → STARTING; bot-scan enqueued to QUE-XB-01* | *N/A* | *Preflight fail: 403 PREFLIGHT_FAILED; state stays IDLE* |
 
 **B. Business Rules & Validations**
 
-> If the source UC references an error code (e.g., `MSG_E001`) or a common business rule ID (e.g., `BR_xxx`), do NOT keep the bare code here — resolve it to the **exact original text** from `docs/BA/SRS-report/CMR/Bảng thông báo lỗi.docx` (for messages) or `docs/BA/SRS-report/CMR/Quy tắc nghiệp vụ chung.docx` (for rules), and write the full text in the cell. Keep the original code in parentheses for traceability.
+> Resolve every BR-\* and FR-EXBOT-\* reference to its exact verbatim text from `common-rules.md` / `srs/spec.md`. Keep the code in parentheses for traceability.
 
-| Field / Object | Required | Format / Constraint | Min / Max | Error Message *(exact text)* |
-|----------------|----------|---------------------|-----------|-------------------------------|
-| *(e.g., Name)* | *Yes* | *Alphanumeric only* | *1 / 50* | *"Name is required" / "Max 50 chars"* |
-| *(e.g., Mã báo cáo)* | *Yes* | *Alphanumeric, unique* | *— / 20* | *"Mã báo cáo đã tồn tại trong hệ thống" (MSG_E001)* |
+| Field / Param | Required | Format / Constraint | Min / Max | Error Code + Message *(exact text)* |
+|----------------|----------|---------------------|-----------|--------------------------------------|
+| *(e.g., user_id)* | *Yes* | *UUID v4* | *—* | *400 INVALID_USER / "user_id must be a valid UUID"* |
 
-**C. UI/UX Feedback**
+**C. System Feedback**
 
-> Same rule as 6.1.B: if the UC references a code, expand to full text from the common file and keep the code in parentheses.
-
-* **Loading States:** *(e.g., Spinner on 'Save' button during submission.)*
-* **Toast Messages:** *(e.g., Success: "Record created successfully". Error: "Failed to connect to server".)*
-* **Error Codes:** *(e.g., `MSG_E020` → "Hệ thống đang bận, vui lòng thử lại sau" — exact text from `Bảng thông báo lỗi.docx`.)*
+* **Queue enqueue confirmations:** *(e.g., On bot-start success: QUE-XB-01 bot-scan enqueued with bot_id + epoch_slot)*
+* **D1 state changes:** *(e.g., bots table: status → STARTING, started_at = now)*
+* **Error codes returned:** *(e.g., 403 PREFLIGHT_FAILED — "One or more preflight checks failed: [list]")*
 
 ---
 
 ## 7. Functional Integration Analysis
 
-> **Instructions:** Analyze and evaluate the linkages and influences between the cataloged functions, acting as an integration check between functions.
+> **Instructions:** Analyze linkages and influences between operations — queue fan-out, DO lease coordination, HL adapter calls, dual-chain interactions.
 
-| Trigger Function / Action | Impact Analysis (Cross-function influence) | Data Consistency Verification |
-|---------------------------|--------------------------------------------|-------------------------------|
-| *(e.g., Delete a Parent Category)* | *(e.g., Indirectly affects the 'View List' function: all child items associated with this category must be hidden or reassigned.)* | *(e.g., Verify that the dropdown list in the 'Add Record' form immediately reflects the deletion of the category.)* |
-| *(e.g., Change Item Status to Inactive)* | *(e.g., Item can no longer be selected in the reporting module.)* | *(e.g., Verify the dashboard counters update automatically to exclude the inactive item.)* |
+| Trigger Operation / Event | Impact Analysis (cross-operation influence) | Data / State Consistency Verification |
+|---------------------------|---------------------------------------------|----------------------------------------|
+| *(e.g., Bot Start → bot-scan enqueued)* | *(e.g., Triggers light-check scan cycle; UserLockDO lease acquired for 90s preventing concurrent start)* | *(e.g., Verify bots.status = STARTING in D1 before QUE-XB-01 consumer processes the message)* |
+| *(e.g., User Redeem → QUE-XB-08 enqueued)* | *(e.g., Highest-priority queue; must complete within 5 min SLA; UserLockDO prevents concurrent redeem)* | *(e.g., Verify close_operations ledger entry created atomically with redeem request)* |
 *(Add rows as needed)*
 
 ---
 
 ## 8. Acceptance Criteria
 
-> **Instructions:** Acceptance criteria must be written in a verifiable pass/fail format, using the Given / When / Then structure.
+> **Instructions:** Acceptance criteria must be written in a verifiable pass/fail format, using the Given / When / Then structure. Cover each operation, state transition, error path, and SLA requirement.
 
-| AC # | Scenario | Given *(precondition)* | When *(user action)* | Then *(expected result)* |
-|------|----------|------------------------|----------------------|--------------------------|
-| AC-01 | *(e.g., Create - Happy Path)* | *(e.g., Admin is on the Add form with valid data.)* | *(e.g., Admin clicks Save.)* | *(e.g., "Success" message appears. Record is added to the list.)* |
-*(Add ACs for every flow and business rule...)*
+| AC # | Scenario | Given *(precondition)* | When *(trigger)* | Then *(expected result)* |
+|------|----------|------------------------|------------------|--------------------------|
+| AC-01 | *(e.g., Bot Start — Happy Path)* | *(e.g., User has active LP position; all 5 preflight checks pass)* | *(e.g., POST /api/exbot/start called by OPERATOR)* | *(e.g., Response 200 { status: "STARTING" }; bots.status = STARTING in D1; QUE-XB-01 enqueued within 1s)* |
+*(Add ACs for every operation, state transition, error path, and SLA...)*
 
 ---
 
@@ -164,10 +182,10 @@
 
 | Category | Requirement | Source / Reference |
 |----------|-------------|-------------------|
-| *(Performance)* | *(e.g., Search results must load within 2 seconds.)* | *(e.g., SLA doc)* |
-| *(Security)* | *(e.g., Authentication tokens stored in platform-appropriate secure storage; sensitive data masked in transit and at rest.)* | *(e.g., Security policy)* |
-| *(Compatibility)* | *(Platform-dependent — fill per `project-context-master` §1 Product Platform Type. Web: browser matrix (e.g., Chrome/Edge/Safari latest-2). Mobile native: min OS versions (iOS X+, Android Y+) + device matrix. Desktop native: OS targets (Windows 10/11, macOS last-3, Linux distro).)* | |
-| *(Accessibility)* | *(e.g., WCAG AA color contrast; screen-reader labels — VoiceOver/TalkBack on mobile, NVDA/JAWS on Windows desktop, semantic HTML on web.)* | |
+| *(Performance)* | *(e.g., user_redeem SLA: LP-first close must complete within 5 min)* | *(e.g., SRS spec.md §user-redeem)* |
+| *(Performance)* | *(e.g., HLRateLimitDO: max 800 weight/min sliding window)* | *(e.g., DO-XB-01 spec)* |
+| *(Security)* | *(e.g., No raw agent key stored in D1 or logs; AES-GCM envelope encryption required)* | *(e.g., SPEC_v5.2.6_EN.md §21.5)* |
+| *(Reliability)* | *(e.g., All queue operations must be idempotent; DLQ policy must be stated)* | *(e.g., SRS spec.md §queue-topology)* |
 *(Add categories as needed)*
 
 ---
