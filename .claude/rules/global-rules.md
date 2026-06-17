@@ -5,9 +5,7 @@
 
 ## Language & Communication
 - Communication language: Vietnamese is the default language for all exchanges, reports, and explanations.
-- All outputs of any "skill" MUST be determined by the source input language according to the following logic:
-    - IF Input Language is Vietnamese THEN Output Language is Vietnamese.
-    - IF Input Language is Any other language THEN Output Language is English.
+- All outputs of any "skill" MUST be written in English.
 - All skill.md files MUST be written in English.
 - All labels/messages MUST be kept in their original language (e.g., Korean, Japanese, Chinese, etc.) and annotated with the English translation in parentheses, except when they are written in Vietnamese.
 - All requirement documents, input materials, and output deliverables are in Vietnamese. MUST read and understand them accurately, write in grammatically correct Vietnamese, and preserve the clarity, naturalness, and integrity of the Vietnamese language.

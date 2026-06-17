@@ -1,41 +1,10 @@
-# Phase 7 - Gap and Readiness
+# Legacy alias — phase-7-gap-readiness.md
 
-## Goal
+This file is retained only for backward compatibility with older references.
 
-Classify missing information, assumptions, conflicts, and readiness.
+Do not follow this phase in new runs. The active workflow is:
 
-## Gap types
 
-- `Missing`: expected screen/navigation/access/mapping source not found.
-- `Conflict`: sources disagree.
-- `Assumption`: inferred item needs confirmation.
-- `Unclear`: source exists but is ambiguous.
+`workflows/workflow-1-build-site-map.md`
 
-## Readiness areas
-
-Assess:
-
-- screen inventory;
-- navigation flow;
-- role/access by screen;
-- screen-feature mapping;
-- data/API/integration/state touchpoints;
-- regression/impact usage;
-- dashboard feature-level handoff.
-
-Status values:
-
-- `Ready`
-- `Partial`
-- `Blocked`
-- `N/A` when applicable.
-
-## Output checkpoint
-
-Write:
-
-```text
-process-logging/qc-site-map/07_gap_readiness.md
-```
-
-Include Section 11 and Section 12 drafts for `qc-site-map.md`.
+Gap and readiness assessment now lives in Workflow 1.

@@ -1,0 +1,5 @@
+interface:
+  display_name: QC Site Map
+  short_description: Build QC site maps and data maps for screen, data, and dashboard sync workflows.
+  icon: 🗺️
+  color: blue

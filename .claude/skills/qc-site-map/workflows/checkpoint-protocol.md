@@ -2,59 +2,72 @@
 
 Use checkpoints to make long `qc-site-map` runs resumable.
 
-All checkpoints live under:
+Canonical checkpoint folder:
 
 ```text
-process-logging/qc-site-map/
+.claude/skills/qc-site-map/process-logging/
 ```
 
+If an old run used `process-logging/qc-site-map/`, read it for resume compatibility, then migrate or continue under the canonical folder.
+
 This folder is internal scratch space. It is not a user deliverable.
+
+---
 
 ## Required files
 
 ```text
-process-logging/qc-site-map/progress.md
-process-logging/qc-site-map/01_input_audit.md
-process-logging/qc-site-map/02_context_baseline.md
-process-logging/qc-site-map/03_source_inventory.md
-process-logging/qc-site-map/04_screen_inventory.md
-process-logging/qc-site-map/05_navigation_map.md
-process-logging/qc-site-map/06_mapping_access.md
-process-logging/qc-site-map/07_gap_readiness.md
-process-logging/qc-site-map/08_site_map_rendered.md
-process-logging/qc-site-map/09_dashboard_handoff.md
-process-logging/qc-site-map/10_handover.md
+.claude/skills/qc-site-map/process-logging/progress.md
+.claude/skills/qc-site-map/process-logging/00_run_control.md
+.claude/skills/qc-site-map/process-logging/01_site_map_model.md
+.claude/skills/qc-site-map/process-logging/02_data_map_model.md
+.claude/skills/qc-site-map/process-logging/03_commit_handoff_cleanup.md
 ```
+
+Mode 3 may also write:
+
+```text
+.claude/skills/qc-site-map/process-logging/mode_3_confirm_orphans.md
+```
+
+---
 
 ## Resume rule
 
 At the start of every run:
 
-1. Look for `process-logging/qc-site-map/progress.md`.
-2. If it exists, read `last_phase_done`, `next_phase`, and `mode`.
-3. Resume from `next_phase` if checkpoint files are present and consistent.
-4. If checkpoints are inconsistent, report the inconsistency and resume from the last safe phase.
+1. Look for `progress.md` in the canonical checkpoint folder, then in the legacy folder.
+2. If found, read `run_id`, `mode`, `last_workflow_done`, `next_workflow`, and `status`.
+3. Resume from `next_workflow` if checkpoint files are present and consistent.
+4. If checkpoints are inconsistent, report the inconsistency and resume from the last safe workflow.
+5. Do not re-prompt mode on resume. Preserve the mode recorded by the interrupted run.
+
+---
 
 ## Checkpoint contract
 
-Every phase checkpoint must include:
+Every checkpoint must include:
 
 - run id or timestamp;
-- mode: Initialization / Update;
-- phase name;
+- mode: Initialization / Update / Mode3-ConfirmOrphans / Skipped;
+- workflow name;
 - inputs used;
 - output produced;
+- changed/unmodified state where relevant;
 - gaps/conflicts/assumptions found;
-- next phase.
+- next workflow.
 
-Each phase must write its checkpoint before moving to the next phase.
+Every workflow must write its checkpoint before moving to the next workflow.
+
+---
 
 ## Cleanup rule
 
-Do not delete `process-logging/qc-site-map/` mid-run.
+Do not delete checkpoint folders mid-run.
 
 Cleanup is allowed only after:
 
-- `qc-site-map.md` was written successfully;
-- dashboard handoff was written or explicitly skipped with a reason;
+- `qc-site-map.md` was written successfully or confirmed unchanged;
+- `qc-data-map.md` was written successfully, confirmed unchanged, or explicitly skipped with a reason;
+- dashboard handoff was written, preserved, or explicitly skipped with a reason;
 - final handover summary was produced.

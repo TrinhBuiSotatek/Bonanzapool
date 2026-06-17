@@ -25,7 +25,7 @@ import re
 import shutil
 import sys
 from dataclasses import dataclass
-from typing import Iterable
+from typing import Iterable, Union
 
 from openpyxl import load_workbook
 from openpyxl.styles import Alignment, Font
@@ -69,7 +69,7 @@ class HeaderRow:
     level: str  # "screen" or "section"
 
 
-Item = TestCase | HeaderRow
+Item = Union[TestCase, HeaderRow]
 
 
 def part_number(path: str) -> int:

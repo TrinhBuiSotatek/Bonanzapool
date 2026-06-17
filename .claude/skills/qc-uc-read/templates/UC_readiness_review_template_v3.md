@@ -1,213 +1,324 @@
-# UC Readiness Review
-**Functional / Black-box Test Readiness Template**
+# Báo cáo rà soát mức độ sẵn sàng của Use Case
+
+**Template rà soát requirement phục vụ thiết kế test**
 
 ---
 
-> **How to use this template**
->This template defines the minimum information QA testers need to begin test case design.
->Fill out all sections completely before handing off to QA. Do not leave any field blank — if a section truly does not apply, write N/A and explain why.
+> ## Cách sử dụng template này
 >
-> **Completion status conventions:**
-> - ✅ **Complete** = section is fully populated and no longer ambiguous
-> - ⚠️ **Partial** = contains content but requires further clarification
-> - ❌ **Missing** = absent — BLOCKER, cannot start test design
-
----
-
-## Feature Brief
-
-*(Summarize the feature based on all read documents. Include: what the feature is, who uses it, how it works, key business rules, and known exceptions.)*
-
----
-
-## Readiness Verdict
-
-| Overall Score | Verdict |
-| ------------- | ------- |
-| `XX / 100` | [✅ READY / ⚠️ CONDITIONALLY READY / ❌ NOT READY] |
-
----
-
-## 0. Document Metadata
-
-| UC-ID | Feature Name | Version | Status |
-|-------|-------------|---------|--------|
-| *(e.g., UC-12)* | *(e.g., Service Menu List)* | *(e.g., v1.0)* | *(Draft / In Review / Finalized)* |
-
-| Author / BA | Approved By | Date Created | Last Updated |
-|-------------|-------------|--------------|--------------|
-| *(Name)* | *(Name & Role)* | *(YYYY-MM-DD)* | *(YYYY-MM-DD)* |
-
----
-
-## 1. Objective & Scope
-
-### 1.1 Objective
-*(Describe WHY this feature exists. What business problem does it solve? Who benefits? Write 1–3 concise sentences.)*
-
-### 1.2 In Scope
-*(List every function / sub-use-case covered in this UC. Use one line per item or bullet points.)*
-
-### 1.3 Out of Scope
-*(Clearly list what is NOT covered in this UC. If nothing is excluded, write "None.")*
-
----
-
-## 2. Actors & Stakeholders
-
-| Actor | Type | Role & Permissions |
-|-------|------|-------------------|
-| *(e.g., Admin User)* | *(Primary / System)* | *(Describe what this actor can do in the UC.)* |
-*(Add rows as needed)*
-
----
-
-## 3. Preconditions & Postconditions
-
-### 3.1 Preconditions
-*(List every condition that must be true before the flow begins. One condition per line.)*
-- *(e.g., The admin has successfully authenticated.)*
-
-### 3.2 Postconditions
-| After completing... | System state / Postcondition |
-|--------------------|------------------------------|
-| *(e.g., Add record)* | *(e.g., New record appears at the top of the list. Success message is displayed.)* |
-*(Add rows as needed)*
-
----
-
-## 4. API / Queue / State Interface Inventory
-
-> **Instructions:** Extract and catalog every endpoint, queue consumer, and Durable Object. **One entry = one row.** Do NOT collapse multiple fields into a single row (e.g., do NOT write "5 request fields" — list each individually).
+> Template này dùng để tạo file `*_audited_*.md` sau khi Agent đọc và rà soát use case, tài liệu liên quan, common rules, wireframe/mockup, API hoặc các artefact hỗ trợ khác.
 >
-> **Required columns per row:** Entry ID (API-XB-\* / QUE-XB-\* / DO-XB-\* or method+path) · trigger condition · all request fields (name/type/required/constraint) · success response shape · error codes + messages.
+> File audited có 2 mục đích:
 >
-> **Coverage rule:** The number of rows must equal the count of endpoints + queues + DOs declared in the UC spec §2. If a schema is absent, mark the row `[BLOCKED: no schema provided]`.
-
-**REST Endpoints:**
-
-| # | Entry ID / Path | Trigger Condition | Request Fields (name · type · required · constraint) | Success Response | Error Codes + Messages |
-|---|---|---|---|---|---|
-| *(e.g., 1)* | *(e.g., POST /api/exbot/start)* | *(e.g., zen calls after preflight pass)* | *(e.g., user_id: string, required, must be active LP)* | *(e.g., { status: "STARTING", bot_id: uuid })* | *(e.g., 400 ALREADY_RUNNING / 403 PREFLIGHT_FAILED)* |
-
-**Queue Consumers:**
-
-| # | Queue ID | Trigger Event | Handler Summary | DLQ Policy | Retry Count | Idempotency Key | Priority / SLA |
-|---|---|---|---|---|---|---|---|
-| *(e.g., 1)* | *(e.g., QUE-XB-01 bot-scan)* | *(e.g., enqueued by light-check cron)* | *(e.g., scans all bots, enqueues hedge-sync per delta)* | *(e.g., DLQ after 3 retries)* | *(e.g., 3)* | *(e.g., bot_id + epoch_slot)* | *(e.g., Normal)* |
-
-**Durable Objects:**
-
-| # | DO ID | State Owned | Lease Duration | Expiry Action | Contention Policy |
-|---|---|---|---|---|---|
-| *(e.g., 1)* | *(e.g., DO-XB-02 UserLockDO)* | *(e.g., per-user operation lock)* | *(e.g., 90 seconds)* | *(e.g., release lock, log timeout)* | *(e.g., second caller receives 409 LOCK_HELD)* |
+> 1. **Tổng hợp lại cách Agent hiểu nghiệp vụ của use case** để QC Lead / BA / user có thể review xem Agent đã hiểu đúng chưa.
+> 2. **Rà soát độ đầy đủ, rõ ràng, nhất quán và khả năng test được của tài liệu**, bao gồm việc đối chiếu với use case liên quan, common rules, site map, project context và các nguồn khác để phát hiện thiếu sót, mâu thuẫn hoặc điểm cần xác nhận.
+>
+> Không được để trống section. Nếu không áp dụng, ghi `N/A` và giải thích ngắn gọn lý do.
+> Không được chỉnh sửa các đầu mục của template.
+> Khi viết file phải xoá bỏ các phần nội dung hướng dẫn.
 
 ---
 
-## 5. System State Model
+## Nguyên tắc viết nội dung audited
 
-> **Instructions:** Define the state and behavior of each entry from Section 4. Every Section 4 entry must have ≥ 1 row here.
+Khi viết file audited, Agent phải **tổng hợp ý nghĩa nghiệp vụ**, không chỉ copy lại heading hoặc label trong tài liệu nguồn.
 
-**Lifecycle State Transitions** *(for UCs involving bot lifecycle — FM-XB-07)*:
+### 1. Viết rõ ràng, tự nhiên
 
-| From State | Trigger Event | Guard Condition | To State | On Guard Fail |
+- Viết câu đầy đủ, dễ hiểu cho QC Lead / BA / Tester.
+- Không viết kiểu dịch máy hoặc nửa Anh nửa Việt nếu không cần thiết.
+- Không dùng các cụm khó hiểu như: `UC cổng`, `UC xuôi dòng`, `hiện thực hoá`, `gắn ngữ cảnh`, `4x case`, `5x exception`.
+- Nếu cần giữ thuật ngữ tiếng Anh vì đó là tên chính thức trong sản phẩm, giữ nguyên thuật ngữ đó.
+
+### 2. Không dùng heading/label nguồn thay cho nội dung nghiệp vụ
+
+Các heading, label hoặc mã trong tài liệu nguồn chỉ dùng để trace, không được dùng thay cho phần giải thích.
+
+Ví dụ label nguồn:
+- `4x`, `5x`
+- `Happy path`, `Alternative flow`, `Exception`
+- `Business process`
+- tên dòng trong bảng
+- tiêu đề section
+- mã rule / mã message như `BR-006`, `MSG_E001`, `COMMON-xxx`
+
+Agent phải giải thích ý nghĩa nghiệp vụ trước, sau đó mới đặt mã/label gốc trong ngoặc hoặc phần trích nguồn.
+
+### 3. Bắt buộc trích nội dung nguồn kèm mã/mục gốc
+
+Với mỗi rule, điều kiện, exception, validation, error case, common rule, common message hoặc item được tham chiếu, Agent phải ghi:
+
+1. Diễn giải nghiệp vụ bằng câu rõ ràng.
+2. Mã / heading / label gốc nếu có.
+3. Nội dung nguồn liên quan, hoặc quote ngắn nhất đủ chứng minh ý đó.
+
+Định dạng khuyến nghị:
+
+```text
+[Diễn giải nghiệp vụ]. (Nguồn: <file/section>; mã/mục gốc: <code hoặc heading>; nội dung nguồn: "<trích dẫn ngắn từ source>")
+```
+
+Với common rules: với các rule là quy định cần tuân thủ hoặc tránh thì nội dung chính là diễn giải với context hiện tại kèm ghi chú mã/nguồn và nội dung gốc trong dấu ().
+
+```text
+[Diễn giải nghiệp vụ]. (Nguồn: common rules; mã: <BR/COMMON ID>; nội dung nguồn: "<nội dung rule gốc>")
+```
+
+Với error/message common file: thì trích dẫn chính xác nội dung error/message kèm ghi chú mã/nguồn trong dấu ().
+
+```text
+[Trích xuất nội dung message/thông báo]. (Nguồn: common messages; mã: <message ID>; nội dung nguồn: "<nội dung message gốc>")
+```
+
+Với các nội dung trích xuất một mục từ tài liệu nguồn thì trích xuất cả mã kèm tiêu đề, nếu mục không có tiêu đề thì trích xuất kèm tiêu đề của mục cha.
+
+```text
+[Nội dung mô tả, diễn giải]. (Nguồn: mục X.tiêu đề mục; mã - hoặc nội dung)
+[Nội dung mô tả, diễn giải]. (Nguồn: mục X trong phần X.Tiêu đề)
+```
+### 4. Ví dụ viết đúng
+
+**Ví dụ sai:**
+
+> Banner cảnh báo cho 3 trường hợp 4x (sai credential, account suspended, tenant suspended) + toast cho exception 5x system error.
+
+**Ví dụ nên làm:**
+
+> Khi đăng nhập thất bại do thông tin đăng nhập không đúng, tài khoản người dùng bị tạm ngưng hoặc tổ chức bị tạm ngưng, hệ thống cần hiển thị banner cảnh báo tương ứng trên màn hình đăng nhập. Đây là các trường hợp lỗi do dữ liệu hoặc trạng thái nghiệp vụ không hợp lệ. (Nguồn: mục 4x trong Phần Exception Flow thuộc mục 1; nội dung nguồn: "<trích đúng phần mô tả nhóm 4x trong UC>")
+
+**Ví dụ sai:**
+
+> UC-ORGUSER-001 hiện thực hoá FR-001 và là UC cổng duy nhất cho mọi chức năng nghiệp vụ trong Org Portal.
+
+**Ví dụ nên làm:**
+
+> UC-ORGUSER-001 mô tả quy trình đăng nhập vào Org Portal. Use case này đáp ứng FR-001 về xác thực phiên đăng nhập của người dùng. Người dùng chỉ được truy cập các chức năng trong Org Portal sau khi đăng nhập thành công và hệ thống xác định được tổ chức mà người dùng đang làm việc. (Nguồn: UC §2 Business process; mã/mục gốc: `FR-001`; nội dung nguồn: "<trích đúng nội dung FR-001 hoặc đoạn UC liên quan>")
+
+---
+
+## Feature Brief - Tóm tắt nghiệp vụ
+
+Viết 1-3 đoạn ngắn để mô tả use case theo cách dễ hiểu.
+
+Nội dung cần có:
+- use case này dùng để làm gì;
+- ai sử dụng;
+- điều kiện nào cần có trước khi thực hiện;
+- hệ thống xử lý các nghiệp vụ chính nào;
+- rule, exception, audit, permission, integration hoặc data/state nào ảnh hưởng đến thiết kế test;
+- các use case / module / common rule liên quan nếu có.
+
+Không copy heading hoặc shorthand label từ source làm nội dung giải thích. Nếu heading/mã nguồn quan trọng, hãy giải thích ý nghĩa nghiệp vụ trước, sau đó giữ heading/mã gốc trong phần trích nguồn.
+
+---
+
+## 0. Thông tin tài liệu
+
+| UC ID | Tên feature / use case | Version | Trạng thái tài liệu |
+|---|---|---|---|
+|  |  |  | Draft / In Review / Finalized / TBD |
+
+| Người viết / BA | Người duyệt | Ngày tạo | Cập nhật lần cuối |
+|---|---|---|---|
+|  |  |  |  |
+
+| Artefact đã đọc | Version / ngày cập nhật | Vai trò của artefact | Ghi chú |
+|---|---|---|---|
+|  |  | UC / Wireframe / API / Common rule / Site map / Project context / Other |  |
+
+---
+
+## 1. Mục tiêu và phạm vi
+
+### 1.1 Mục tiêu nghiệp vụ
+
+[Giải thích use case tồn tại để giải quyết vấn đề gì, phục vụ ai, mang lại kết quả nghiệp vụ gì.]
+
+### 1.2 Phạm vi trong use case
+
+| Hạng mục / chức năng | Mô tả | Nguồn |
+|---|---|---|
+|  |  |  |
+
+### 1.3 Ngoài phạm vi / chưa bao gồm
+
+| Hạng mục | Lý do ngoài phạm vi / chưa rõ | Ảnh hưởng đến test |
+|---|---|---|
+|  |  |  |
+
+---
+
+## 2. Actor, vai trò và quyền hạn
+
+| Actor / Role | Loại | Vai trò trong use case | Quyền hạn / giới hạn liên quan | Nguồn |
 |---|---|---|---|---|
-| *(e.g., IDLE)* | *(e.g., POST /start received)* | *(e.g., 5 preflight checks pass; NV-1/NV-3 not required for Phase A1)* | *(e.g., STARTING)* | *(e.g., Return 403 PREFLIGHT_FAILED, state remains IDLE)* |
+|  | Primary / Secondary / System / External |  |  |  |
 
-**DO Behavior** *(one row per DO from Section 4)*:
+**Nhận xét readiness:**  
+[Đánh giá actor/role đã đủ rõ để thiết kế test theo role chưa. Nếu chưa, nêu rõ thiếu gì.]
 
-| DO ID | State Owned | Lease Duration | On Lease Expiry | On Contention |
+---
+
+## 3. Điều kiện trước và kết quả sau
+
+### 3.1 Điều kiện trước
+
+| # | Điều kiện trước | Bắt buộc? | Nguồn |
+|---|---|---|---|
+| 1 |  | Yes / No / TBD |  |
+
+### 3.2 Kết quả sau khi hoàn tất
+
+| Thao tác | Trạng thái hệ thống / dữ liệu sau khi hoàn tất | Nguồn |
+|---|---|---|
+| Thêm bản ghi | Bản ghi mới xuất hện ở hàng đầu tiên của danh sách. Thông báo thành công hiển thị |  |
+
+**Lưu ý:** Nếu điều kiện trước hoặc kết quả sau được tham chiếu từ common rule / common function, phải resolve nội dung gốc và ghi rõ mã trong ngoặc.
+
+---
+
+## 4. Danh sách UI object và mapping
+
+> Section này dùng khi có wireframe, mockup, screen spec hoặc mô tả UI. Nếu use case không có UI, ghi `N/A` và giải thích.
+
+| # | Màn hình / khu vực | Label gốc trên UI | Loại component | Bắt buộc? | Giá trị mặc định | Placeholder | Danh sách giá trị / enum | Mô tả / constraint | Nguồn |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 |  |  | Text input / Dropdown / Button / Table column / Modal / Toast / Other | Yes / No / N/A |  |  |  |  |  |
+
+Nguyên tắc:
+- Mỗi UI element là một dòng riêng.
+- Không viết kiểu “9 fields”, “4 buttons”, “N values”.
+- Với dropdown/radio/checkbox, liệt kê đầy đủ các giá trị nếu source có.
+- Giữ nguyên label gốc trên UI để phục vụ trace và test case.
+
+---
+
+## 5. Thuộc tính và hành vi của UI object
+
+| Object / Component | Trạng thái hệ thống liên quan | Tương tác của user | Hành vi / phản hồi của hệ thống | Nguồn |
 |---|---|---|---|---|
-| *(e.g., DO-XB-02)* | *(e.g., user operation lock)* | *(e.g., 90s)* | *(e.g., release lock, emit timeout metric)* | *(e.g., 409 LOCK_HELD returned to second caller)* |
+|  | Enabled / Disabled / Hidden / Read-only / Loading / Error / Other | Click / Tap / Input / Hover / Submit / Other |  |  |
 
-**Queue Behavior** *(one row per queue from Section 4)*:
+Nguyên tắc:
+- Mỗi object quan trọng ở Section 4 nên có hành vi tương ứng ở Section 5.
+- Nếu object không có hành vi đặc biệt, vẫn ghi rõ `Không có hành vi đặc biệt được mô tả trong source`.
+- Nếu hành vi được suy luận từ UI hoặc flow, ghi `Suy luận cần xác nhận`.
 
-| Queue ID | DLQ After N Retries | Backoff | Idempotency Key | Priority vs Others | SLA |
+---
+
+## 6. Phân rã nghiệp vụ và luồng xử lý
+
+> Phân tích các chức năng / sub-flow chính trong use case. Có thể nhân bản block 6.x cho từng function như: đăng nhập, tìm kiếm, tạo mới, cập nhật, xoá, export, phê duyệt, gửi thông báo...
+
+### 6.1 Tên chức năng / luồng: [Tên chức năng]
+
+#### A. Luồng xử lý
+
+| Bước | Actor | Hành động / trigger | Phản hồi hệ thống - happy path | Luồng thay thế | Luồng lỗi / exception | Nguồn |
+|---|---|---|---|---|---|---|
+| 1 |  |  |  |  |  |  |
+
+#### B. Business rules và validation
+
+| Field / Object / Rule | Điều kiện / constraint | Bắt buộc? | Kết quả khi hợp lệ | Kết quả khi không hợp lệ | Nguồn |
 |---|---|---|---|---|---|
-| *(e.g., QUE-XB-08 user-redeem)* | *(e.g., 3)* | *(e.g., exponential 1s/2s/4s)* | *(e.g., redeem_request_id)* | *(e.g., Highest — runs before all other queues)* | *(e.g., 5 min LP-first)* |
+|  |  | Yes / No / N/A |  |  |  |
+
+Nếu rule được tham chiếu bằng mã, phải viết rõ nội dung rule:
+
+```text
+[Diễn giải rule]. (Nguồn: common rules; mã: <BR/COMMON ID>; nội dung nguồn: "<nội dung rule gốc>")
+```
+
+#### C. Thông báo, lỗi và phản hồi UI/UX
+
+| Trường hợp | Loại phản hồi | Nội dung hiển thị / message | Mã / mục gốc | Nguồn |
+|---|---|---|---|---|
+|  | Banner / Toast / Inline error / Modal / Loading / Empty state / Other |  |  |  |
+
+Nguyên tắc:
+- Không ghi chỉ `4x`, `5x`, `error`, `exception`.
+- Phải giải thích nguyên nhân lỗi và phản hồi hệ thống.
+- Nếu có message code, phải resolve nội dung message gốc.
 
 ---
 
-## 6. Functional Logic & Workflow Decomposition
+## 7. Phân tích liên kết và ảnh hưởng giữa các chức năng
 
-> **Instructions:** Analyze in detail the business processes of each operation in this feature. Duplicate the block below for each major operation (e.g., 6.1 Bot Start, 6.2 Hedge Sync).
+| Chức năng / hành động kích hoạt | Khu vực / UC / module bị ảnh hưởng | Ảnh hưởng nghiệp vụ | Kiểm tra nhất quán dữ liệu | Nguồn |
+|---|---|---|---|---|
+|  |  |  |  |  |
 
-### 6.1 Operation Name: *(e.g., Bot Start)*
-
-**A. Workflows**
-| Step | Actor | Action | System Response (Happy Path) | Alternative Flows | Exception & Error Flows |
-|------|-------|--------|------------------------------|-------------------|-------------------------|
-| 1 | *OPERATOR* | *POST /api/exbot/start* | *5 preflight checks run; state → STARTING; bot-scan enqueued to QUE-XB-01* | *N/A* | *Preflight fail: 403 PREFLIGHT_FAILED; state stays IDLE* |
-
-**B. Business Rules & Validations**
-
-> Resolve every BR-\* and FR-EXBOT-\* reference to its exact verbatim text from `common-rules.md` / `srs/spec.md`. Keep the code in parentheses for traceability.
-
-| Field / Param | Required | Format / Constraint | Min / Max | Error Code + Message *(exact text)* |
-|----------------|----------|---------------------|-----------|--------------------------------------|
-| *(e.g., user_id)* | *Yes* | *UUID v4* | *—* | *400 INVALID_USER / "user_id must be a valid UUID"* |
-
-**C. System Feedback**
-
-* **Queue enqueue confirmations:** *(e.g., On bot-start success: QUE-XB-01 bot-scan enqueued with bot_id + epoch_slot)*
-* **D1 state changes:** *(e.g., bots table: status → STARTING, started_at = now)*
-* **Error codes returned:** *(e.g., 403 PREFLIGHT_FAILED — "One or more preflight checks failed: [list]")*
-
----
-
-## 7. Functional Integration Analysis
-
-> **Instructions:** Analyze linkages and influences between operations — queue fan-out, DO lease coordination, HL adapter calls, dual-chain interactions.
-
-| Trigger Operation / Event | Impact Analysis (cross-operation influence) | Data / State Consistency Verification |
-|---------------------------|---------------------------------------------|----------------------------------------|
-| *(e.g., Bot Start → bot-scan enqueued)* | *(e.g., Triggers light-check scan cycle; UserLockDO lease acquired for 90s preventing concurrent start)* | *(e.g., Verify bots.status = STARTING in D1 before QUE-XB-01 consumer processes the message)* |
-| *(e.g., User Redeem → QUE-XB-08 enqueued)* | *(e.g., Highest-priority queue; must complete within 5 min SLA; UserLockDO prevents concurrent redeem)* | *(e.g., Verify close_operations ledger entry created atomically with redeem request)* |
-*(Add rows as needed)*
+Gợi ý phân tích:
+- Dữ liệu được tạo/cập nhật ở UC này có xuất hiện ở màn hình hoặc UC khác không?
+- Trạng thái thay đổi ở UC này có ảnh hưởng permission, notification, dashboard, report hoặc integration không?
+- Có use case nào phụ thuộc vào kết quả của use case này không?
 
 ---
 
 ## 8. Acceptance Criteria
 
-> **Instructions:** Acceptance criteria must be written in a verifiable pass/fail format, using the Given / When / Then structure. Cover each operation, state transition, error path, and SLA requirement.
+> Nếu source có AC rõ ràng, tổng hợp lại theo format có thể test được. Nếu source thiếu AC nhưng flow/rule đủ rõ, Agent có thể đề xuất AC từ phần hiểu nghiệp vụ và đánh dấu `Suy luận cần xác nhận`.
 
-| AC # | Scenario | Given *(precondition)* | When *(trigger)* | Then *(expected result)* |
-|------|----------|------------------------|------------------|--------------------------|
-| AC-01 | *(e.g., Bot Start — Happy Path)* | *(e.g., User has active LP position; all 5 preflight checks pass)* | *(e.g., POST /api/exbot/start called by OPERATOR)* | *(e.g., Response 200 { status: "STARTING" }; bots.status = STARTING in D1; QUE-XB-01 enqueued within 1s)* |
-*(Add ACs for every operation, state transition, error path, and SLA...)*
+| AC # | Scenario | Given - điều kiện | When - hành động | Then - kết quả mong đợi | Nguồn / ghi chú |
+|---|---|---|---|---|---|
+| AC-01 |  |  |  |  |  |
 
----
-
-## 9. Non-functional Requirements
-
-| Category | Requirement | Source / Reference |
-|----------|-------------|-------------------|
-| *(Performance)* | *(e.g., user_redeem SLA: LP-first close must complete within 5 min)* | *(e.g., SRS spec.md §user-redeem)* |
-| *(Performance)* | *(e.g., HLRateLimitDO: max 800 weight/min sliding window)* | *(e.g., DO-XB-01 spec)* |
-| *(Security)* | *(e.g., No raw agent key stored in D1 or logs; AES-GCM envelope encryption required)* | *(e.g., SPEC_v5.2.6_EN.md §21.5)* |
-| *(Reliability)* | *(e.g., All queue operations must be idempotent; DLQ policy must be stated)* | *(e.g., SRS spec.md §queue-topology)* |
-*(Add categories as needed)*
+Nguyên tắc:
+- AC phải có thể pass/fail.
+- Không viết AC quá chung như “system works correctly”.
+- Với AC suy luận, ghi rõ `Suy luận cần xác nhận`.
 
 ---
 
-## 10. Open Questions & Dependencies
+## 9. Yêu cầu phi chức năng
 
-### 10.1 Open Questions
-| # | Question / Issue | Context | Owner | Status |
-|---|-----------------|---------|-------|--------|
-| Q1 | *(e.g., Is drag-and-drop reordering in scope?)* | *(e.g., Wireframe conflict.)* | *(e.g., PO)* | *(Open)* |
+| Nhóm | Requirement | Ảnh hưởng đến test | Nguồn |
+|---|---|---|---|
+| Performance |  |  |  |
+| Security |  |  |  |
+| Compatibility |  |  |  |
+| Accessibility |  |  |  |
+| Audit / Logging |  |  |  |
+| Privacy / Compliance |  |  |  |
 
-### 10.2 Dependencies
-*(List any UC, feature, API, or external system that this UC depends on.)*
-
----
-
-## 11. Change Log
-
-| Version | Date | Author | Summary of Changes |
-|---------|------|--------|--------------------|
-| *(e.g., v2.0)* | *(YYYY-MM-DD)* | *(Author name)* | *(e.g., Restructured template to include UI mapping and integration analysis.)* |
+Nếu không tìm thấy NFR trong source, ghi rõ là thiếu thay vì tự suy đoán.
 
 ---
 
-*UC Readiness Template v3.0 — For QA Test Design*
+## 10. Gap, mâu thuẫn và câu hỏi mở
+
+### 10.1 Bảng gap và câu hỏi cần xác nhận
+
+| ID | Mức ưu tiên | Loại vấn đề | Tham chiếu nguồn | Nội dung vấn đề / câu hỏi cần xác nhận | Vì sao quan trọng | Owner đề xuất | Trạng thái |
+|---|---|---|---|---|---|---|---|
+| Q1 | High / Medium / Low | Missing / Unclear / Conflict / Assumption / Suggestion |  |  |  | BA / QC Lead / Tech Lead / PO / TBD | Open |
+
+Nguyên tắc viết câu hỏi:
+- Viết bằng tiếng Việt rõ ràng.
+- Nêu đúng vấn đề cần BA/QC Lead trả lời.
+- Không hỏi chung chung như “Please clarify”.
+- Nếu là mâu thuẫn, ghi rõ hai nguồn đang mâu thuẫn như thế nào.
+- Nếu là thiếu thông tin, ghi rõ thiếu thông tin nào và ảnh hưởng gì đến test design.
+
+**Ví dụ câu hỏi tốt:**
+
+> UC mô tả trường hợp tài khoản bị tạm ngưng sẽ hiển thị banner lỗi, nhưng chưa nêu nội dung message cụ thể. BA vui lòng xác nhận exact message cần hiển thị cho trường hợp này. Nếu chưa có message, test case không thể kiểm tra đúng expected result của UI.
+
+### 10.2 Dependency cần theo dõi
+
+| Dependency | Loại | Ảnh hưởng | Owner | Trạng thái |
+|---|---|---|---|---|
+|  | UC / API / Common rule / Data / Integration / Environment / Other |  |  | Open / In Progress / Resolved |
+
+---
+
+## 11. Change log
+
+| Version | Ngày | Người cập nhật | Nội dung thay đổi |
+|---|---|---|---|
+| v1 | YYYY-MM-DD | QC UC Read Agent | Tạo báo cáo audited lần đầu |
+
+---
+
+*Template audited UC readiness - Vietnamese headings version*

@@ -1,322 +1,374 @@
 # Format of input files
 
-> Reference for the structure of all BA input artifacts that the `qc-uc-read` skill consumes.
-> Project: **Bonanzapool — BNZA Ecosystem**.
->
-> All BA artifacts live under `docs/BA/plans/bnza-sotatek-260519-0000/`.
-> Common (cross-feature) artifacts are in `02_backbone/`.
-> Per-feature/module artifacts are in `03_modules/<module>/`.
+> Reference for the structure of all BA input artifacts that the `qc-uc-read` skill
+> consumes in the **bonanzapool** project.
+> All BA artifacts live under a single plan root:
+> `docs/sotatek/ba/plans/<plan-id>/` (current plan: `bnza-sotatek-260519-0000`).
+
+The plan root has three top-level folders:
+
+| Folder           | Purpose                                                   |
+| :--------------- | :-------------------------------------------------------- |
+| `01_intake/`     | Raw client materials (intake, source spec). Read-only.    |
+| `02_backbone/`   | Cross-module canonical registries (see §1).               |
+| `03_modules/`    | Per-portal BA artifacts (US / UC / Screen). See §2.       |
 
 ---
 
 ## 1. Common artifacts — `02_backbone/`
 
-Files in this folder are shared across the whole project and apply to every feature/UC.
+These four files are **the canonical registries**. Every `FM-*`, `BR-*`, `E-*`,
+`ACT-*`, `PTL-*` code referenced anywhere in a UC / US / Screen MUST resolve to a
+row in one of these files. The audit MUST treat them as the authoritative source
+of truth.
 
-### 1.1 `common-rules.md`
+### 1.1 `backbone.md`
 
-- **Type:** Catalogue of cross-cutting business rules per portal/module: `BR-MOB-*`, `BR-EX-*`, `BR-PL-*`, `BR-ADM-*`, `BR-WLA-*`.
-- **File name:** `common-rules.md` (single canonical file, no version suffix).
-- **Logical name in path-registry:** `requirement-common-files`.
-- **Language:** Vietnamese/English mixed; rules must be quoted verbatim from this file when referenced from a feature spec.
-
-#### Rule ID conventions
-
-| Prefix | Portal / Module | Example |
-|:---|:---|:---|
-| `BR-MOB-*` | WL Mobile (OOS — Helix) | `BR-MOB-009` |
-| `BR-EX-*` | BNZA-EX (Perps trading) | `BR-EX-04` |
-| `BR-PL-*` | BNZA-POOL (LP bot) | `BR-PL-16` |
-| `BR-ADM-*` | BNZA-ADMIN (Admin portal) | `BR-ADM-031` |
-| `BR-WLA-*` | WL Admin (OOS — Helix) | `BR-WLA-001` |
-
-#### Reference rule
-
-When a UC/spec quotes a `BR-*` rule, the audit MUST resolve the full rule text from `common-rules.md` and inline it verbatim into the audit output (do NOT leave the bare code only).
-
----
+- **Type:** Top-level system blueprint (actors, portals, delivery structure,
+  shared architecture, fee model, deployment topology).
+- **Defines:**
+  - `ACT-<NN>` — shared actors (e.g. `ACT-04` = Admin / zen).
+  - `PTL-<NN>` — portal registry (e.g. `PTL-02` = ops.bnza.io).
+  - Numbered top-level sections (`§5`, `§8`, …) referenced from FRDs.
+- **Frontmatter:** `type: backbone`, plus `engagement_mode`, `links`, `changelog`.
 
 ### 1.2 `feature-map.md`
 
-- **Type:** Master index of all features in the project, grouped by portal.
-- **File name:** `feature-map.md`.
-- **Logical name in path-registry:** part of `requirement-common-files`.
-- **Purpose:** Single source of truth for the **feature list** (`FM-*` IDs), their **portal mapping**, **priority tier**, and **cross-feature dependencies**.
+- **Type:** System-level feature index. **Single source of truth for `FM-*`
+  codes**, which are the primary join key between US, UC, and Screen.
+- **Defines:**
+  - `FM-<MOD>-<NN>` — module feature code (e.g. `FM-ADM-01` = WL Partner
+    Onboarding inside the `admin` portal).
+  - Portal Registry, Actor Registry, per-module feature tables, priority tiers,
+    cross-module dependencies.
+- **Frontmatter:** `type: feature-map`, `links` (to `backbone.md`), `changelog`.
 
-#### Feature ID conventions
+### 1.3 `common-rules.md`
 
-| Prefix | Portal / Module | Example |
-|:---|:---|:---|
-| `FM-ADM-*` | BNZA-ADMIN | `FM-ADM-01` |
-| `FM-EX-*` | BNZA-EX | `FM-EX-03` |
-| `FM-XB-*` | BNZA-EXBOT Infra (backend) | `FM-XB-07` |
-| `FM-PL-*` | BNZA-POOL | `FM-PL-01` |
-| `FM-OPW-*` | OPERATOR WL Backend | `FM-OPW-02` |
-| `FM-WLC-*` | WL Smart Contract | `FM-WLC-01` |
-| `FM-WLA-*` | WL Admin (OOS — Helix) | `FM-WLA-01` |
-| `FM-MOB-*` | WL Mobile (OOS — Helix) | `FM-MOB-01` |
+- **Type:** Cross-module business-rule registry. **Single source of truth for
+  `BR-*` codes**.
+- **ID format:** `BR-<MOD>-<NNN>` — module prefix is uppercase (`MOB`, `EX`, `PL`,
+  `ADM`, `WLA`, …); `<NNN>` is zero-padded and unique inside the module.
+- **Layout:** One `## <MOD>` section per module, each containing a table:
 
-#### Priority tiers
+  | Column | Meaning                                              |
+  | :----- | :--------------------------------------------------- |
+  | `ID`   | `BR-<MOD>-<NNN>` (verbatim — quoted by UCs).          |
+  | `Rule` | The rule statement (verbatim — quoted by UCs).        |
+  | `Scope`| Which screens / flows the rule applies to.            |
 
-| Tier | Label | Meaning |
-|:---|:---|:---|
-| T0 | WL Launch critical | Must pass before WL go-live |
-| T1 | Core Dev | Core deliverable |
-| T2 | Enhancement | Nice-to-have |
-| T3 | Low Priority | Deferred / mock only |
+- **Reference rule:** When a UC quotes a `BR-*` rule, the text MUST match this
+  file verbatim. Any deviation = a UC override and must be flagged in the audit.
+- **Module-level `srs/spec.md` SHOULD NOT redefine `BR-*` inline** — reference
+  by ID.
 
----
+### 1.4 `message-list.md`
 
-### 1.3 `backbone.md`
+- **Type:** Cross-module user-facing message registry. **Single source of truth
+  for `E-*` codes**.
+- **ID format:** `E-<MOD>-<NNN>` (e.g. `E-ADM-001`, `E-MOB-003`,
+  `E-pool-001` — case preserved as written in source).
+- **Layout:** One `## <MOD>` section per module, each with a table:
 
-- **Type:** Full system architecture and delivery structure.
-- **File name:** `backbone.md`.
-- **Logical name in path-registry:** part of `requirement-common-files`.
-- **Purpose:** Portal matrix (PTL-01..06 with tech stack, hosting, auth, Sotatek build flag), actor permissions (ACT-01..07), feature sections (§5), dependency graph (§6), priority ordering (§7).
+  | Column                | Meaning                                              |
+  | :-------------------- | :--------------------------------------------------- |
+  | `E-ID`                | `E-<MOD>-<NNN>`                                       |
+  | `Type` / `HTTP` / `Code` | Message kind (Error / Info / Warning) and/or HTTP code or backend error code. Column header varies by module. |
+  | `Trigger`             | Backend condition / HTTP status that fires the message. |
+  | `User-Facing Message` | Verbatim string shown to the user (quoted by UCs).    |
 
-#### Portal IDs
-
-| ID | Portal | Sotatek builds? |
-|:---|:---|:---|
-| PTL-01 | WL Mobile — wl.bnza.io | ❌ OOS Helix |
-| PTL-02 | BNZA-ADMIN — ops.bnza.io | ✅ |
-| PTL-03 | BNZA-EX — ex.bnza.io | ✅ |
-| PTL-04 | BNZA-EXBOT Infra — api.bnza.io/exbot | ✅ |
-| PTL-05 | BNZA-POOL — pool.bnza.io | ✅ |
-| PTL-06 | WL Admin — wl-admin.bnza.io | ❌ OOS Helix |
-
-#### Actor IDs
-
-| ID | Actor | Key access |
-|:---|:---|:---|
-| ACT-01 | End User (LP) | PTL-03 EX, PTL-05 POOL |
-| ACT-02 | WL Partner | (registration/config flow) |
-| ACT-03 | WL End User (OOS) | PTL-01 WL Mobile |
-| ACT-04 | Admin (zen) | PTL-02 ADMIN, PTL-04 config, PTL-05 |
-| ACT-05 | Trader | PTL-03 EX |
-| ACT-06 | OPERATOR (System) | PTL-04 EXBOT Infra — internal only |
-| ACT-07 | WL Operator Admin (OOS) | PTL-06 WL Admin |
+- **Reference rule:** When a UC quotes an `E-*` message, the text MUST match
+  this file verbatim. Screen files MUST NOT define message text inline —
+  reference by `E-*` ID.
 
 ---
 
-### 1.4 `backbone-index.md`
+## 2. Per-module artifacts — `03_modules/<portal>/[<role>/]…`
 
-- **Type:** Section navigator for `backbone.md`.
-- **File name:** `backbone-index.md`.
-- **Purpose:** Use to quickly find which §section of `backbone.md` contains a specific topic (permissions, feature map, dependency graph, etc.).
+### 2.1 Folder layout
 
----
+Two folder shapes exist; both are valid and the skill MUST handle both:
 
-## 2. Per-module artifacts — `03_modules/<module>/`
-
-Each module has its own folder under `03_modules/`. Currently only the `exbot` module has detailed BA docs.
-
-### 2.1 Module `exbot` — `03_modules/exbot/`
-
-Structure inside `03_modules/exbot/`:
+**Shape A — single-role portal (no `<role>` subfolder):**
 
 ```
-03_modules/exbot/
+03_modules/<portal>/
+├── frd.md
+├── srs/                # technical spec (optional context)
+├── userstories/
+│   ├── index.md
+│   └── us-NNN.md
 ├── usecases/
-│   ├── index.md                    ← UC index (see 2.1.1)
-│   └── <UC-ID>.md                    ← UC file (see 2.1.2)
-└── srs/
-    └── spec.md                     ← Module-level SRS (see 2.1.3)
+│   ├── index.md
+│   └── uc-<slug>.md
+└── ascii-screen/
+    ├── index.md
+    └── <screen-slug>.md
 ```
 
-**Logical name in path-registry:** `requirement-files` points to `03_modules/exbot/usecases/`.
+Examples: `bnza-pool/`, `mobile/`, `operator/`, `exbot/`, `bnza-ex/`.
 
----
+**Shape B — multi-role portal (`<role>` subfolder is required):**
 
-#### 2.1.1 UC index — `usecases/index.md`
-
-- **Type:** Master list of all EXBOT use cases.
-- **Purpose:** Gives each UC a canonical ID, short name, and module section mapping.
-
-##### UC ID conventions — EXBOT
-
-EXBOT UCs use a compound slug, not a numbered pattern:
-
-| UC ID | Short name |
-|:---|:---|
-| `uc-bot-start` | Bot Start (preflight + lifecycle init) |
-| `uc-light-check` | Light Check (cron scan, zero HL calls) |
-| `uc-hedge-sync` | Hedge Sync (delta-only rebalance) |
-| `uc-user-redeem` | User Redeem (LP-first, SLA 5 min) |
-| `uc-bot-safe-close` | Bot Safe Close (admin-initiated) |
-| `uc-agent-key` | Agent Key Submit & Approve |
-
----
-
-#### 2.1.2 Per-UC spec — `usecases/<name-UC>.md`
-
-Each UC has its own folder named with the UC ID slug (e.g., `usecases/uc-bot-start.md`).
-
-##### Document structure
-
-The UC spec SHOULD contain the following sections:
-
-**Header block:**
-
-```markdown
-# <name-UC>: <name-UC>
-
-> Feature: <FM-ID> — <Feature name>
-> Portal: <PTL-ID> (<portal name>)
-> Actor(s): <ACT-ID list>
-> Source: backbone.md §<section>, srs/spec.md §<section>
-> SPEC ref: SPEC_v5.2.6_EN.md §<section> (if applicable)
-> NV items: NV-<N> (if applicable — Phase 0 blockers from SPEC v5.2.6 §0.5)
+```
+03_modules/<portal>/<role>/
+├── frd.md
+├── srs/
+├── userstories/        # may be absent in roles that ship UC-only
+├── usecases/
+└── ascii-screen/
 ```
 
-**Section 1 — Use Case Description:**
+Examples: `admin/bnza-admin/`, `admin/wl-admin/`.
 
-| Field | Content |
-|:---|:---|
-| `ID` | UC ID (matches folder name) |
-| `Feature` | FM-ID + feature name |
-| `Portal` | PTL-ID + portal |
-| `Actor(s)` | ACT-ID list with roles |
-| `Description` | As a `<actor>`, I want to `<goal>`, so that `<benefit>`. |
-| `Pre-conditions` | Bulleted list |
-| `Trigger` | Event/condition that starts the UC |
-| `Post-conditions` | On Success + On Failure |
-| `Basic Flow` | Numbered steps referencing `[BR-*]`, `[FR-EXBOT-*]`, `[NV-*]` inline |
-| `Alternative Flows` | Named sub-flows |
-| `Business Rules` | `[BR-*]` references with verbatim rule text |
-| `NV Gate` | Any NV items that must be confirmed before this UC's impl section is active |
+> **Note.** Some roles (e.g. `operator/`) intentionally ship only `usecases/` +
+> `ascii-screen/` and have no `userstories/` folder. Do not treat the missing
+> folder as a gap.
 
-**Section 2 — API / Queue / State Interface** *(replaces "Screen Description" for backend-only UCs):*
+### 2.2 `index.md` files — inventory + mapping
 
-For EXBOT (PTL-04, no UI):
+Each of the three subfolders (`userstories/`, `usecases/`, `ascii-screen/`) has
+an `index.md` that the skill MUST read first. The index serves two purposes:
 
-| Sub-section | Content |
-|:---|:---|
-| `Endpoints / Queues` | List of REST endpoints or Queue IDs involved (e.g., `POST /api/exbot/start`, `QUE-XB-01 bot-scan`) |
-| `Request schema` | Fields, types, required/optional, constraints |
-| `Response schema` | Success + error response shapes |
-| `D1 state changes` | Which D1 tables/columns are read/written |
-| `External calls` | HL API calls made, DO interactions (UserLockDO, HLRateLimitDO, MarketDataDO) |
-| `Error codes` | List of error codes + messages |
+1. **Inventory** — lists every file in the folder.
+2. **Mapping** — links each item to its peers (US ↔ UC ↔ Screen) via either
+   explicit `Linked …` columns OR a shared `FM-trace` column.
 
-For UI-bearing portals (PTL-02 ADMIN, PTL-03 EX, PTL-05 POOL), use the standard Screen Description format (one `### Screen SC-<##><letter>: <Screen Name>` subsection per screen state with asset reference, layout overview, and element table).
+The repo currently contains **two flavours** of `index.md`; the skill must
+handle both:
 
-**Section 3 — Validation Summary:**
+**Flavour 1 — rich index (preferred, observed in `bnza-pool/userstories/index.md`):**
 
-Same as standard: table of all fields/params with validation rules. For API: `Field | Required | Type | Constraint | Error`.
+| Column                 | Meaning                                                  |
+| :--------------------- | :------------------------------------------------------- |
+| `Story ID` / `UC file` / `Screen file` | Identifier of the item.                          |
+| `File`                 | Relative path.                                            |
+| `Actor`                | `ACT-<NN> <name>`.                                        |
+| `Feature / FR`         | Primary `FM-*` link.                                      |
+| `AC Count` (US only)   | Number of acceptance criteria.                            |
+| `Linked Use Cases`     | `uc-<slug>` of the UC(s) this story maps to.              |
+| `Linked Screens`       | `<screen-slug>` of the screen(s) this story maps to.      |
+| `Source Backbone IDs`  | Full list of `FM-*` codes.                                |
+| `Marker`               | `📋 Spec` (from client spec) or `⚡ Dev-built`.            |
+| `Stale Status`         | `unknown` / `fresh` / `stale` — staleness vs source spec. |
 
-**Section 4 — Cross-References:**
+Frontmatter (rich flavour): `type: userstories-index` / `usecases-index` /
+`screens-index`, `module`, `generated_at`, `stale_status`, …
 
-Table `| Reference | Type | Notes |` listing every external code referenced. Type values for BNZA:
+**Flavour 2 — minimal index (observed in `admin/bnza-admin/*/index.md`):**
 
-| Type | When |
-|:---|:---|
-| `Feature` | FM-* reference |
-| `Business Rule` | BR-* reference |
-| `Functional Requirement` | FR-EXBOT-* reference |
-| `SPEC Section` | SPEC_v5.2.6_EN.md §N reference |
-| `NV Item` | NV-N Phase 0 verification item |
-| `UC Dependency` | Another UC-EXBOT-* that must complete first |
-| `Use Case` | UC-to-UC link (Next Step / Previous Step / Downstream / Upstream) |
+| Column                          | Meaning                            |
+| :------------------------------ | :--------------------------------- |
+| `Story file` / `UC file` / `Screen file` | Filename.                          |
+| `story_id` / `usecase_id` / `Screen name` | Identifier.                        |
+| `Summary` / `Use case name` / —  | Short title.                       |
+| `FM-trace`                      | The `FM-*` code(s) the item supports. |
+| `Priority`                      | `P0` / `P1` / `P2` / `P3 (mock)` / `maintain`. |
+| `Status`                        | `draft` / `in-review` / `approved`. |
 
-**Section 5 — Open Questions:**
+Frontmatter (minimal flavour): `type: user-story` / `use-case` / `screen`,
+`status`, `owner`, `module`, `lang`, `changelog`.
 
-Table `# | Question | Status` of unresolved questions. Status values:
+**Resolving the US ↔ UC ↔ Screen map:**
 
-- `Open` — pending answer.
-- `Resolved: <answer> — <source>` — answer + citation.
+The skill MUST resolve the map using this priority:
 
-**Section 6 — Changelog:**
-
-Append-only table `Date | Source | Changes | NV Resolved`.
-
----
-
-#### 2.1.3 Module SRS — `srs/spec.md`
-
-- **Type:** Module-level Software Requirements Specification for BNZA-EXBOT Infra.
-- **File name:** `spec.md`.
-- **Purpose:** Defines `FR-EXBOT-*` functional requirements, lifecycle state machine (18 states), queue topology (10 queues), Durable Object specs (3 DOs), cron schedule, HL adapter rules, and Phase 0 Gate conditions.
-
-##### Key IDs in `srs/spec.md`
-
-| ID prefix | Meaning | Example |
-|:---|:---|:---|
-| `FM-XB-*` | Feature-level grouping | `FM-XB-07` Lifecycle State Machine |
-| `FR-EXBOT-*` | Functional requirement (numbered) | `FR-EXBOT-001` 1-bot-per-user |
-| `FR-EXBOT-002` | 5 preflight checks | |
-| `FR-EXBOT-003` | 18-state lifecycle machine | |
+1. Rich index columns (`Linked Use Cases`, `Linked Screens`) if present.
+2. Otherwise, the `linked_usecases` / `linked_stories` / `linked_screens`
+   arrays in the frontmatter of each individual file (see §2.3 / §2.4 / §2.5).
+3. Otherwise, fall back to the shared `FM-*` code (items sharing the same
+   `FM-*` belong to the same feature).
 
 ---
 
-## 3. High-level files — `docs/qc-lead/high-level-files/`
+### 2.3 User Story file — `userstories/us-NNN.md`
 
-Supplementary high-level documents also used as context when auditing features.
+#### Filename
 
-### 3.1 `SPEC_v5.2.6_EN.md`
+`us-<NNN>.md` (3-digit zero-padded, unique inside the module).
 
-- **Type:** EXBOT Product Specification — authoritative business/design rules for the ExBot system.
-- **Logical name in path-registry:** `High-level-files`.
-- **Key sections relevant to QC audit:**
+#### Frontmatter
 
-| Section | Content |
-|:---|:---|
-| `§0.4` | Validation points (what zen must verify before each phase) |
-| `§0.5` | **NV items (NV-1..14)** — Phase 0 verification blockers |
-| `§1.2` | Core Strategy — IL reduction formula, net formula |
-| `§1.3` | Phase 1 scope — **dual-chain Base+OP from Phase 1** (🆕 v5.2.6) |
-| `§2` | Marketing wording rules (ok/NG, risk disclosures) |
-| `§3.1/3.2` | Design decisions — adopt/reject from carter2099 |
-| `§3.4` | **BnzaExVault Option C** — independent Solidity contract for NFT custody (Base + OP) |
-| `§6.4` | Dual-chain LP setup — wethIndex per-chain (NV-12 blocker) |
-| `§19.5` | Stop system — **blocked until NV-1/NV-3 confirmed** |
-| `§21.5` | Agent key envelope encryption (AES-GCM) |
+```yaml
+---
+type: user-story
+module: "<module-name>"          # e.g. "bnza-admin"
+story_id: "US-<NNN>"
+slug: "<kebab-case-name>"
+actor: "<Role Name (handle)>"    # e.g. "Super Admin (zen)"
+priority: P0 | P1 | P2 | P3
+status: draft | in-review | approved
+source_backbone_ids: ["FM-<MOD>-<NN>", …]
+linked_usecases: ["uc-<slug>", …]   # may be []
+linked_screens:  ["<screen-slug>", …] # may be []
+created: "YYYY-MM-DD"
+owner: "@<handle>"
+changelog:
+  - YYYY-MM-DD | <source> | <change description>
+---
+```
 
-##### NV item quick lookup (Phase 0 blockers)
+#### Body sections (in order)
 
-| NV ID | What it blocks | Owner |
-|:---|:---|:---|
-| NV-1 | HL stop system behavior (isolated margin support) | SOTATEK verify |
-| NV-3 | HL stop replacement on hedge-sync | SOTATEK verify |
-| NV-5 | cloid idempotency on HL | SOTATEK verify |
-| NV-8..11 | CF rate limits | SOTATEK verify |
-| NV-12 | USDC/WETH pool address + wethIndex per chain (Base/OP) | zen (BNZA) |
-
-##### Price 3-way split (must NOT be mixed)
-
-| Price type | Used for |
-|:---|:---|
-| Uniswap price (sqrtPriceX96) | LP math — tick range, liquidity amounts |
-| Mark price (HL) | Hedge target — delta calculation |
-| Oracle price (HL) | Stop placement — NV-1/NV-3 gate |
+1. `# US-<NNN>: <Story Name>`
+2. `## Story Statement` — one paragraph in **"As a … , I want to … , so that …"** form.
+3. `## Acceptance Criteria` — one `### AC-<NNN> (<label>)` subsection per
+   criterion. Each AC uses the **Gherkin pattern**:
+   `**Given** …` `**When** …` `**Then** …`. Labels include `(Happy Path)`,
+   `(Edge Case — …)`, `(Negative — …)`, etc.
+4. `## INVEST Check` — 6-row table `| Criterion | Pass? | Note |` for
+   Independent / Negotiable / Valuable / Estimable / Small / Testable.
+5. `## Trace` — bulleted list of: `Backbone feature: FM-…`, `FRD reference: …`,
+   `Screens: …`, `Table: <DB table + columns>`, `RBAC gate: …`.
 
 ---
 
-## 4. Inline reference codes — quick lookup
+### 2.4 Use Case file — `usecases/uc-<slug>.md`
 
-| Code prefix | Meaning | Defined in |
-|:---|:---|:---|
-| `FM-*` | Feature ID | `feature-map.md` |
-| `BR-PL-*` / `BR-ADM-*` / `BR-EX-*` / `BR-MOB-*` / `BR-WLA-*` | Business rule by portal | `common-rules.md` |
-| `FR-EXBOT-*` | Functional requirement (EXBOT SRS) | `srs/spec.md` |
-| `PTL-*` | Portal ID | `backbone.md`, `feature-map.md` |
-| `ACT-*` | Actor ID | `backbone.md`, `feature-map.md` |
-| `UC-EXBOT-*` | Use case (EXBOT) | `usecases/index.md` |
-| `NV-*` | Phase 0 Not-Yet-Verified item | `SPEC_v5.2.6_EN.md §0.5` |
-| `SC-*` | Screen state inside a UI UC | Per-UC spec §2 (UI portals only) |
-| `API-XB-*` | REST endpoint (EXBOT OPERATOR facade) | `qc-site-map.md §5` |
-| `QUE-XB-*` | Queue consumer (EXBOT) | `qc-site-map.md §5` |
-| `DO-XB-*` | Durable Object (EXBOT) | `qc-site-map.md §5` |
-| `SCR-ADM-*` | Screen (BNZA-ADMIN) | `qc-site-map.md §5` |
-| `SCR-EX-*` | Screen (BNZA-EX) | `qc-site-map.md §5` |
-| `SCR-POOL-*` | Screen (BNZA-POOL) | `qc-site-map.md §5` |
-| `SFLOW-*` | Navigation/screen flow | `qc-site-map.md §6` |
+#### Filename
+
+`uc-<kebab-case-slug>.md`. The `<slug>` is descriptive (no module prefix needed —
+the folder path already disambiguates).
+
+#### Frontmatter
+
+```yaml
+---
+type: use-case
+module: "<module-name>"
+usecase_id: "UC-<slug>"
+slug: "<kebab-case-name>"
+actor: "<Role Name (handle)>"
+status: draft | in-review | approved
+linked_stories: ["US-<NNN>", …]
+linked_screens: ["<screen-slug>.md", …]
+source_backbone_ids: ["FM-<MOD>-<NN>", …]
+created: "YYYY-MM-DD"
+owner: "@<handle>"
+changelog:
+  - YYYY-MM-DD | <source> | <change description>
+---
+```
+
+#### Body sections (in order)
+
+1. `# UC-<slug>: <Use Case Name>`
+2. `## Actors` — primary + secondary, each cited with `ACT-<NN>`.
+3. `## Preconditions` — bulleted list.
+4. `## Trigger` — one-sentence trigger event.
+5. `## Main Flow` — numbered steps. Steps reference `BR-*`, `E-*`,
+   `[AF-NN]`, `[EF-NN]` inline as needed.
+6. `## Alternate Flows` — one `### AF-<NN>: <name>` subsection per alternate.
+   Body describes the deviation point and continuation.
+7. `## Error / Exception Flows` — one `### EF-<NN>: <name>` subsection per
+   exception. MUST cite an `E-*` code when surfacing a user-facing message.
+8. `## Postconditions` — what state holds after success. MAY include
+   `**<FM-…> expanded scope:**` callouts for cross-UC handoffs.
+9. `## Cross-Function Impact` — two tables:
+   - `### Within Module` — `| Direction | UC | Data / State | Type |`.
+   - `### Across Modules` — `| Direction | Target Module | Expected UC / Backbone Ref | Data / State | Type |`.
+   - `Direction` ∈ {`Input`, `Output`}; `Type` is free-form but typically
+     matches `Direction`.
+10. `## Diagram` — a `mermaid sequenceDiagram` block (sometimes a flowchart).
+11. `## Trace` — bulleted list of: `User stories: US-…`, `Backbone feature: FM-…`,
+    `Screens: <relative path>`.
+12. `## Open Questions` — bulleted list `[ ] OQ-<MOD>-<NN>: <question>`.
 
 ---
 
-## 5. OOS boundary reminder
+### 2.5 ASCII Screen file — `ascii-screen/<screen-slug>.md`
 
-PTL-01 (WL Mobile) and PTL-06 (WL Admin) are **OOS — Helix scope**.
-- Features `FM-WLA-*` and `FM-MOB-*` → `In scope? = No` in `qc-dashboard.md`.
-- `qc-uc-read` MUST NOT create review reports for OOS features.
-- The only BNZA endpoint side to test for OOS portals is the `FM-OPW-*` OPERATOR WL Backend (the API that Helix calls into).
+#### Filename
+
+`<kebab-case-screen-slug>.md` (e.g. `whitelabel.md`, `fee-distribution.md`).
+Slug matches the screen's nav target, not its display label.
+
+#### Frontmatter
+
+```yaml
+---
+type: screen
+status: draft | current | in-review
+owner: "@<handle>"
+created: YYYY-MM-DD
+updated: YYYY-MM-DD
+tags: [<module>, <screen-area>, <build-state>]
+changelog:
+  - YYYY-MM-DD | <source> | <change description>
+---
+```
+
+> **Note.** Screen frontmatter intentionally has **no `linked_stories` /
+> `linked_usecases` field**. The reverse-link is resolved via the `index.md`
+> rich columns OR via each US/UC's `linked_screens` array.
+
+#### Body sections (in order)
+
+1. `# Screen: <Screen Name>`
+2. Quick-reference block (3 bold lines):
+   - `**Route:** <URL path>`
+   - `**Nav label:** <icon + label>`
+   - `**Module:** <module-name>`
+3. `## Markers` — explains the 📋 Spec / ⚡ Dev-built convention used inline.
+4. `## Layout Overview` —
+   - **Optional scope callout** `> **FM-<MOD>-<NN> expanded scope (…):** …`
+   - **ASCII layout** in a fenced ``` block — the canonical wireframe.
+   - **Per-tab / per-state sub-sections** (`### <Tab Name> (new — wireframe TBD)`)
+     when the screen is multi-tab and one tab has not been drawn yet.
+5. **Element sections** — one `## <Element Group>` per logical block (Stat
+   Cards, Table, Buttons, Form, etc.). Each is tagged with `📋 Spec` or
+   `⚡ Dev-built`. Tables typically use `| Column | Content |` or
+   `| Card | Current Value | Note |`.
+6. `## Data Sources` — bulleted list of API endpoints or stores the screen reads.
+7. `## Notes` — free-form prose for caveats, current build state, future-work
+   flags.
+
+> Screen files MUST NOT define `BR-*` or `E-*` text inline; they reference by ID.
+
+---
+
+## 3. Inline reference codes — quick lookup
+
+| Code prefix          | Meaning                                             | Defined in                                      |
+| :------------------- | :-------------------------------------------------- | :---------------------------------------------- |
+| `PTL-<NN>`           | Portal (domain/app boundary)                        | `02_backbone/backbone.md` §Portal Registry; mirrored in `feature-map.md` §1 |
+| `ACT-<NN>`           | Shared actor                                        | `02_backbone/backbone.md` §Shared Actors; mirrored in `feature-map.md` §2 |
+| `FM-<MOD>-<NN>`      | Module-level feature                                | `02_backbone/feature-map.md` (and §5 of `backbone.md`) |
+| `BR-<MOD>-<NNN>`     | Business rule                                       | `02_backbone/common-rules.md`                    |
+| `E-<MOD>-<NNN>`      | User-facing message                                 | `02_backbone/message-list.md`                    |
+| `US-<NNN>`           | User story (scoped inside its module)               | `03_modules/<portal>/[<role>/]userstories/us-<NNN>.md` |
+| `UC-<slug>`          | Use case (scoped inside its module)                 | `03_modules/<portal>/[<role>/]usecases/uc-<slug>.md` |
+| `<screen-slug>`      | Screen                                              | `03_modules/<portal>/[<role>/]ascii-screen/<screen-slug>.md` |
+| `AC-<NNN>`           | Acceptance criterion inside a US                    | The owning US file (§3)                          |
+| `AF-<NN>` / `EF-<NN>`| Alternate flow / Error-Exception flow inside a UC   | The owning UC file (§6 / §7)                     |
+| `OQ-<MOD>-<NN>`      | Open question scoped to a module / UC               | The owning UC's `## Open Questions` and module's `oq-*-summary.md` |
+| `📋 Spec`            | Item is in the original client spec                 | Inline marker (defined in `## Markers` block)    |
+| `⚡ Dev-built`        | Item built by dev, NOT in client spec               | Inline marker (defined in `## Markers` block)    |
+
+---
+
+## 4. What `qc-uc-read` MUST open when auditing a single UC
+
+For a UC file at `03_modules/<portal>/[<role>/]usecases/uc-<slug>.md`:
+
+1. **The UC file itself.**
+2. **Every linked US** — files listed in `frontmatter.linked_stories` (or
+   resolved via the `usecases/index.md` rich columns / shared `FM-*`).
+3. **Every linked Screen** — files listed in `frontmatter.linked_screens` (or
+   resolved as above).
+4. **The three indices** in the same module (`userstories/index.md`,
+   `usecases/index.md`, `ascii-screen/index.md`) — to detect coverage gaps and
+   stale-status flags.
+5. **`02_backbone/common-rules.md`** — to verify every `BR-*` cited in the UC
+   exists and the quoted text matches verbatim.
+6. **`02_backbone/message-list.md`** — to verify every `E-*` cited in the UC's
+   `## Error / Exception Flows` exists and the message text matches verbatim.
+7. **`02_backbone/feature-map.md`** — to verify every `FM-*` /
+   `ACT-*` / `PTL-*` cited in the UC exists.
+8. **`02_backbone/backbone.md`** — only when a reference points to a
+   backbone-only artifact (e.g. a `§N` cross-section, an architecture detail not
+   present in `feature-map.md`).
+
+> There is **no per-engagement `project-context_*.md` file** in this project.
+> The role of "authoritative engagement summary" is filled by `backbone.md` +
+> `feature-map.md` together.

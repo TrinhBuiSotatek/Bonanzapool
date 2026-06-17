@@ -10,14 +10,12 @@ Read the `path-registry.md` file to find the below file's location:
 
 - `.claude/skills/qc-uc-read/references/input-files-format.md` — for file format description of the input files
 - `project-context-master`
-- `qc-site-map` (optional) — if present, read §5/§6/§7 for API/Queue/DO coverage cross-check and reverse traceability (see Phase 1 Step 1 + scoring-rubric Cross-Artefact Conflict Check). If missing, skip cross-check and warn once.
-- `requirement-common-files` — backbone.md (portal/actor IDs), feature-map.md (FM-\* IDs + priority tiers), common-rules.md (BR-\* rule text). Read first; resolve any BR-\* / FR-EXBOT-\* reference appearing in the UC to its exact verbatim text from these files and inline that text into the audit output (see Common Reference Resolution rule in the phase files).
-- `requirement-files` — for Bonanzapool EXBOT: points to `03_modules/exbot/usecases/`. Other modules (ADMIN, EX, POOL) do not yet have per-UC folders — use feature-map.md + backbone.md as the only spec source. See input-files-format.md §2 for per-UC folder structure.
+- `qc-site-map`
+- `requirement-common-files` — read first; resolve any code/ID reference (error codes, business rule IDs, common function names) appearing in the UC to its exact text from these files and inline that text into the audit output (see Common Reference Resolution rule in the phase files).
+- `requirement-files`
 - `question-backlog`
+- `.claude/skills/qc-uc-read/references/qc-writting-rules.md`
 - Important: Check the input directory for existing versions, read the highest version of the files.
-
-**OOS guard (check at Phase 0 before generating run_id):** If the UC's Feature ID belongs to `FM-WLA-*` or `FM-MOB-*`, STOP immediately:
-> "Feature [ID] là OOS (Helix scope). qc-uc-read không tạo review report cho OOS features. Xem qc-dashboard.md — cột In scope? = No."
 
 ## Output Contract
 
@@ -33,7 +31,6 @@ This skill writes **per-phase checkpoint files** to `.claude/skills/qc-uc-read/p
 
 - `process-logging/<UC-ID>/` directory layout and `progress.md` format
 - Worklog update protocol — defers to `docs/qc-lead/agent-work-log.local/README.md` (write-before-work rule)
-- `qc-dashboard.md` `UC review stt` column update protocol (with graceful degradation if column missing)
 - Resume detection at Phase 0
 - Cleanup at the end of Phase 3
 
@@ -47,58 +44,24 @@ The protocol is referenced by every phase file — do NOT duplicate its rules he
 
 ## Workflow
 
-### Phase 0 — Routing + Resume Detection + Dashboard Precheck
+### Phase 0 — Routing + Resume Detection
 
-> No user-facing output during the silent-audit substep, EXCEPT the dashboard precheck warning if Case A or B applies.
+> No user-facing output during the silent-audit substep
 
-1. **Identify the UC-ID** from the user's prompt or from the requirement file name. This is treated as the on-disk Folder ID; the dashboard precheck below may resolve it to a different canonical ID if a Mode 3 alias mapping exists.
+1. **Identify the UC-ID** from the user's prompt or from the requirement file name. This is treated as the on-disk Folder ID.
 
-2. **Determine `mode`:** check the UC-ID folder for the existence of `uc-review-report` file.
-   - **If the file exists** → check the `question-backlog` file.
-     - If the open questions are all answered → `mode = re-audit`.
-     - If the open questions are NOT all answered → STOP and ask the user to answer the open questions first, then `mode = re-audit`.
-   - **If the file does not exist** → `mode = first-audit`.
-
-3. **Resume detection** (per `workflows/checkpoint-protocol.md` §4):
+2. **Resume detection** (per `workflows/checkpoint-protocol.md` §4):
    - Check `.claude/skills/qc-uc-read/process-logging/<UC-ID>/progress.md`.
-   - **Found** → ask the user `Continue from Phase <next>?` or `Restart fresh?`. Branch accordingly. If user picks Continue and the stored `mode` differs from the freshly-determined `mode`, warn the user and prefer the stored mode unless they explicitly Restart.
+   - **Found** → ask the user `Continue from Phase <next>?` or `Restart fresh?`. Branch accordingly. If user picks Continue, prefer the stored mode and skip the Determine mode section, unless they explicitly Restart.
    - **Not found** → fresh run.
 
-4. **Dashboard precheck (Case A / B / C per `qc-dashboard-sync` SKILL.md "Per-UC skill precheck contract"):** runs BEFORE generating `run_id` so a user `site-map first` answer does not pollute the worklog.
-   - Resolve `qc-dashboard.md`. Parse `featureIndex` (by column 2 `<ID label>`) + `folderIDIndex` (by column 3 `Folder ID`).
-   - **Case A — UC NOT in dashboard:**
+3. **Determine `mode`:** check the UC-ID folder for the existence of `uc-review-report` file.
+   - **If the file exists** → `mode = re-audit`.
+   - **If the file does not exist** → `mode = first-audit`.
 
-     ```text
-     ⚠️ UC `<UC-ID>` chua co trong qc-dashboard.md va se duoc them moi (Folder ID = <UC-ID>, In scope? = Need confirm).
-     Day la dau hieu UC nay chua duoc reconcile voi site-map.
+4. Generate a new `run_id` per the worklog protocol.
 
-     Ban muon:
-     1. `site-map first` — Dung lai. Chay /qc-site-map (chon Mode 3) truoc de reconcile orphans, roi quay lai chay review.
-     2. `continue` — Tiep tuc. Bottom-up se add row + ghi vao dashboard-orphans.md; ban co the chay /qc-site-map Mode 3 sau de reconcile.
-     ```
-
-     - `site-map first` → STOP. Print `Da dung. Vui long chay /qc-site-map (chon Mode 3) roi chay lai /qc-uc-read.`
-     - `continue` → invoke `qc-dashboard-sync` bottom-up with `uc_id=<UC-ID>` via the Skill tool. Wait for it to return.
-
-   - **Case B — UC in dashboard BUT still listed in `dashboard-orphans.md`:**
-
-     ```text
-     ⚠️ UC `<UC-ID>` da co trong qc-dashboard.md nhung VAN dang nam trong dashboard-orphans.md (qc-site-map Mode 3 chua reconcile).
-     Ket qua review co the bi rename/realign khi Mode 3 chay sau.
-
-     Ban muon:
-     1. `site-map first` — Dung lai. Chay /qc-site-map (chon Mode 3) truoc de reconcile, roi quay lai chay review.
-     2. `continue` — Tiep tuc. Output se duoc tracking duoi Folder ID hien tai; co the can rename sau khi Mode 3 chay.
-     ```
-
-     - `site-map first` → STOP.
-     - `continue` → proceed (no bottom-up trigger).
-
-   - **Case C** — proceed silently.
-
-5. Generate a new `run_id` per the worklog protocol.
-
-6. **Append a new entry** to the device's worklog JSONL with `status = "Running (Phase 1)"`, `input`/`output` empty, `start = now`. (For resume, follow the resume protocol in §4.)
+5. **Append a new entry** to the device's worklog JSONL with `status = "Running (Phase 1)"`, `input`/`output` empty, `start = now`. (For resume, follow the resume protocol in §4.)
 
 ### Phase 1 — 3 (per workflow)
 
@@ -108,19 +71,17 @@ Dispatch to the appropriate workflow folder based on `mode`:
 
 | Phase | File                                                            | Friendly Name                                |
 | ----- | --------------------------------------------------------------- | -------------------------------------------- |
-| 1     | `workflows/first-audit/1-synthesize-understanding.md`           | Synthesizing Requirement Understanding       |
-| 2     | `workflows/first-audit/2-score-and-identify-gaps.md`            | Scoring & Identifying Gaps                    |
-| 3     | `workflows/first-audit/3-generate-review-report.md`             | Generating Review Report                      |
+| 1     | `workflows/first-audit/1-synthesize-understanding.md`           | Đọc hiểu và phân tích yêu cầu       |
+| 2     | `workflows/first-audit/2-score-and-identify-gaps.md`            | Xác định Gaps, mâu thuẫn và đánh giá điểm theo scoring-rubric |
+| 3     | `workflows/first-audit/3-generate-review-report.md`             | Viết báo cáo                      |
 
 #### Re-Audit
 
 | Phase | File                                                            | Friendly Name                                |
 | ----- | --------------------------------------------------------------- | -------------------------------------------- |
-| 1     | `workflows/re-audit/1-apply-ba-answers.md`                      | Applying BA Answers                           |
-| 2     | `workflows/re-audit/2-recalculate-and-update-backlog.md`        | Recalculating Score & Updating Backlog        |
-| 3     | `workflows/re-audit/3-generate-updated-report.md`               | Generating Updated Report v[N+1]              |
+| 1     | `workflows/re-audit/re-audit.md`                      | Phân tích thông tin mới, câu trả lời, áp dụng thay đổi                  |
 
-Each phase file is self-contained: it includes its own Start status update, work steps, end-of-phase checkpoint write, and hand-off pointer to the next phase. After Phase 3 finishes, cleanup runs per `checkpoint-protocol.md` §6.
+Each phase file is self-contained: it includes its own Start status update, work steps, end-of-phase checkpoint write, and hand-off pointer to the next phase. After Phase 3 finishes, cleanup runs per `checkpoint-protocol.md` §5.
 
 ## Purpose
 You operate by **YAGNI**, **KISS**, and **DRY**. Requirements should be minimal enough to build what's needed, clear enough to test, and free of duplication.
@@ -136,6 +97,9 @@ Analyse **one or more requirement artefacts** (use case docs, design specs, wire
   - **Business Layer:** Does it fulfill the "Domain Logic" (e.g., Fintech compliance, Crypto transaction finality)?
   - **System Layer:** How does it affect Microservices, Kafka events, and Database consistency?
   - **User Layer:** Is the UX resilient to "chaotic" user behavior?
+  - **Business Layer:** ... For blockchain UCs, also verify the requirement covers
+    transaction finality, wallet/chain states, and on-chain↔off-chain consistency
+    per §6b of the scoring rubric.
 - **Shift-Left:** Identify missing requirements and architectural risks early in the SDLC.
 
 ### Requirement Analysis & Taxonomy

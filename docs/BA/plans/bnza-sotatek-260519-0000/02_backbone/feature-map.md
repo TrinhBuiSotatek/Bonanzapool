@@ -188,7 +188,7 @@ changelog:
 | FM-ID | Blocked by | Blocks |
 |-------|----------|----------|
 | FM-ADM-01 | OPERATOR WL admin endpoints | FM-ADM-02 (WL must exist before PF distribution) |
-| FM-ADM-02 | daily-collector cron | — |
+| FM-ADM-02 | daily-collector cron, OQ-6 (WL remittance flow) | — |
 | FM-XB-01 | OQ-2 (zen interface specs) | FM-XB-02, FM-XB-03, FM-XB-04, FM-XB-05, FM-XB-06, FM-XB-07, FM-XB-08 |
 | FM-XB-02 | FM-XB-01 (schema must exist before queue writes) | FM-XB-04, FM-XB-05, FM-XB-09 |
 | FM-XB-07 | FM-XB-01, zen Solidity specs | FM-XB-08 (Router extension needed for EXBOT API) |

@@ -1,29 +1,22 @@
 ---
 name: qc-site-map
-description: generates and updates qc-site-map.md as a screen-first QC site map for agentic QC workflows. Step 2 of the top-down chain qc-context-master -> qc-site-map -> qc-dashboard-sync. Use when the user asks to initialize or update site map, map screens to features, analyze navigation, role access, regression impact, or sync site-map coverage into qc-dashboard. Reads project-context-master.md as baseline (HARD REQUIREMENT — stops if missing), derives screen inventory from high-level files and detailed requirement sources when needed. Operates in THREE modes: Initialization (creates new site map), Update (refreshes existing site map from changed sources), Confirm-Orphans (Mode 3 — reconciles UC folders sent by qc-dashboard-sync bottom-up via .claude/skills/qc-site-map/inbox/dashboard-orphans.md, mapping each to an existing feature or adding it as a new one). In Initialization mode auto-invokes qc-dashboard-sync after writing. In Update mode suggests the user to run qc-dashboard-sync only if changes are detected. Mode 3 auto-invokes qc-dashboard-sync after Folder alias mapping is written to handoff.
+description: generates and updates qc-site-map.md and qc-data-map.md for agentic QC workflows. Use when the user asks to initialize or update a screen-first QC site map, build a data-entity-first QC data map, map screens to features, analyze navigation, role access, data/API/integration/state touchpoints, data lifecycle, CRUD permissions, regression impact, or sync site-map feature coverage into qc-dashboard. Reads project-context-master.md as a hard baseline and preserves the top-down chain qc-context-master to qc-site-map/qc-data-map to qc-dashboard-sync. Supports Initialization, Update, and Confirm-Orphans mode for dashboard orphan reconciliation.
 ---
 
 # QC Site Map
 
 ## Purpose
 
-Generate and maintain `qc-site-map.md` as the screen-first QC site map for downstream QC Agents.
+Generate and maintain two complementary QC context files:
 
-The site map helps QC Agents understand:
+1. `qc-site-map.md` — screen-first site map for sites, portals, apps, modules, screens, navigation, role access, screen-feature mapping, touchpoints, gaps, and regression anchors.
+2. `qc-data-map.md` — data-entity-first map for entities, relationships, lifecycle, CRUD permissions, feature-entity coverage, CR impact, and data-driven regression scope.
 
-- site / portal / app structure;
-- screen / page / modal / tab inventory;
-- navigation and screen flow;
-- role access by screen;
-- screen to feature mapping;
-- screen to data / API / integration / state touchpoints;
-- regression and impact anchors.
+These files help downstream QC agents review specs, design function/integration/system/regression scenarios, design test cases, support execution, and verify bugs with screen-level and data-level project understanding.
 
-The output must help downstream agents review specs, design function / integration / regression scenarios, design test cases, support execution, and verify bugs with screen-level project understanding.
+`qc-site-map.md` and `qc-data-map.md` must not replace detailed specs, wireframes, API docs, DB schemas, `project-context-master.md`, or `qc-dashboard.md`. They add screen and data structure layers on top of the project context.
 
-`qc-site-map.md` must not replace detailed specs, wireframes, API docs, or the project-level context. It adds a screen-first structure layer on top of `project-context-master.md`.
-
-The generated `qc-site-map.md` follows the Vietnamese template and should be written in Vietnamese by default so the QC Lead can review and edit it easily.
+Generated outputs should be written in Vietnamese by default so QC Lead can review and edit them easily.
 
 ---
 
@@ -31,86 +24,72 @@ The generated `qc-site-map.md` follows the Vietnamese template and should be wri
 
 | File | Owner | This skill may do |
 |---|---|---|
-| `qc-site-map` | `qc-site-map` | Create and update directly. |
-| `project-context-master` | `qc-context-master` | Read as required baseline. Do not rewrite. |
-| `qc-dashboard` | `qc-dashboard-sync` | Do not write directly. Send feature-level handoff only. |
-| Spec / wireframe / API docs | BA / BE / Tech Lead | Read for screen evidence only. Do not rewrite. |
+| `qc-site-map.md` | `qc-site-map` | Create and update directly as the screen-first QC site map. |
+| `qc-data-map.md` | `qc-site-map` | Create and update directly as the data-entity-first QC data map. |
+| `project-context-master.md` | `qc-context-master` | Read as required baseline. Do not rewrite. |
+| `qc-dashboard.md` | `qc-dashboard-sync` | Do not write directly. Send feature-level site-map handoff only. |
+| Spec / wireframe / API docs / DB schema / ERD | BA / BE / Tech Lead | Read as evidence only. Do not rewrite. |
 | Scenario / test case files | Downstream QC skills | Do not create here. |
 
 `qc-site-map.md` is the QC source for screen structure, navigation, and screen-to-feature mapping.
 
-`qc-dashboard.md` tracks QC workflow status at the feature/spec level, not at the screen level. Therefore, this skill must not create one dashboard row per screen. Aggregate site map findings by feature when handing off to `qc-dashboard-sync`.
+`qc-data-map.md` is the QC source for data entity inventory, lifecycle, CRUD permission, feature-entity coverage, and data-driven CR/regression impact.
+
+`qc-dashboard.md` tracks QC workflow status at feature/spec level, not screen level or entity level. Do not create one dashboard row per screen. Do not create data-level dashboard rows unless `qc-dashboard-sync` explicitly supports a future data-map handoff contract.
 
 ---
 
 ## Modes
 
-There are THREE modes. Determine the candidate mode from on-disk state, then — when more than one mode is applicable — ASK the user to choose.
+Determine the mode from on-disk state, then ask the user only when multiple modes are applicable.
 
 | Mode | Determination signal | One-line behavior |
 |---|---|---|
-| **Initialization** | `qc-site-map.md` does not exist or is empty | Create a new screen-first site map from `project-context-master.md` and available sources. Auto-invoke `qc-dashboard-sync` after writing. |
-| **Update** | `qc-site-map.md` exists with real content | Run version preflight against `Sources consolidated`. Refresh changed screen/navigation/mapping content. Suggest the user to run `qc-dashboard-sync` only if content changed. |
-| **Confirm-Orphans (Mode 3)** | `.claude/skills/qc-site-map/inbox/dashboard-orphans.md` EXISTS with at least one non-empty data row | Reconcile each orphan UC folder against the existing site-map. Map to an existing feature (Case 1/2) or add as a new feature (Case 3). After reconciliation, rewrite `qc-site-map.md`, regenerate `site-map-handoff.md` with updated `Folder alias(es)`, DELETE the orphan inbox file, and auto-invoke `qc-dashboard-sync`. |
+| **Initialization** | `qc-site-map.md` does not exist or is empty | Create `qc-site-map.md` and `qc-data-map.md` from `project-context-master.md` and available sources. Auto-invoke `qc-dashboard-sync` after writing site-map handoff. |
+| **Update** | `qc-site-map.md` exists with real content | Run version preflight against `Sources consolidated`; refresh changed site-map/data-map content; suggest or ask to run `qc-dashboard-sync` only if site-map handoff changed. |
+| **Confirm-Orphans (Mode 3)** | `.claude/skills/qc-site-map/inbox/dashboard-orphans.md` exists with at least one data row and `qc-site-map.md` exists | Reconcile orphan UC folders from dashboard bottom-up into existing site-map aliases or new features, rewrite handoff, delete/rewrite orphan inbox, and auto-invoke `qc-dashboard-sync`. |
 
 ### Mode selection algorithm
 
-1. At skill start (after path resolution), check both:
-   - `siteMapExists` = does `qc-site-map.md` exist with non-empty content?
-   - `orphanInboxExists` = does `.claude/skills/qc-site-map/inbox/dashboard-orphans.md` exist with at least one orphan row?
+1. Resolve paths from `path-registry.md` whenever possible.
+2. Compute:
+   - `siteMapExists` = resolved `qc-site-map.md` exists with non-empty content and at least one markdown header.
+   - `dataMapExists` = resolved `qc-data-map.md` exists with non-empty content and at least one markdown header.
+   - `orphanInboxExists` = `.claude/skills/qc-site-map/inbox/dashboard-orphans.md` exists and parses to at least one non-empty orphan row.
+3. Apply:
 
-2. Apply this decision table:
+| siteMapExists | orphanInboxExists | Action |
+|:-:|:-:|---|
+| No | Any | Mode = Initialization. Orphans cannot be reconciled yet; leave the orphan inbox untouched. |
+| Yes | No | Mode = Update. If `qc-data-map.md` is missing, create it as part of Update. |
+| Yes | Yes | Prompt the user to pick Mode 2, Mode 3, or both. Default = Mode 3. |
 
-   | siteMapExists | orphanInboxExists | Action |
-   |:-:|:-:|---|
-   | No  | — (any) | Mode = Initialization. No prompt. (Mode 3 cannot run without an existing site map to reconcile against.) |
-   | Yes | No  | Mode = Update. No prompt. |
-   | Yes | Yes | **PROMPT** the user with the menu below to pick Mode 2 or Mode 3 (default Mode 3 since orphans are usually higher priority). |
-
-3. The Mode 2 vs Mode 3 prompt (Vietnamese):
-
-   ```text
-   📋 Phat hien 2 trang thai dong thoi:
-   - qc-site-map.md ton tai (mode Update kha dung)
-   - .claude/skills/qc-site-map/inbox/dashboard-orphans.md ton tai (<N> orphan UC tu qc-dashboard-sync bottom-up)
-
-   Ban muon chay mode nao?
-   1. `mode 3` (mac dinh) — Confirm orphans: reconcile <N> orphan UC voi site-map hien tai (mapping case 1/2/3), update handoff, trigger dashboard-sync.
-   2. `mode 2` — Update site map: refresh content tu source files, KHONG dong cham toi orphans (orphans van con cho lan sau).
-   3. `both` — Chay mode 2 truoc roi mode 3 (refresh site-map roi reconcile orphans tren site-map moi).
-   ```
-
-   Default if user just hits enter / says nothing parseable → `mode 3`.
-
-4. `both`: run Mode 2 to completion (Phases 0 → 10 of the normal workflow), then immediately re-enter the skill with Mode 3 (using the freshly-updated site map as baseline). The dashboard-sync invocation from Mode 2 is suppressed (only the one from Mode 3 fires at the end).
-
-In Update mode + Mode 3, always read the existing `qc-site-map.md` before any extraction or reconciliation.
-
-## Prerequisite
-
-`project-context-master.md` MUST exist with real content. This skill is step 2 in the top-down chain and refuses to run if step 1 has not produced its output. If `project-context-master.md` is missing, STOP and instruct the user to run `qc-context-master` first.
-
-## Version preflight (Update mode only)
-
-Before re-running the full pipeline, parse the `Sources consolidated` table from the existing `qc-site-map.md`. For each source, scan its parent folder for the latest version (`_v<N>` suffix in filename) and compare with the recorded version.
-
-- If at least one source has a new version, a new file, or a deleted file -> proceed with the full pipeline.
-- If no version change is detected on any source, ask the user:
+Prompt in Vietnamese:
 
 ```text
-Khong phat hien version moi cua cac source files da consolidated lan truoc:
-- <file 1>: v<N> (khong doi)
-- <file 2>: v<N> (khong doi)
-...
+📋 Phat hien 2 trang thai dong thoi:
+- qc-site-map.md ton tai (mode Update kha dung)
+- .claude/skills/qc-site-map/inbox/dashboard-orphans.md ton tai (<N> orphan UC tu qc-dashboard-sync bottom-up)
 
-Luu y: co che nay chi detect version qua ten file (regex _v<N>).
-Neu ban da sua content ma khong tang version, hay tra loi yes de chay lai.
-
-Ban co muon chay lai khong? [yes/no]
+Ban muon chay mode nao?
+1. `mode 3` (mac dinh) — Confirm orphans: reconcile <N> orphan UC voi site-map hien tai, update handoff, trigger dashboard-sync.
+2. `mode 2` — Update site map/data map tu source files, KHONG dong cham toi orphans.
+3. `both` — Chay mode 2 truoc roi mode 3.
 ```
 
-- User answers `no` -> exit early without changes, log the skip in the worklog.
-- User answers `yes` -> continue with the full pipeline.
+For `both`, run the Update workflow first, suppress Update's dashboard-sync invocation, then immediately run Mode 3. Mode 3's dashboard-sync invocation fires once at the end.
+
+---
+
+## Hard prerequisite
+
+`project-context-master.md` MUST exist with real content. This skill is step 2 in the top-down chain and refuses to run if step 1 has not produced its output.
+
+If `project-context-master.md` is missing or unreadable, STOP and instruct the user in Vietnamese:
+
+```text
+Khong tim thay project-context-master.md. Hay chay /qc-context-master truoc khi chay /qc-site-map.
+```
 
 ---
 
@@ -124,82 +103,56 @@ Required:
 - `path-registry.md`
 - `project-context-master.md`
 - `templates/qc-site-map-template.vi.md`
+- `templates/qc-data-map-template.vi.md`
 - `references/qc-site-map-writing-guide.md`
+- `references/qc-data-map-writing-guide.md`
 
-Required in Update mode if available:
+Required in Update mode when available:
 
 - existing `qc-site-map.md`
+- existing `qc-data-map.md`
 - existing `qc-dashboard.md`
 
-Optional sources:
+Optional evidence sources:
 
 - high-level BA files;
-- official site map / menu / navigation documents;
-- feature list;
+- official sitemap / menu / navigation documents;
+- feature list / use-case list / backbone file;
 - wireframe index / screen list;
 - user journey / user flow documents;
 - role / permission matrix;
-- SRS / spec / wireframe folder for fallback derivation;
-- release notes / change logs.
+- SRS / spec / wireframe folders for fallback derivation;
+- API specs / DB schema / ERD / data dictionary;
+- FRD per module;
+- data classification / retention / audit policy;
+- release notes / change logs / CR impact-assessment files.
 
-Stop if `project-context-master.md` is missing. Continue as Partial if official sitemap/screen sources are missing but enough module/feature context exists to create a skeleton.
-
----
-
-## Required supporting files
-
-Before generating or updating the site map, read:
-
-- `templates/qc-site-map-template.vi.md`
-- `references/qc-site-map-writing-guide.md`
-
-Use the template as the output structure. Use the writing guide as the operational rules.
-
-For long runs, read:
-
-- `workflows/checkpoint-protocol.md`
-
-Then follow the workflow files in order.
+Stop if `project-context-master.md` is missing. Continue as Partial if official screen/data sources are missing but enough module/feature context exists to create skeleton outputs.
 
 ---
 
 ## Core workflow
 
-### Mode 1 / Mode 2 (Initialization / Update)
+### Initialization / Update
 
-1. Follow `workflows/phase-0-audit-resume.md` to detect existing checkpoints, resume safely, run mode detection (incl. orphan inbox check + the Mode-2/3 prompt when both signals are present), and run version preflight in Update mode.
-2. Follow `workflows/phase-1-preflight-input-audit.md` to resolve paths, detect mode, verify the `project-context-master.md` prerequisite, audit inputs, and record source versions.
-3. Follow `workflows/phase-2-project-context-baseline.md` to extract baseline from `project-context-master.md`.
-4. Follow `workflows/phase-3-source-inventory.md` to classify sitemap-related sources and confidence.
-5. Follow `workflows/phase-4-screen-inventory.md` to create screen/page/modal/tab inventory.
-6. Follow `workflows/phase-5-navigation-map.md` to build the screen-first tree and navigation flows.
-7. Follow `workflows/phase-6-mapping-access.md` to map screens to features, roles, data/API/integration/state, and regression anchors.
-8. Follow `workflows/phase-7-gap-readiness.md` to classify missing information, conflicts, assumptions, and readiness.
-9. Follow `workflows/phase-8-render-site-map.md` to write `qc-site-map.md` including the `Sources consolidated` table.
-10. Follow `workflows/phase-9-dashboard-handoff.md` to write the `site-map-handoff.md` inbox file and either auto-invoke `qc-dashboard-sync` (Initialization) or suggest the user to run it (Update with changes).
-11. Follow `workflows/phase-10-handover-cleanup.md` to summarize completion and delete the entire process-logging folder on success.
+1. Follow `workflows/workflow-0-run-control.md` to resolve paths, resume safely, determine mode, verify prerequisites, run version preflight, and audit source files.
+2. Follow `workflows/workflow-1-build-site-map.md` to build or update the screen-first site-map model.
+3. Follow `workflows/workflow-2-build-data-map.md` to build or update the data-entity-first data-map model.
+4. Follow `workflows/workflow-3-commit-handoff-cleanup.md` to render staged outputs, compare semantic changes, commit files safely, write `site-map-handoff.md`, invoke/suggest `qc-dashboard-sync` when appropriate, and clean checkpoints.
 
-Each phase must write a checkpoint before moving to the next phase.
+Each workflow must write a checkpoint before moving to the next workflow.
 
-### Mode 3 (Confirm-Orphans)
+### Confirm-Orphans Mode
 
-Mode 3 runs an entirely separate, short workflow defined in `workflows/mode-3-confirm-orphans.md`. It does NOT share Phases 1–10 above (no source inventory, no screen inventory rebuild, no readiness rescoring) — its only job is to reconcile orphan UC folders from `dashboard-orphans.md` against the existing `qc-site-map.md`, update the site map + handoff with mapping decisions, delete the orphan inbox, and trigger `qc-dashboard-sync`.
+When Mode 3 is selected, jump directly to `workflows/mode-3-confirm-orphans.md`.
 
-This separation exists because Mode 3:
-- Has a different prerequisite (orphan inbox file MUST exist, with at least one row);
-- Performs a per-orphan interactive loop (Case 1 / Case 2 / Case 3 decision), not a linear source-to-output pipeline;
-- Touches only the alias-mapping bits of `qc-site-map.md` (Section adjacencies for new features in Case 3) and the `Folder alias(es)` column of the handoff;
-- Always ends by auto-invoking `qc-dashboard-sync` (no `contentChanged` short-circuit).
-
-See the dedicated workflow file for the step-by-step procedure.
+Mode 3 does not rebuild source inventory, screen inventory, navigation, or data map. Its only job is to reconcile dashboard orphan folders against the existing `qc-site-map.md`, update folder aliases, rewrite `site-map-handoff.md`, clean the orphan inbox, and invoke `qc-dashboard-sync`.
 
 ---
 
-## Screen-first rule
+## Screen-first rule for `qc-site-map.md`
 
-The site map is screen-first.
-
-Start from:
+Build `qc-site-map.md` from this hierarchy:
 
 ```text
 System / Site / Portal
@@ -213,42 +166,75 @@ Then map each screen to:
 - related feature/spec;
 - role/access;
 - navigation flow;
-- data/API/integration/state;
+- data/API/integration/state touchpoints;
 - regression/impact notes.
 
 Do not start from feature-first structure. Feature list belongs to `project-context-master.md` and dashboard. `qc-site-map.md` contributes the screen/navigation layer.
 
 ---
 
+## Data-entity-first rule for `qc-data-map.md`
+
+Build `qc-data-map.md` from this hierarchy:
+
+```text
+Data entity
+  -> relationship / dependency / cascade
+  -> lifecycle / CRUD / side-effect / sync
+  -> state transition when complex
+  -> CRUD role permission and field-level restriction
+  -> feature-entity coverage and regression impact
+```
+
+Do not turn `qc-data-map.md` into a full data dictionary. Include only fields, relationships, lifecycle details, permission rules, and touchpoints that affect QC analysis, test design, CR impact, or regression scope.
+
+---
+
 ## Dashboard relationship
 
-This skill is the SOLE upstream source of the feature list used by `qc-dashboard-sync` in top-down mode. `qc-context-master` no longer writes its own handoff to `qc-dashboard-sync`; the feature list flows: `project-context-master.md` -> read by this skill -> aggregated by feature with screen mapping -> written to `site-map-handoff.md` -> consumed by `qc-dashboard-sync`.
+This skill is the SOLE upstream source of the feature list used by `qc-dashboard-sync` in top-down mode. The feature list flows:
 
-When handing off to `qc-dashboard-sync`, aggregate by feature.
+```text
+project-context-master.md -> qc-site-map.md -> site-map-handoff.md -> qc-dashboard-sync
+```
 
-Send (per feature row in `Feature-level site map coverage`):
+When handing off to `qc-dashboard-sync`, aggregate by feature/use case.
+
+Send per feature row:
 
 - mapped screens;
-- folder alias(es) — comma-separated list of folder-name IDs that map to this feature. EMPTY for features whose canonical Feature ID equals the folder ID. NON-EMPTY only for features reconciled by Mode 3 from a folder using a different ID/name format;
-- `In scope?` — authoritative scope value (`Yes` / `No` / `Need confirm`). Decided by this skill, NOT by `qc-dashboard-sync`;
-- site map status (Mapped / Partial / Missing / Conflict / Need confirm);
-- site map gaps;
+- folder alias(es) — comma-separated list of folder-name IDs that map to this feature;
+- `In scope?` — authoritative scope value (`Yes` / `No` / `Need confirm`);
+- site-map status (`Mapped` / `Partial` / `Missing` / `Conflict` / `Need confirm`);
+- site-map gaps;
 - role/access/navigation issues that affect this feature;
 - regression/impact notes if relevant.
 
-Do not create one dashboard row per screen. If a screen cannot be mapped to any feature, report it as an unmapped screen in the handoff notes, but do not create a dashboard feature row unless QC Lead confirms it represents a real feature/spec.
+Do not create one dashboard row per screen. If a screen cannot be mapped to any feature, report it as an unmapped screen in handoff notes but do not create a dashboard feature row unless QC Lead confirms it represents a real feature/spec.
+
+`qc-data-map.md` currently has no automatic dashboard handoff. Report data-map readiness, entity gaps, and hotspot findings in the final summary only, unless `qc-dashboard-sync` has an explicit future contract for data-map handoff.
 
 Invocation mode:
-- Initialization (no existing `qc-dashboard.md` OR no existing `qc-site-map.md` before this run) -> auto-invoke `qc-dashboard-sync` after writing handoff.
-- Update with content change -> suggest the user to run `qc-dashboard-sync`.
-- Update with no content change -> no downstream action.
-- Mode 3 (Confirm-Orphans) -> ALWAYS auto-invoke `qc-dashboard-sync` after writing the updated handoff + deleting the orphan inbox. The orphan inbox lifecycle is owned by this skill in Mode 3 (sole deleter).
+
+- Initialization -> auto-invoke `qc-dashboard-sync` after writing `site-map-handoff.md`.
+- Update with site-map semantic change -> suggest or ask the user whether to run `qc-dashboard-sync`.
+- Update with only data-map change -> no dashboard sync by default.
+- Update with no semantic change -> no downstream action.
+- Mode 3 -> always auto-invoke `qc-dashboard-sync` after writing updated handoff and deleting/rewriting orphan inbox.
+
+---
 
 ## Inbox files this skill consumes
 
 | File | Producer | Consumer | Lifecycle |
 |---|---|---|---|
-| `.claude/skills/qc-site-map/inbox/dashboard-orphans.md` | `qc-dashboard-sync` (top-down Phase 4 + bottom-up step 9). Append + dedupe by Folder ID. | This skill Mode 3. | This skill Mode 3 DELETES the file after all orphans are reconciled. |
+| `.claude/skills/qc-site-map/inbox/dashboard-orphans.md` | `qc-dashboard-sync` | This skill Mode 3 | Mode 3 deletes the file after all orphans are reconciled, or rewrites it with skipped-only rows. |
+
+## Inbox files this skill writes
+
+| File | Consumer | Lifecycle |
+|---|---|---|
+| `.claude/skills/qc-dashboard-sync/inbox/site-map-handoff.md` | `qc-dashboard-sync` | This skill is sole writer. Do not let `qc-dashboard-sync` delete it; it remains available for manual dashboard re-sync. |
 
 ---
 
@@ -256,12 +242,12 @@ Invocation mode:
 
 Stop and ask the user only when:
 
-1. `project-context-master.md` is missing or unreadable. STOP and instruct the user to run `qc-context-master` first.
-2. `path-registry.md` cannot resolve where to write `qc-site-map.md`.
-3. There is no usable project/module/feature/screen context at all.
-4. In Initialization mode, `qc-dashboard-sync` cannot be found or invoked.
-5. A required existing file path has changed in a way that may overwrite user work.
-6. A conflict blocks safe writing of `qc-site-map.md`.
+1. `project-context-master.md` is missing or unreadable.
+2. `path-registry.md` cannot resolve where to write `qc-site-map.md` or `qc-data-map.md`.
+3. There is no usable project/module/feature/screen/data context at all.
+4. Initialization mode cannot find or invoke `qc-dashboard-sync` after writing the required site-map handoff.
+5. A required existing file path changed in a way that may overwrite user work.
+6. A conflict blocks safe writing of `qc-site-map.md` or `qc-data-map.md`.
 7. Version preflight returned no detected changes and the user answered `no`.
 
 Otherwise, continue with available information, mark gaps, and report what needs confirmation.
@@ -272,16 +258,21 @@ Otherwise, continue with available information, mark gaps, and report what needs
 
 Return a concise Vietnamese summary:
 
-- Mode: Initialization / Update / Skipped (when version preflight returned no change and user declined).
+- Mode: Initialization / Update / Skipped / Mode 3.
 - `qc-site-map.md`: created / updated / unchanged.
+- `qc-data-map.md`: created / updated / unchanged.
 - Sources consolidated: count of files, count with new version since last run.
-- Source quality: official / derived / partial.
+- Site-map source quality: official / derived / partial.
 - Screen count and mapped feature count.
+- Data-map source quality: confirmed / derived / partial.
+- Entity count, relationship count, CRUD-role coverage status, and feature-entity coverage status.
 - Dashboard handoff status:
-  - Initialization → `qc-dashboard-sync` auto-invoked.
-  - Update with changes → handoff written, user suggested to run `/qc-dashboard-sync`.
-  - Update no change → handoff not written, no downstream action.
+  - Initialization -> `qc-dashboard-sync` auto-invoked.
+  - Update with site-map change -> handoff written, user suggested/asked to run `/qc-dashboard-sync`.
+  - Update with only data-map change -> no dashboard action.
+  - Update no change -> handoff not written, no downstream action.
+  - Mode 3 -> `qc-dashboard-sync` auto-invoked.
 - Major gaps/conflicts/assumptions.
 - Suggested next action for QC Lead.
 
-Do not paste the full generated file into chat unless the user asks.
+Do not paste full generated files into chat unless the user asks.

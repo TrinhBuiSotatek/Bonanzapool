@@ -1,34 +1,10 @@
-# Phase 5 - Navigation Map
+# Legacy alias — phase-5-navigation-map.md
 
-## Goal
+This file is retained only for backward compatibility with older references.
 
-Build the screen-first tree and important navigation flows.
+Do not follow this phase in new runs. The active workflow is:
 
-## Build
 
-1. Site / Portal / App tree.
-2. Area / Module branches.
-3. Screen / Page nodes.
-4. Sub-screen / Tab / Modal / Action nodes if known.
-5. Important user flows and cross-module navigation.
+`workflows/workflow-1-build-site-map.md`
 
-## Rules
-
-- Keep the tree concise and screen-first.
-- Do not write scenario steps.
-- Do not design new UX or navigation.
-- Mark missing navigation as `TBD` or `Need confirm`.
-
-## Output checkpoint
-
-Write:
-
-```text
-process-logging/qc-site-map/05_navigation_map.md
-```
-
-Include:
-
-- tree draft;
-- navigation flow table;
-- navigation gaps.
+Navigation tree and flow mapping now live in Workflow 1.

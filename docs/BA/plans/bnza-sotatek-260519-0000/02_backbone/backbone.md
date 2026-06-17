@@ -2,14 +2,13 @@
 type: backbone
 status: in-review
 created: 2026-05-20
-updated: 2026-06-12
+updated: 2026-06-08
 owner: "@hien.duong"
 engagement_mode: formal
 lang: en
 links:
   - ../../01_intake/intake.md
 changelog:
-  - "2026-06-12 | manual | §8.9: absorb SPEC_v5.2.6_EN.md key content inline — Phase 0 conditions, NV-1–14 table, all formulas (LP calc, hedge target, stop price, margin thresholds, preflight), price 3-way split, behavioral rules; §11: add source row"
   - "2026-06-08 | manual | OOS markings: PTL-01/PTL-06 + ACT-03/ACT-07 (§2/§3); §4.1/§4.7 OOS banners; §5.0/§5.0B OOS banners; §6 deps (remove Helix-side rows); §7 priorities (remove FM-WLA/FM-MOB); §0 delivery structure updated; §8.8 context-only note added"
   - "2026-06-04 | /ba-impact | sync WL_SPEC_SOTATEK_EN_v1.1 §4.4: thêm §8.1 WL post-record auth row (HMAC-SHA256 Helix server-to-server, CORS N/A, explicit starter wallet); clarify §6 stream 3 endpoint path (atomic-start/stop)"
   - "2026-06-04 | /ba-impact | sync with WL_SPEC_SOTATEK_EN_v1.0: expand FM-ADM-01 (member lifecycle + master wallet); reduce FM-ADM-02 (BnzaSplitter removed, off-chain only); add FM-ADM-10 (WL bot lifecycle monitor); add ADMIN→OPERATOR WL lifecycle dependency; update fee model PF row (pfCollector single EOA); update §8.8.3 money flow (pfCollector + wlMaster)"
@@ -69,7 +68,7 @@ changelog:
 | PTL-01 **[OOS — Helix scope]** | wl.bnza.io (TBD) | WL Mobile | Vite + React 19 + TS 5.9 + Zustand + Tailwind 4 + shadcn/ui + Reown AppKit + PWA | CF Pages | SIWE/JWT (24h) |
 | PTL-02 | ops.bnza.io | BNZA-ADMIN | React 19.2 + Vite 8.0 + TS 5.9 + Tailwind 4.2 + shadcn/ui + React Router 7.14 + TanStack Query 5.100 | CF Pages | Wallet + CF Access + RBAC |
 | PTL-03 | ex.bnza.io | BNZA-EX | React 18.3 + Vite 6.0 + JavaScript (no TS) + Wagmi 3.6 + @nktkas/hyperliquid 0.32 | CF Pages | Wallet (direct HL) |
-| PTL-04 | api.bnza.io/exbot | BNZA-EXBOT Infra | CF Workers (standalone `apps/bnza-exbot/`) + D1 (ExBot schema) + 8 Queues + DO (3: HLRateLimitDO, UserLockDO, MarketDataDO) | CF Workers | Internal (service binding from OPERATOR) |
+| PTL-04 | api.bnza.io | BNZA-EXBOT Infra | CF Workers + Hono 4.12 + D1 (22 migrations) + Queues (3 defined) + DO (2 active) + KV | CF Workers | Internal (system) |
 | PTL-05 | pool.bnza.io | BNZA-POOL Steps 7-8 | Next.js 16.2 + React 19.2 + TS 5.9 + Tailwind 4 + shadcn/ui + Wagmi 2.19 + TanStack Query 5.94 | Vercel | Wallet |
 | PTL-06 **[OOS — Helix scope]** | wl-admin.bnza.io (TBD) | WL Admin System (bnza-wl-admin) | CF Pages (frontend) + CF Workers (backend/cron) + CF D1 (25 tables) + CF Queues | CF Pages + CF Workers | SSO (CF Access) + 2FA (TOTP mandatory); roles: Super / Operator / Read-only |
 
@@ -140,15 +139,12 @@ changelog:
 
 | Action | ACT-06 OPERATOR (System) | ACT-04 Admin |
 |--------|:---:|:---:|
-| Queue processing (bot-scan, light-check, hedge-sync, reconcile, deep-audit, price-near-stop-audit, partial_repair, user_redeem, notification, metrics-rollup) | ✅ | — |
+| Queue processing (bot-scan, hedge-sync, reconcile) | ✅ | — |
 | Cron execution (deep-audit) | ✅ | — |
-| D1 read/write (ExBot tables) | ✅ | — |
-| Durable Object management (HLRateLimitDO, UserLockDO, MarketDataDO) | ✅ | — |
-| API: start bot (via Operator facade) | — | ✅ |
-| API: status bot (via Operator facade) | — | ✅ |
-| API: close bot (via Operator facade) | — | ✅ |
-| API: agent-key management | — | ✅ |
-| API: margin adjustment | — | ✅ |
+| D1 read/write (EXBOT tables) | ✅ | — |
+| Durable Object management (rate limit, locks) | ✅ | — |
+| API: start/stop/pause/status EXBOT | — | ✅ |
+| API: agent-key-approval | — | ✅ |
 | Hyperliquid adapter calls | ✅ | — |
 
 ### 4.5 BNZA-POOL Steps 7-8 (PTL-05)
@@ -295,18 +291,14 @@ changelog:
 
 | Sub-module | Description | Priority | Effort |
 |------------|-------------|----------|--------|
-| FM-XB-01: D1 Schema | 5 primary tables (bots, bot_runtime_state, hedge_legs, hl_agent_keys, queue_idempotency); optimistic concurrency via state_version guard | P0 | 0.5w |
-| FM-XB-02: Queue Topology | 10 queues: bot-scan, light-check, hedge-sync, reconcile, deep-audit, price-near-stop-audit, partial_repair, user_redeem (highest priority, SLA 5 min), notification, metrics-rollup | P0 | 1w |
-| FM-XB-03: Durable Objects | HLRateLimitDO (sliding-window, 800 weight/min budget), UserLockDO (lease-based 90s TTL, 1-user mutex), MarketDataDO (sqrtPriceX96/tick cache) | P0 | 0.5w |
-| FM-XB-04: Cron Jobs | `*/360 * * * *` deep-audit + hourly metrics-rollup + 6h stop-integrity scan | P1 | 0.5w |
-| FM-XB-05: HL Adapter | Rate limit (1,200 wt/min, BNZA budget 800), cloid deterministic generation, nested error parser, delta-only adjustShortDelta, post-order reconcile, agent key decrypt | P1 | 1w |
-| FM-XB-06: API Endpoints (Operator Facade) | `/api/exbot/*` proxy: start, status, close, agent-key, margin — OPERATOR forwards to ExBot Worker via service binding; ExBot NOT public | P1 | 1w |
-| FM-XB-07: Lifecycle State Machine | 18 states: idle→preflight→lp_opening→lp_opened→hedge_pre_open→hedge_post_confirmed→stop_placing→stop_verified→active; runtime: hedge_stopped_cooldown, cooldown, parked, lp_rebalancing, lp_closing, closed, safe_mode, error; PAUSED=status-level only | P0 | 1w |
-| FM-XB-08: Close/Redeem Operations | Two systems: (A) user_redeem = LP-first instant redemption (on-chain guarantee, hedge close SLA 5 min); (B) bot_safe_close = hedge-first, USDC parked into uninvested_balances; close_operations idempotency ledger prevents double settlement | P0 | 0.5w |
+| FM-XB-01: D1 Schema | 9 tables (hl_agent_keys, subaccount_mappings, lp_positions, hedge_positions, funding_ledger, rebalance_attempts, circuit_breakers, stop_triggers, reconcile_log) | P0 | 0.5w |
+| FM-XB-02: Queue Topology | 6 queues (bot-scan, light-check, hedge-sync, reconcile, deep-audit, stop-audit) | P0 | 1w |
+| FM-XB-03: Durable Objects | HLRateLimitDO, UserLockDO, MarketDataDO | P0 | 0.5w |
+| FM-XB-04: Cron Jobs | `*/360 * * * *` deep-audit + other intervals | P1 | 0.5w |
+| FM-XB-05: HL Adapter | Rate limit handling, cloid, error parser, reconcile glue | P1 | 1w |
+| FM-XB-06: API Endpoints | start, stop, pause, status, agent-key-approval | P1 | 1w |
 
-> **EXBOT Phase 0 Gate (blocks Phase A start)**: Prerequisites per SPEC v5.2.6 §0.3 — (1) zen approves SPEC v5.2.6; (2) BnzaExVault deployed, Base + OP addresses/operator/multiSig finalized (2 sets); (3) HL agent key encryption method confirmed; (4) WL stability gate — 7 consecutive days post-launch with zero SAFE_MODE + no major incident. Before all 4 met: SOTATEK prepares D1 schema + Queue skeleton only — no HL integration.
-
-> **D1 Architecture (2 DBs)**: `control_db` (users, bot_registry, shard_registry, hl_agent_keys) + `state_db_shard_xx` (bots, positions, hedge_legs, bot_runtime_state, circuit_breakers, rebalance_attempts, lp_operations, close_operations, queue_idempotency, funding_daily_metrics, hourly/daily_bot_metrics). Phase A: 1 shard; Phase B: 4; Phase C: 16 (deferred). R2 archive + Analytics Engine: Phase B+.
+> **EXBOT Phase 0 Gate (blocks Phase A start)**: Prerequisites per SPEC v5.2.5 §0.3 — (1) zen approves SPEC v5.2.5; (2) BnzaExVault deployed, zen confirms address/operator/multiSig; (3) HL agent key encryption confirmed (Phase A default: Cloudflare Secrets Store); (4) WL stability gate — 7 consecutive days post-launch with no SAFE_MODE + no major incident. Before all 4 met: SOTATEK prepares D1 schema + Queue skeleton only — no HL integration.
 
 ### 5.5 BNZA-POOL Steps 7-8 (Priority: P1 — Post-WL)
 
@@ -373,7 +365,7 @@ changelog:
 > - wl_activation_status transitions: OPERATOR cron đọc wl_members + wl_codes để quyết định
 >   pending_set / active / failed_set / pending_unset / needs_repair.
 | ADMIN → EXBOT Infra | EXBOT management endpoints | Via OPERATOR API | Partial |
-| EXBOT Infra → OPERATOR | OPERATOR proxies `/api/exbot/*` into ExBot Worker via service binding + internal token | CF service binding (Worker-to-Worker) | Yes |
+| EXBOT Infra → OPERATOR | Must integrate into existing Queue v2 architecture | Internal (same codebase) | Yes |
 | EXBOT Infra → zen | Interface specs (D1 schema, Queue topology, API contracts) | Documentation | **Blocker** (OQ-2) |
 | EXBOT Infra → Hyperliquid | Trading API (testnet first) | External API | Yes |
 | **ExBot → WL (future)** | **ExBot replaces/extends LPBot as WL bot engine** | **TBD — integration point Line 1 × Line 2** | **Future milestone** |
@@ -482,7 +474,7 @@ changelog:
 | MOBILE | CF Pages | `wrangler pages deploy dist/` | Monorepo (packages/mobile) |
 | ADMIN | CF Pages | `wrangler pages deploy dist/` | Monorepo (packages/admin) |
 | EX | CF Pages | `wrangler pages deploy dist/` | Monorepo (packages/ex) |
-| EXBOT Infra | CF Workers | `wrangler deploy` (`apps/bnza-exbot/` — standalone Worker) | Monorepo (apps/bnza-exbot) |
+| EXBOT Infra | CF Workers | `wrangler deploy` (same as OPERATOR) | Monorepo (packages/operator) |
 | POOL Steps 7-8 | Vercel | Push to `main` (auto-deploy) | Existing repo (separate — not in SOTATEK monorepo) |
 
 ### 8.5 Shared Design Language
@@ -575,7 +567,6 @@ This section is the canonical inline reference for the WL+MLM system. All module
 | **Tenant** | One WL operator = one tenant. Admin system and mobile are multi-tenant. |
 | **earned** | Raw uncollected fees generated by a user's Uniswap V3 LP position. |
 | **net** | Amount sent to `wlMaster[tokenId]` = earned − opFee (0.5%) − PF (30% of afterOp). Allocation source. |
-| **WL bot** | A bot instance where `wlMaster[tokenId] != 0`; i.e., a bot associated with a whitelabel partner's master wallet on-chain. |
 | **WL master account** | Per-bot, per-chain address stored in Router on-chain storage (`wlMaster[tokenId]`). Set by BNZA via `setBotWlMaster` after bot start. Net from WL bot fees is sent here; principal never enters here. |
 | **Fee reward** | User's own share = net × rank reward rate (30–62%). |
 | **MLM pool** | Remainder = net × (1 − rank reward rate). Source for all MLM bonuses. |
@@ -797,147 +788,8 @@ WL ops team "Helix" logs into WL-ADMIN (PTL-06) to run daily MLM operations
 |---|---|---|---|
 | OQ-1: Monorepo strategy | **Resolved: Monorepo** | Deployment topology updated (§8.4 — monorepo branch strategy) | Done |
 | OQ-2: EXBOT interface specs | Hold (escalate zen) | **Blocker** for FM-XB-01→06 detailed requirements | Escalate immediately; start with known patterns from Queue v2 |
-| OQ-6: PF WL remittance flow | **Resolved** | FM-ADM-02 is off-chain config only. fee_distributions records BNZA's internal PF allocation. WL 70/30 split is Helix's concern — not SOTATEK/BNZA-ADMIN scope (BR-ADM-020). Real API live as of 2026-06-12. | Resolved via uc-pf-distribution.md 2026-06-04; confirmed real API 2026-06-12 |
+| OQ-6: PF WL remittance flow | Hold | Affects FM-ADM-02 detailed design (daily-collector + WL split) | Document known: daily-collector cron exists; WL-specific 70/30 remittance mechanism TBD |
 | OQ-8: Staging environment | Hold | Affects deployment guide; non-blocking for development | Staging domains defined in deployment guide but not confirmed |
-
----
-
-### 8.9 EXBOT Strategy Spec — v5.2.6 Key Content
-
-> **Source:** SPEC_v5.2.6_EN.md — client-provided, NOT in repo. File path at time of writing: `/Users/hienduong/Downloads/SPEC_v5.2.6_EN.md`.
-> v5.2.6 is the **Final Approved** version (3-AI QA: Claude Code + Codex + GPT, Theme A–F). Unlike v5.2.3–v5.2.5 (doc-sync only), **v5.2.6 contains behavioral changes**. Where any module artifact (SRS/FRD/UC) conflicts with v5.2.6, v5.2.6 prevails.
-
-#### 8.9.1 What changed in v5.2.6 vs v5.2.5
-
-| Theme | Changes |
-|---|---|
-| A | Stop subsystem fully BigDecimal; protected stop replacement invariant (INV-STOP §19.5); automatic cooldown ladder after stop fires; circuit breaker stored-column canonical |
-| B | `lp_operations` ledger (on-chain success + D1 failure recovery); close/redeem state machine ledger (`close_operations`); dust close bypass; `partial_repair` promoted to first-class queue; lifecycle enum canonicalized (B-5); queue idempotency ledger (B-6); one-bot preflight gap fix |
-| C | Margin warning guard; margin definition fixed + preflight 2.0× buffer; price 3-way split (uniPoolPrice / hlMarkPrice / hlOraclePrice); budget overflow = proportional scale-down ladder (not hedge ratio change); **light-check HL-inviolability restored** (no HL fetch in light-check, ever) |
-| D | D1 write budget gate; D1 Free tier corrected to 500 MB; max 6 simultaneous outbound connections per CF Worker |
-| E | **Dual-chain from Phase 1 = Base + Optimism both from day 1** (not Base-only then add OP) |
-| F | §0.5 NV table added (NV-1 to NV-14); version bump |
-
-#### 8.9.2 Phase 0 Start Conditions (§0.3 / §30)
-
-All 4 must be met before Phase A implementation begins:
-1. zen approves SPEC v5.2.6 (document finalized) ✅ done
-2. BnzaExVault deployed on Base + Optimism — addresses, `authorizedOperator`, `multiSig` (2 sets) confirmed by zen
-3. HL agent key encryption method confirmed (NV-3 result finalizes §19.5 path a vs b)
-4. WL stability gate: 7 consecutive days post-launch with zero SAFE_MODE + no major incident
-
-#### 8.9.3 NV Items — External Assumptions to Verify in Phase 0
-
-Owner: NV-1–11 = SOTATEK | NV-12 = BNZA (zen)
-
-| NV | Category | What to verify | Blocks |
-|---|---|---|---|
-| NV-1 | HL | Exact API fields of isolated margin (`marginBalanceUsd`, `marginRequiredUsd`) + acceptance spec of reduce-only stop | §18.4 margin formula; §19.5 branch |
-| NV-2 | HL | Whether `clearinghouseState` returns `entryPx` / `liquidationPx` / `effectiveLeverage` / `isolatedMargin` | §17.3 / §19.1 |
-| NV-3 | HL | **Whether duplicate reduce-only stops are accepted on the same leg** → determines §19.5 path (a) or (b). Also: reduce-only stop size > position; `cancelByCloid` after trigger fire | §19.5 INV-STOP implementation |
-| NV-4 | HL | Native trigger stop: mark-price vs oracle-price firing; immediate-trigger rejection; partial fill behavior | §8.4 / §19.2 |
-| NV-5 | HL | Cloid duplication behavior (idempotency — prevents double submission) | §8.5 / §13.8 |
-| NV-6 | HL | Order/info behavior when `subaccount + vaultAddress` specified; behavior on agent key expiry/revocation | §8.3 / §16.5 / §21.5 |
-| NV-7 | HL | Measured rate-limit weight per endpoint (`clearinghouseState`=2 confirmed; others TBD) + `userRateLimit` endpoint | §9 HLRateLimitDO |
-| NV-8 | CF | Workers subrequest limit (Paid=10,000); simultaneous open connections=6 | §5.2 |
-| NV-9 | CF | D1 queries Paid=1,000; single-thread write; write QPS under 10k load | §5.2 D1 budget |
-| NV-10 | CF | Queue throughput 5,000/s; batch 100; concurrency 250; wall time 15 min | §10 queue arch |
-| NV-11 | CF | DO single-thread; lease behavior; Secrets Store binding decrypt round-trip | §11 / §21.5 |
-| NV-12 | Chain | **Base + Optimism pool address; token0/token1 order (`wethIndex`); BnzaExVault deploy address** | §6.4 LP calc; §15.5.6 |
-| NV-13 | HL | ETH perp min order / min notional / dust handling (write-off for size below minimum close) | §17.2 dust close |
-| NV-14 | HL | Builder fee 5bps approval flow (on-chain or API?); billing timing; interaction with agent key/subaccount | §2 / §8 preflight |
-
-> NV-3 and NV-12 are the most critical — do not implement §19.5 (stop replacement) or §6.4 (dual-chain LP) until these are confirmed.
-
-#### 8.9.4 Key Formulas
-
-**LP Position Amount (Uniswap V3 — §6.2)**
-
-```
-S = sqrt(currentPrice),  A = sqrt(P_lower),  B = sqrt(P_upper),  L = liquidity
-
-current_tick < tick_lower  →  amount0 = L×(1/A − 1/B),  amount1 = 0
-tick_lower ≤ current_tick < tick_upper  →  amount0 = L×(B−S)/(S×B),  amount1 = L×(S−A)
-current_tick ≥ tick_upper  →  amount0 = 0,  amount1 = L×(B−A)
-
-lpEthAmount = (wethIndex === 0) ? amount0Human : amount1Human
-```
-
-Implementation: `LiquidityAmounts.getAmountsForLiquidity(sqrtPriceX96, sqrtA, sqrtB, liquidity)` — never use `depositedToken − withdrawnToken + collectedFees` (carter2099 bug).
-
-**Hedge Target (§7.1)**
-```
-targetShortEth = lpEthAmount × hedgeRatio  (Phase A: hedgeRatio = 0.70 fixed)
-```
-Always use BigDecimal. Normalize via `normalizeTargetRatioBps("0.70") → 7000n`. Never `Number("0.70") × 10000`.
-
-**Rebalance Triggers (§7.3) — all BigDecimal**
-```
-deltaErrorUsd = |targetShortEth − actualShortEth| × uniPoolPrice
-lpValueUsd    = from bot_runtime_state.lp_value_usd
-drift_threshold   : deltaErrorUsd > max($25, lpValueUsd × 3%)
-drift_relative    : |target − actual| / target > 0.15
-range_boundary_near: price 90% to upper/lower tick
-funding_alert      : 7d funding APR < −15%  (Phase A: sum of latest 7 rows in funding_daily_metrics)
-time_fallback      : 4h since last adjustment
-```
-
-> ⚠️ `deltaErrorUsd` uses `uniPoolPrice` (LP valuation price), NOT `hlMarkPrice` or `hlOraclePrice` — v5.2.6 X-5 3-way price split.
-
-**Stop Trigger Price (§19.1)**
-```
-effective_leverage  = notional_usd / isolated_margin_usd   (NOT the inverse)
-notional_usd        = abs(sizeEth) × entryPrice
-
-if liquidationPrice available:
-  liq_distance_pct = (liquidationPrice − entryPrice) / entryPrice
-else (fallback):
-  liq_distance_pct ≒ 1 / effective_leverage
-
-stop_trigger_px = entryPrice × (1 + liq_distance_pct × stopSafetyFactor)
-stopSafetyFactor: Phase A = 0.70  |  Phase B+ = TBD via backtest (OQ)
-```
-All BigDecimal — no intermediate `Number()` conversion.
-
-**Margin Status (§18.4)**
-```
-marginRequiredUsd = (lpEthAmount × hedgeRatio × hlOraclePrice) / leverage
-marginUsage       = marginRequiredUsd / marginBalanceUsd
-
-ok:       marginUsage < 0.55
-warning:  0.55 ≤ marginUsage < 0.75
-critical: marginUsage ≥ 0.75
-```
-Updated only at: (1) just before hedge-sync; (2) deep-audit. Light-check reads D1 only — **never fetches HL marginSummary**.
-
-**Preflight Margin Check (§18.4 / C-2)**
-```
-required = (lpEthAmount × hedgeRatio × hlOraclePrice) / leverage
-pass condition: isolatedMarginBalance ≥ required × 2.0
-```
-
-#### 8.9.5 Price 3-Way Split (v5.2.6 X-5)
-
-| Price | Source | Used for |
-|---|---|---|
-| `uniPoolPrice` | Uniswap V3 pool slot0 (via MarketDataDO) | LP drift valuation (`deltaErrorUsd`); LP amount calc |
-| `hlMarkPrice` | HL mark price | Stop trigger detection in light-check (`price >= stop_price`) |
-| `hlOraclePrice` | HL oracle price | Margin calculation; preflight |
-
-Never mix these three.
-
-#### 8.9.6 Key Behavioral Rules (v5.2.6 non-negotiable)
-
-| Rule | Detail |
-|---|---|
-| INV-STOP | While HL short is non-zero, a verified reduce-only stop must always exist. The only exception is inside the `replaceStopProtected` critical section (max 60s). §17.2 never calls `cancelByCloid`/`placeReduceOnlyStopMarket` directly — only via `replaceStopProtected`. |
-| Light-check HL weight = 0 | Absolute. No HL fetch of any kind in light-check, including margin. Margin status = read from D1 `hedge_legs.margin_status` only. v5.2.6 C-5 explicitly removes the old "fetch margin every 30 min" rule. |
-| Delta-only hedge | `adjustShortDelta(target − actual)` is the default. Full close→open is only for: target=0 (bot close), emergency reset, or manual reset (Phase B+). |
-| Budget overflow = scale-down ladder | Do NOT change `hedgeRatio`. Scale LP + hedge proportionally together: 100% → 50% → 25%. Idempotent via `scale_step_pct` absolute value in D1. |
-| After stop fires | Transition `lifecycle_state = 'hedge_stopped_cooldown'`, keep LP, suppress hedge-sync. After 4h: auto re-hedge. After 3 stops in 7 days: `bot_safe_close` → §16.7 closed loop. |
-| user_redeem = LP-first | On-chain `BnzaExVault.redeem()` returns LP USDC to user **unconditionally in the same tx**. HL hedge close is best-effort (SLA 5 min). Hedge failure → `residual_hl_liability`, never blocks LP repayment. |
-| bot_safe_close = hedge-first | Order: close HL → close LP via BnzaExVault → park USDC in `uninvested_balances`. After done: `lifecycle_state = 'cooldown'` → automatic re-entry every 60 min if conditions met. |
-| Dual-chain from Phase 1 | Base + Optimism both from day 1. `wethIndex` (0 or 1) must be verified per chain at LP open — never hardcoded. Pool addresses pending NV-12. |
 
 ---
 
@@ -997,4 +849,3 @@ Never mix these three.
 | EXBOT contract architecture | SPEC v5.2.1 Option C decision | §8.7 EXBOT Contract Architecture |
 | WL+MLM system architecture | WL_SPEC_SOTATEK_EN_v1.1.md (all layers); Layer B/C = Helix-owned OOS, kept as reference | §8.8 WL+MLM System Architecture |
 | OQs | Intake §10 (inherited hold items) | §9 Inherited Open Questions |
-| EXBOT strategy SPEC (zen-approved, source of truth for Module 4) | **SPEC_v5.2.6_EN.md** — client-provided external file, NOT in repo. Local path at time of writing: `/Users/hienduong/Downloads/SPEC_v5.2.6_EN.md`. Repo only has v5.2.5 at `docs/bnza-exbot/docs/SPEC_v5.2.5.md`. Key content absorbed inline in §8.9. | §8.9 (formulas, NV items, behavioral rules, Phase 0 conditions) |

@@ -1,173 +1,299 @@
-# Mode 3 — Confirm Orphans (from dashboard)
+# Mode 3 — Confirm Orphans from Dashboard
 
 ## Goal
 
-Reconcile each orphan UC folder reported by `qc-dashboard-sync` (via `.claude/skills/qc-site-map/inbox/dashboard-orphans.md`) against the existing `qc-site-map.md`. For each orphan, decide whether it is:
+Reconcile each orphan UC folder reported by `qc-dashboard-sync` through:
 
-- **Case 1** — A folder alias of an EXISTING feature in site-map (high-confidence name match). Map the alias and persist it so the dashboard can rename column 2 to the canonical Feature ID while keeping the alias in column 3 `Folder ID`.
-- **Case 2** — A POSSIBLE alias of an existing feature (partial name match, not confident enough). Ask the user. If user confirms → behave as Case 1; if user denies → behave as Case 3.
-- **Case 3** — A genuinely NEW feature. Append it to site-map at the bottom of the screen tree / feature tables with `Status = Need confirm`. Ask the user follow-up questions about its module + connections; if user provides info, finish the integration. If user provides nothing, leave the new feature at `Need confirm` and continue.
+```text
+.claude/skills/qc-site-map/inbox/dashboard-orphans.md
+```
 
-When done, rewrite `qc-site-map.md`, write the handoff with updated `Folder alias(es)`, DELETE the orphan inbox file, and auto-invoke `qc-dashboard-sync`.
+against the existing `qc-site-map.md`.
+
+For each orphan, decide whether it is:
+
+- **Case 1** — A folder alias of an existing feature in the site map, with high-confidence name/screen match.
+- **Case 2** — A possible alias of an existing feature, requiring user confirmation.
+- **Case 3** — A genuinely new feature that must be appended to the site map with `Need confirm` status.
+
+When done, rewrite `qc-site-map.md`, write the updated `site-map-handoff.md`, delete or rewrite the orphan inbox, and auto-invoke `qc-dashboard-sync`.
+
+Mode 3 does not rebuild `qc-data-map.md`.
+
+---
 
 ## Prerequisites
 
-- `qc-site-map.md` MUST exist with real content (mode determination already gated this).
+- `qc-site-map.md` MUST exist with real content.
 - `.claude/skills/qc-site-map/inbox/dashboard-orphans.md` MUST exist with at least one orphan row.
-- `path-registry.md` resolves successfully for `requirement-files`, `qc-site-map`, and the dashboard inbox.
+- `path-registry.md` resolves successfully for requirement files, `qc-site-map.md`, and dashboard inbox.
+- `qc-dashboard-sync` can be invoked.
+
+If `qc-data-map.md` exists, leave it untouched. If a Case 3 new feature likely introduces a new entity, mention in the final report that `qc-data-map.md` should be updated in the next normal Update run.
+
+---
 
 ## Step 1 — Load inputs
 
-1. Generate `run_id` per the worklog protocol. Worklog: append new entry with `status = "Running (Mode 3 - load)"`, `start = now`.
-2. Read `qc-site-map.md`. Parse:
-   - Feature/UC list (canonical IDs + names + module + screens mapped) → `siteFeatures = Map<canonicalID → { name, module, mappedScreens[], folderAliases[] }>`.
-   - Screen inventory + tree → `siteScreens` (for adjacency suggestions in Case 3).
-   - Existing Folder-alias map (look for `## Folder alias map` section if previously written; build `existingAliasMap = Map<folderID → canonicalID>`). Empty if section not present.
-3. Read `.claude/skills/qc-site-map/inbox/dashboard-orphans.md`. Parse the `Dashboard Orphan UC List for Site Map` table → `orphanList = [{ folderID, folderPaths[], filesStt, detectedAt }]`. If parsing fails (corrupt table) → STOP with a Vietnamese error and ask the user to manually fix the inbox file.
-4. Filter out orphans already present in `existingAliasMap` (defensive — they should not be in the inbox, but if they are, treat as already-resolved and remove from the list silently). Record removed count for the run report.
+1. Generate or reuse `run_id` according to `workflows/checkpoint-protocol.md`.
+2. Append a worklog/progress entry with `status = Running (Mode 3 - load)`.
+3. Read `qc-site-map.md`.
+4. Parse:
+   - Feature/UC list: canonical IDs, names, module, mapped screens, `In scope?`, and aliases.
+   - Screen inventory and tree.
+   - Existing `Folder alias map` section if present.
+5. Read `.claude/skills/qc-site-map/inbox/dashboard-orphans.md`.
+6. Parse table `Dashboard Orphan UC List for Site Map` into:
+
+```text
+orphanList = [{ folderID, folderPaths[], filesStt, detectedAt }]
+```
+
+7. If parsing fails, STOP with a Vietnamese error asking the user to manually fix the inbox file.
+8. Filter out orphans already present in `existingAliasMap`; record removed count.
+
+Write checkpoint:
+
+```text
+.claude/skills/qc-site-map/process-logging/mode_3_confirm_orphans.md
+```
+
+---
 
 ## Step 2 — Per-orphan reconciliation loop
 
-For each `orphan ∈ orphanList`:
+For each orphan:
 
-### 2.1 Locate source artifacts for the orphan
+### 2.1 Locate source artifacts
 
-Resolve folder paths from `orphan.folderPaths`. Of particular interest:
+Resolve folder paths from `orphan.folderPaths`.
 
-- The folder under `requirement-files/<folderID>/`: search for the highest-version SRS/spec (`.md` / `.docx` / `.pdf`) AND for wireframe files (`.png` / `.jpg` / `.fig` / `.svg` / ...). If found, prefer reading the spec to extract:
-  - **Feature/UC name** — explicit title in the SRS, or first H1/H2 heading.
-  - **Screen name(s)** — any wireframe filename hints, or screen mentions inside the SRS.
-- If `requirement-files` folder is missing for this orphan → set `evidence = "no-spec"`. Mark for Case 3 path (cannot match without evidence).
+Prefer evidence from:
 
-### 2.2 Compare against site-map
+- `requirement-files/<folderID>/`;
+- highest-version SRS/spec (`.md`, `.docx`, `.pdf`) when readable;
+- wireframe files (`.png`, `.jpg`, `.fig`, `.svg`, etc.);
+- existing feature/use-case naming conventions.
 
-For the extracted `(orphanFeatureName, orphanScreenNames[])`:
+Extract:
 
-1. **Exact-match check (Case 1):**
-   - Compare `orphanFeatureName` against each `siteFeatures[X].name` using case-insensitive normalized comparison (strip diacritics, collapse whitespace, remove punctuation). Also compare each `orphanScreenName` against `siteScreens` entries the same way.
-   - If exactly ONE feature matches with high confidence (feature-name exact match OR ≥1 screen-name exact match unambiguously inside that feature's `mappedScreens`) → declare **Case 1**, target = `siteFeatures[X]`.
-2. **Partial-match check (Case 2):**
-   - If 0 exact matches BUT one or more features have ≥40% normalized token overlap with `orphanFeatureName`, OR a screen-name partial-overlap inside one feature → declare **Case 2** with `candidates = [siteFeatures[Y], ...]` ranked by overlap score (highest first, top 3).
-3. **No-match (Case 3):**
-   - No exact match and no partial match → declare **Case 3**.
+- feature/use-case name;
+- screen names;
+- module hints;
+- role/access hints if obvious;
+- data/entity hints only as note, not as data-map update.
 
-### 2.3 Apply per-case action
+If no evidence is found, mark `evidence = no-spec` and treat as Case 3 unless user says otherwise.
 
-**Case 1 — confident alias:**
+### 2.2 Compare against site map
 
-1. Append `orphan.folderID` to `siteFeatures[X].folderAliases`.
-2. Record in `aliasUpdates` for later persistence: `(canonicalID = X, addedAlias = orphan.folderID)`.
-3. Print a short Vietnamese confirmation line (no prompt) on the console:
-   ```text
-   ✓ Map: folder `<folderID>` → feature `<X>` (<name>) — exact match.
-   ```
+Normalize names by:
+
+- case-insensitive comparison;
+- stripping diacritics;
+- collapsing whitespace;
+- removing punctuation;
+- comparing key tokens.
+
+Case logic:
+
+1. **Case 1 exact/high-confidence alias**
+   - Exactly one feature matches by normalized feature name; or
+   - at least one extracted screen name matches unambiguously inside one feature's mapped screens.
+
+2. **Case 2 possible alias**
+   - No exact match; and
+   - one or more features have at least 40 percent normalized token overlap with orphan feature name; or
+   - one screen-name partial overlap points to candidate features.
+
+3. **Case 3 new feature**
+   - No exact or useful partial match.
+
+### 2.3 Case 1 — Confident alias
+
+1. Append `orphan.folderID` to the target feature's `folderAliases` if not already present.
+2. Record alias update:
+
+```text
+canonicalID -> addedAlias
+```
+
+3. Print a short Vietnamese confirmation line:
+
+```text
+✓ Map: folder `<folderID>` → feature `<canonicalID>` (<name>) — exact match.
+```
+
 4. Move to next orphan.
 
-**Case 2 — possible alias, ask user:**
+### 2.4 Case 2 — Possible alias, ask user
 
-1. Present the top candidates and ask:
-   ```text
-   ❓ Folder `<folderID>` (SRS: <feature name từ spec>, screens: <list>) co the la alias cua mot trong cac feature sau khong?
+Present up to top 3 candidates:
 
-   1. `<canonicalID-1>` — <name-1> (mapped screens: <screens-1>)
-   2. `<canonicalID-2>` — <name-2> (mapped screens: <screens-2>)
-   3. `<canonicalID-3>` — <name-3> (mapped screens: <screens-3>)
-   4. `none` — Khong khop, day la feature moi (chuyen sang Case 3)
-   5. `skip` — Bo qua orphan nay lan nay (giu trong inbox cho lan sau)
-   ```
-2. Parse user response:
-   - `1` / `2` / `3` (or the canonicalID text) → treat as Case 1 with `target = siteFeatures[<chosen>]`. Run the Case 1 action.
-   - `none` → drop to **Case 3** action below for this orphan.
-   - `skip` → record `(folderID, "skipped")` in `skippedOrphans`. Do NOT remove from inbox at end-of-run. Move to next orphan.
+```text
+❓ Folder `<folderID>` (SRS: <feature name từ spec>, screens: <list>) co the la alias cua mot trong cac feature sau khong?
 
-**Case 3 — new feature:**
+1. `<canonicalID-1>` — <name-1> (mapped screens: <screens-1>)
+2. `<canonicalID-2>` — <name-2> (mapped screens: <screens-2>)
+3. `<canonicalID-3>` — <name-3> (mapped screens: <screens-3>)
+4. `none` — Khong khop, day la feature moi (chuyen sang Case 3)
+5. `skip` — Bo qua orphan nay lan nay (giu trong inbox cho lan sau)
+```
 
-1. Mint a canonical ID for the new feature. Strategy (in order):
-   - If `orphan.folderID` already looks like an ID pattern (matches the project's ID regex from Phase 1) → use it verbatim as the canonical ID.
-   - Else generate a new ID: pick the next sequence number in the project's prefix (e.g., next `UC-<N>` after current max). If the project's ID label is not `Use Case ID`, use the equivalent prefix.
-2. Append a new entry to `siteFeatures[newCanonicalID]` with:
-   - `name` = name extracted from SRS (or `orphan.folderID` if no spec was readable).
-   - `module` = blank (to be filled by user prompt below).
-   - `mappedScreens` = screens extracted from SRS / wireframes (best effort).
-   - `folderAliases` = `[orphan.folderID]` (only if folderID differs from newCanonicalID; otherwise empty).
-   - Site map status = `Need confirm`.
-3. Add this new feature to the BOTTOM of the screen tree / feature tables in the working copy of `qc-site-map.md` (`Section: New features pending confirmation`). Mark with a `<!-- mode-3 added <ISO> -->` HTML comment for traceability.
-4. Ask the user follow-up questions (single consolidated prompt):
-   ```text
-   ❓ Feature moi tu folder `<folderID>` da duoc them vao site-map (ID canonical: `<newCanonicalID>`, ten: `<name>`, screens phat hien: <list>).
-   De hoan thien:
+Parse response:
 
-   1. Feature/screen nay thuoc Module nao? (vd: User, Admin, Vendor, hoac de trong neu chua biet)
-   2. Feature nay lien ket toi cac feature/screen nao da co trong site-map? (vd: navigation tu screen X, share data voi feature Y; de trong neu chua biet)
-   3. Role/access nao co the truy cap feature nay? (vd: User dang nhap, Admin; de trong neu chua biet)
+- `1` / `2` / `3` / canonical ID -> treat as Case 1 with chosen target.
+- `none` -> continue as Case 3.
+- `skip` -> record skipped orphan and leave it in inbox for the next Mode 3 run.
 
-   Tra loi tung dong, hoac go `skip` de giu o trang thai `Need confirm` va xu ly sau.
-   ```
-5. Parse user response:
-   - User provides info on any of the 3 questions → integrate into `siteFeatures[newCanonicalID]`:
-     - Update module / navigation references / role-access.
-     - If user names a Module that does NOT exist → add the module to site-map's module list with a `Need confirm` flag.
-     - If user names a navigation target that DOES exist → update both directions (this feature's `pre/post conditions` + the target feature's `regression anchors`).
-   - User `skip` (or empty response) → leave the new feature at `Need confirm`; downstream user can edit `qc-site-map.md` manually.
-6. Move to next orphan.
+### 2.5 Case 3 — New feature
 
-### 2.4 Worklog update per orphan
+1. Mint canonical ID:
+   - If `orphan.folderID` already matches project ID convention, use it as canonical ID.
+   - Otherwise generate next sequence in the project's prefix, such as `UC-<N>`.
+2. Append a new feature to the site map with:
+   - canonical ID;
+   - name from spec or folder ID;
+   - module = blank / `Need confirm` unless evidence is clear;
+   - mapped screens from spec/wireframes if found;
+   - `Folder alias(es)` only if folder ID differs from canonical ID;
+   - `In scope? = Need confirm` unless user confirms;
+   - `Site map status = Need confirm`.
+3. Add it under a `New features pending confirmation` note in relevant screen/feature sections.
+4. Add trace comment if compatible with project style:
 
-After each orphan is processed, rewrite the worklog last entry's `status` with the running counter:
-`status = "Running (Mode 3 - processed <i>/<N> orphans: <case-1-count> Case1, <case-2-count> Case2, <case-3-count> Case3, <skipped-count> skipped)"`.
+```html
+<!-- mode-3 added <ISO-8601 datetime> -->
+```
+
+5. Ask one consolidated prompt:
+
+```text
+❓ Feature moi tu folder `<folderID>` da duoc them vao site-map (ID canonical: `<newCanonicalID>`, ten: `<name>`, screens phat hien: <list>).
+De hoan thien:
+
+1. Feature/screen nay thuoc Module nao? (vd: User, Admin, Vendor, hoac de trong neu chua biet)
+2. Feature nay lien ket toi cac feature/screen nao da co trong site-map? (vd: navigation tu screen X, share data voi feature Y; de trong neu chua biet)
+3. Role/access nao co the truy cap feature nay? (vd: User dang nhap, Admin; de trong neu chua biet)
+
+Tra loi tung dong, hoac go `skip` de giu o trang thai `Need confirm` va xu ly sau.
+```
+
+6. If user provides info, integrate module/navigation/role-access into the site map working copy. If user skips or gives no info, leave the feature as `Need confirm`.
+
+### 2.6 Worklog update per orphan
+
+After each orphan, update progress status:
+
+```text
+Running (Mode 3 - processed <i>/<N> orphans: <case1> Case1, <case2> Case2, <case3> Case3, <skipped> skipped)
+```
+
+---
 
 ## Step 3 — Persist site-map changes
 
-1. Generate the updated `qc-site-map.md` in-memory:
-   - Apply all `aliasUpdates` to the appropriate sections (typically Section: Feature ↔ Screen mapping + a new `## Folder alias map` section if not already present — that section holds the canonical → aliases mapping for traceability).
-   - Apply all new features added in Case 3 to the BOTTOM of the relevant section (Feature tables, screen tree leaf).
-   - Update `generated at` / `last modified` metadata at top of `qc-site-map.md`.
-2. Write the updated `qc-site-map.md` IN-PLACE (per path-registry exception for fixed-path files). Atomic single Write.
+1. Generate updated `qc-site-map.md` in memory.
+2. Apply alias updates to:
+   - Section 8 Feature-level coverage summary;
+   - Section 13 Folder alias map.
+3. Apply new Case 3 features to relevant site-map sections with `Need confirm` markers.
+4. Preserve existing reviewed content and existing aliases.
+5. Update metadata date/mode.
+6. Write updated `qc-site-map.md` atomically.
+
+Do not update `qc-data-map.md` in Mode 3. Note any possible data-map follow-up in the final report.
+
+---
 
 ## Step 4 — Write updated handoff
 
-1. Resolve `.claude/skills/qc-dashboard-sync/inbox/site-map-handoff.md`.
-2. If the file exists → DELETE it.
-3. Compose the new handoff body with the full feature list from `siteFeatures` (including freshly-added Case 3 features). Schema per `phase-9-dashboard-handoff.md` — `mode: mode-3-confirm-orphans`, `generated_at: <now>`.
-   - For each feature with non-empty `folderAliases`, fill the `Folder alias(es)` column with the comma-separated list.
-   - For Case 3 features, set `In scope? = Need confirm` unless the user explicitly indicated scope during the follow-up prompt.
-   - For Case 1/2-resolved features, copy their existing `In scope?` from the prior site-map content (do NOT downgrade scope just because an alias was added).
-4. Write the handoff file.
+Resolve:
 
-## Step 5 — Delete orphan inbox
+```text
+.claude/skills/qc-dashboard-sync/inbox/site-map-handoff.md
+```
 
-1. Resolve `.claude/skills/qc-site-map/inbox/dashboard-orphans.md`.
-2. **If `skippedOrphans` is empty** → DELETE the file outright. All orphans are reconciled.
-3. **If `skippedOrphans` is non-empty** → rewrite the file containing ONLY the skipped rows (preserve their original `Detected at` timestamps). This keeps them on the queue for the next Mode 3 run.
+If the file exists, delete it before writing the new version.
+
+Compose the full feature list from the updated site map, including Case 3 features.
+
+Use schema from `workflow-3-commit-handoff-cleanup.md` with:
+
+```text
+mode: mode-3-confirm-orphans
+```
+
+Rules:
+
+- Fill `Folder alias(es)` for every feature with aliases.
+- For Case 3 features, set `In scope? = Need confirm` unless user explicitly scoped it.
+- For Case 1/2 features, copy existing `In scope?`; do not downgrade scope just because an alias was added.
+- Do not write `qc-dashboard.md` directly.
+
+---
+
+## Step 5 — Delete or rewrite orphan inbox
+
+Resolve:
+
+```text
+.claude/skills/qc-site-map/inbox/dashboard-orphans.md
+```
+
+If no orphans were skipped, delete the file.
+
+If some orphans were skipped, rewrite the file with ONLY skipped rows and preserve original `Detected at` timestamps.
+
+Mode 3 owns this inbox lifecycle and is the only deleter.
+
+---
 
 ## Step 6 — Auto-invoke `qc-dashboard-sync`
 
-1. INVOKE `qc-dashboard-sync` via the Skill tool (no `uc_id` parameter → triggers top-down sync). The handoff written in Step 4 will drive its reconcile + rename rows whose Folder ID matches an alias.
-2. Capture the invocation result for the worklog.
+Invoke `qc-dashboard-sync` without `uc_id` so it runs top-down sync from the updated `site-map-handoff.md`.
+
+Capture invocation result for the worklog/final report.
+
+There is no contentChanged short-circuit in Mode 3. Alias changes are semantically significant for dashboard sync.
+
+---
 
 ## Step 7 — Final report
 
-Worklog: rewrite last entry → `status = "Done (Mode 3)"`, `end = now`, `duration_min = computed`. Print a Vietnamese summary on chat:
+Worklog: rewrite last entry with:
+
+```text
+status = Done (Mode 3)
+end = now
+duration_min = computed
+```
+
+Print Vietnamese summary:
 
 ```text
 ✅ Mode 3 (Confirm orphans) hoan tat.
 
 Da xu ly <N> orphan UC:
-- Case 1 (exact alias map): <count>  — vd: <folderID-1> → <canonicalID-1>, ...
+- Case 1 (exact alias map): <count> — vd: <folderID-1> → <canonicalID-1>, ...
 - Case 2 (user-confirmed alias): <count>
-- Case 3 (new feature minted): <count>  — vd: `<newCanonicalID-1>` (<name-1>), ...
+- Case 3 (new feature minted): <count> — vd: `<newCanonicalID-1>` (<name-1>), ...
 - Skipped (giu lai trong inbox): <count>
 
 qc-site-map.md: updated.
+qc-data-map.md: unchanged (Mode 3 khong rebuild data map). <data-map follow-up neu co>
 site-map-handoff.md: rewritten.
 dashboard-orphans.md: <deleted | <count> rows giu lai>.
 qc-dashboard-sync: invoked → <summary tu dashboard-sync>.
 ```
 
+---
+
 ## Boundaries
 
-- Mode 3 does NOT re-run source inventory / screen inventory / navigation pipeline (Phases 1–8 of the standard workflow). It edits the existing site map surgically.
-- Mode 3 does NOT prompt the user for `In scope?` on existing features. Only Case 3 new features get a `Need confirm` default + the optional follow-up prompt about module/connections.
-- Mode 3 ALWAYS deletes (or rewrites with skipped-only) the orphan inbox at end-of-run. The inbox is not allowed to leak stale entries.
-- Mode 3 ALWAYS invokes `qc-dashboard-sync` at the end. There is no `contentChanged` short-circuit (the alias-map changes alone are semantically significant for the dashboard even if the screen tree is unchanged).
-- A user `cancel` mid-loop (Ctrl+C / interrupt) means the run is incomplete. The progress.md checkpoint allows resume: next run picks up at the next unprocessed orphan. Re-running detects that some aliases are already in `siteFeatures` and skips them on re-parse of the inbox.
+- Mode 3 does not re-run normal source inventory, screen inventory, navigation, or data-map workflow.
+- Mode 3 does not prompt for `In scope?` on existing features.
+- Mode 3 only uses Case 3 follow-up prompt for new features.
+- Mode 3 always deletes or rewrites orphan inbox at end-of-run.
+- Mode 3 always invokes `qc-dashboard-sync` at end-of-run.
+- If user cancels mid-loop, leave checkpoint/progress so next run can resume safely.

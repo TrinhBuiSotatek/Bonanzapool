@@ -8,26 +8,24 @@ The output language of test cases is governed by `rules/global-rules.md`:
 
 The agent MUST detect the project's working language from the source UC document before applying any rule below, and MUST NOT mix languages within the same output file.
 
----
+--- 
 
 ### Language & Encoding (MANDATORY)
 
-> **Scope note:** Rules **0a–0d** apply **only when the output language is Vietnamese**. For English-output projects, only Rule 0c's "use the shared converter, do not write a new script" and Rule 0d's "self-verify before delivery (no `?` boxes / mojibake)" still apply — diacritic-preservation and the forbidden-transformation list are not relevant.
+> **Scope note:** 
+- If the output language is Vietnamese: apply rule 1, rule 2 and rule 3.
+- If the output language is English: apply rule 2 and rule 3.
 
-**Rule 0a — Preserve Vietnamese diacritics.** All Vietnamese text written into the test cases (Title, Pre-conditions, Steps, Expected Result, Function name, Sub-function) MUST preserve the original diacritics from the source UC document. Do NOT strip, normalize, or transliterate to ASCII.
-- ✅ Correct: `"Đăng nhập hệ thống bằng tài khoản NĐT"`, `"Kiểm tra màn hình khởi tạo"`, `"Truy cập menu Báo cáo định kỳ 6 tháng ĐTRNN"`
-- ❌ Wrong: `"Dang nhap he thong bang tai khoan NDT"`, `"Kiem tra man hinh khoi tao"`, `"Truy cap menu Bao cao dinh ky 6 thang DTRNN"`
-
-**Rule 0b — Forbidden transformations.** Do NOT use any of the following on Vietnamese strings before writing to the xlsx:
+**Rule 1 — Forbidden transformations.** Do NOT use any of the following on Vietnamese strings before writing to the xlsx:
 - `unicodedata.normalize('NFD', s).encode('ascii', 'ignore').decode()` — strips dấu
 - `unidecode(s)` / `text_unidecode(s)` — strips dấu
 - Manual replacement maps (`'à' → 'a'`, `'Đ' → 'D'`, …)
 - `.encode('latin-1', 'ignore')` / `.encode('cp1252', 'ignore')` — corrupts non-Latin-1 chars
 - Any transliteration library
 
-**Rule 0c — Use the shared converter; do NOT write a new script.** xlsx generation is performed by `qc-func-tc-design/scripts/md_to_xlsx.py`, invoked exclusively from `workflows/convert-md-to-xlsx.md` (auto-triggered by the skill — see `SKILL.md` → "Skill Execution Steps"). The agent invokes this script and does NOT write its own openpyxl populator. The script is UTF-8, opens md with `encoding='utf-8'`, writes Unicode literals, and self-verifies before exit. If you must extend the script, preserve these properties — never add `# -*- coding: cp1252 -*-`, never normalize/transliterate.
+**Rule 2 — Use the shared converter; do NOT write a new script.** xlsx generation is performed by `qc-func-tc-design/scripts/md_to_xlsx.py`, invoked exclusively from `workflows/convert-md-to-xlsx.md` (auto-triggered by the skill — see `SKILL.md` → "Skill Execution Steps"). The agent invokes this script and does NOT write its own openpyxl populator. The script is UTF-8, opens md with `encoding='utf-8'`, writes Unicode literals, and self-verifies before exit. If you must extend the script, preserve these properties — never add `# -*- coding: cp1252 -*-`, never normalize/transliterate.
 
-**Rule 0d — Self-verification before delivery.** After generating the xlsx, open it and spot-check at least 3 rows containing non-ASCII text. If any cell shows: ASCII-only Vietnamese (no dấu, VI projects only), `?` boxes, mojibake (e.g., `Ä\x90`, `Ã©`), or any character that doesn't match the source — STOP, debug the script, regenerate. Do NOT deliver a partially-stripped output.
+**Rule 3 — Self-verification before delivery.** After generating the xlsx, open it and spot-check at least 3 rows containing non-ASCII text. If any cell shows: ASCII-only Vietnamese (no dấu, VI projects only), `?` boxes, mojibake (e.g., `Ä\x90`, `Ã©`), or any character that doesn't match the source — STOP, debug the script, regenerate. Do NOT deliver a partially-stripped output.
 
 ### Sheet Layout & Section Headers (MANDATORY)
 
@@ -35,102 +33,81 @@ The agent MUST detect the project's working language from the source UC document
 
 `A=ID_TC | B=Test Title/Summary of test cases | C=Pre-conditions | D=Step | E=Expected Result | F=Priority`
 
-Functional test cases are written into the **`Test cases` sheet**, starting from row 2, separated by section header rows. The agent MUST insert these header rows in addition to the test case rows.
+**Within GUI section, sort in this order (4 buckets):**
+1. **Screen Initialization** — initial render, default state, empty / populated state of every object on the screen.
+2. **Item Interactions** — every UI object on the screen: textboxes, dropdowns, buttons, icons, labels — clickability, default state, list values, enabled / disabled, placeholder.
+3. **Common UI cases** — browser / keyboard interactions: F5 / Refresh, Back / Next browser, Tab / Shift+Tab, Enter, Backspace, zoom in / zoom out, message consistency.
+4. **UI elements verify** — visual fidelity vs design: position, color (HEX), spacing, font size, responsive across resolutions.
 
-**Within FUNC section, sort by logical flow:** Happy path first → API contract / validation → state transitions → exception / error cases.
+**Within FUNC section, sort by logical flow:** Happy path first → validation → error / exception cases.
 
-**Hierarchy (use Roman numerals I, II, III… — one per operation / sub-UC). Pick the row that matches the output language:**
+**Hierarchy (use Roman numerals I, II, III… — one per screen / sub-UC). Pick the row that matches the output language:**
 
 | Header level | VI pattern | EN pattern | Where it appears |
 |---|---|---|---|
-| Operation | `<RomanNumeral>. Nghiệp vụ: <tên nghiệp vụ>` | `<RomanNumeral>. Operation: <operation name>` | One row per operation / sub-UC |
-| FUNC section | `<RomanNumeral>.1. Kiểm tra FUNC của nghiệp vụ: <tên nghiệp vụ>` | `<RomanNumeral>.1. Functional verification — Operation: <operation name>` | Immediately below the operation header |
+| Screen | `<RomanNumeral>. Màn hình: <tên màn hình>` | `<RomanNumeral>. Screen: <screen name>` | One row per screen / sub-UC |
+| GUI section | `<RomanNumeral>.1. Kiểm tra UI/UX của màn hình: <tên màn hình>` | `<RomanNumeral>.1. UI/UX verification — Screen: <screen name>` | Immediately below the screen header |
+| FUNC section | `<RomanNumeral>.2. Kiểm tra FUNC của màn hình: <tên màn hình>` | `<RomanNumeral>.2. Functional verification — Screen: <screen name>` | After all GUI test cases for that screen |
 
 **Header row format:**
 - Header text goes in column **B** (`Test Title/Summary of test cases`).
 - All other columns on the header row stay empty (no TC ID, no Pre-condition, no Step, no Expected Result, no Priority).
 - Header rows are NOT counted as test cases — they do not consume TC ID numbers and they are not subject to Rule 2 (`TC_XXX`).
-- The operation name in the header MUST match the operation name used in Section 6 of the audited UC file. Do NOT paraphrase or translate.
+- The screen name in the header MUST match the screen name used in Section 4 of the audited UC file. Do NOT paraphrase or translate.
 
-**Example 1 — Single-operation UC:**
-
-| VI | EN |
-|---|---|
-| <pre>I. Nghiệp vụ: Bot Start<br>I.1. Kiểm tra FUNC của nghiệp vụ: Bot Start<br>TC_001 \| FUNC \| Kiểm tra POST /api/exbot/start thành công   \| …<br>TC_002 \| FUNC \| Kiểm tra preflight thất bại → 403           \| …<br>…</pre> | <pre>I. Operation: Bot Start<br>I.1. Functional verification — Operation: Bot Start<br>TC_001 \| FUNC \| Verify POST /api/exbot/start success path  \| …<br>TC_002 \| FUNC \| Verify preflight fail → 403                  \| …<br>…</pre> |
-
-**Example 2 — Multi-operation UC (3 operations):**
+**Example 1 — Single-screen UC:**
 
 | VI | EN |
 |---|---|
-| <pre>I. Nghiệp vụ: Bot Start<br>  I.1. Kiểm tra FUNC của nghiệp vụ: Bot Start<br>  …FUNC TCs for operation I<br>II. Nghiệp vụ: Hedge Sync<br>  II.1. Kiểm tra FUNC của nghiệp vụ: Hedge Sync<br>  …FUNC TCs for operation II<br>III. Nghiệp vụ: User Redeem<br>  III.1. Kiểm tra FUNC của nghiệp vụ: User Redeem<br>  …FUNC TCs for operation III</pre> | <pre>I. Operation: Bot Start<br>  I.1. Functional verification — Operation: Bot Start<br>  …FUNC TCs for operation I<br>II. Operation: Hedge Sync<br>  II.1. Functional verification — Operation: Hedge Sync<br>  …FUNC TCs for operation II<br>III. Operation: User Redeem<br>  III.1. Functional verification — Operation: User Redeem<br>  …FUNC TCs for operation III</pre> |
+| <pre>I. Màn hình: Danh sách báo cáo<br>I.1. Kiểm tra UI/UX của màn hình: Danh sách báo cáo<br>TC_001 \| GUI  \| Kiểm tra màn hình khởi tạo            \| …<br>TC_002 \| GUI  \| Kiểm tra trạng thái mặc định bộ lọc    \| …<br>…<br>I.2. Kiểm tra FUNC của màn hình: Danh sách báo cáo<br>TC_012 \| FUNC \| Kiểm tra hiển thị các kỳ báo cáo      \| …<br>TC_013 \| FUNC \| Kiểm tra trạng thái nộp báo cáo       \| …<br>…</pre> | <pre>I. Screen: Report List<br>I.1. UI/UX verification — Screen: Report List<br>TC_001 \| GUI  \| Verify screen initialization              \| …<br>TC_002 \| GUI  \| Verify default state of filter bar       \| …<br>…<br>I.2. Functional verification — Screen: Report List<br>TC_012 \| FUNC \| Verify display of reporting periods       \| …<br>TC_013 \| FUNC \| Verify report submission state            \| …<br>…</pre> |
+
+**Example 2 — Multi-screen UC (3 screens):**
+
+| VI | EN |
+|---|---|
+| <pre>I. Màn hình: Danh sách báo cáo<br>  I.1. Kiểm tra UI/UX của màn hình: Danh sách báo cáo<br>  …GUI test cases for screen I<br>  I.2. Kiểm tra FUNC của màn hình: Danh sách báo cáo<br>  …FUNC test cases for screen I<br>II. Màn hình: Tạo mới báo cáo<br>  II.1. Kiểm tra UI/UX của màn hình: Tạo mới báo cáo<br>  …GUI test cases for screen II<br>  II.2. Kiểm tra FUNC của màn hình: Tạo mới báo cáo<br>  …FUNC test cases for screen II<br>III. Màn hình: Chi tiết báo cáo<br>  III.1. Kiểm tra UI/UX của màn hình: Chi tiết báo cáo<br>  …GUI test cases for screen III<br>  III.2. Kiểm tra FUNC của màn hình: Chi tiết báo cáo<br>  …FUNC test cases for screen III</pre> | <pre>I. Screen: Report List<br>  I.1. UI/UX verification — Screen: Report List<br>  …GUI test cases for screen I<br>  I.2. Functional verification — Screen: Report List<br>  …FUNC test cases for screen I<br>II. Screen: Create Report<br>  II.1. UI/UX verification — Screen: Create Report<br>  …GUI test cases for screen II<br>  II.2. Functional verification — Screen: Create Report<br>  …FUNC test cases for screen II<br>III. Screen: Report Detail<br>  III.1. UI/UX verification — Screen: Report Detail<br>  …GUI test cases for screen III<br>  III.2. Functional verification — Screen: Report Detail<br>  …FUNC test cases for screen III</pre> |
 
 ### Test Case Writing rules:
 
-**Rule 1 — Notation Standard.** The Agent must utilize specific notations to differentiate values and identifiers.
+**Rule 1 - DATA HANDLING CONSTRAINT**
+- Do NOT hardcode specific values such as system paths, account names, or concrete test data into any part of the test case.
+- ALWAYS use the generic name, UI label, or logical placeholder for the information. Do not use the ID, Code.
+- When test data requires clarification, provide a short description or example enclosed in parentheses () immediately following the object name.
 
-`"Double Quotes"`: Use for field names, parameter names, error codes/messages, queue/DO identifiers, or specific values being tested.
+Examples:
+Correct: Kiểm tra màn hình khởi tạo modal: Gán thiết bị cho bệnh nhân.
+Correct: Enter email into the "Email" textbox (e.g., a valid formatted email).
+Correct: Select a platform from the "Platform" dropdown ("Select platform" placeholder).
+Incorrect: Kiểm tra màn hình khởi tạo modal: variant patient-first.
+Incorrect: Enter "admin123" into the Username field.
+Incorrect: Upload file from "D:\test_data\image.png".
 
-| VI example | EN example |
-|---|---|
-| Gửi request với "user_id" thiếu | Send request with "user_id" missing |
-| Queue "QUE-XB-08" được enqueue thành công | Queue "QUE-XB-08" is enqueued successfully |
+**Rule 2 — UI Notation Standard.** The Agent must utilize specific notations to differentiate on-screen components.
 
-**Rule 2 — Content Logic.**
-
-**TC ID** (language-agnostic): Always strictly adhere to the format `TC_[XXX]` — XXX is an incremental number (3 digits). Example: `TC_001`, `TC_002`.
-
-**Test Title:**
-- Must begin with a verification verb.
-- Must include the scenario context.
-
-| VI — verbs | EN — verbs |
-|---|---|
-| `Kiểm tra`, `Xác nhận` | `Verify`, `Confirm` |
-
-Functional Test Title — start with the verb plus the business action or API operation being verified.
+`"Double Quotes"`: Use for interactive components such as Buttons, Menus, Tabs, Icons; or Labels, Placeholders, input values, or selected values from a list.
 
 | VI example | EN example |
 |---|---|
-| Kiểm tra POST /api/exbot/start khi preflight thành công | Verify POST /api/exbot/start when preflight passes |
-| Kiểm tra trạng thái IDLE → STARTING khi nhận trigger hợp lệ | Verify IDLE → STARTING state transition on valid trigger |
-| Kiểm tra lỗi 403 khi gọi endpoint không có quyền | Verify 403 error when calling endpoint without permission |
-| Kiểm tra idempotency của queue consumer khi nhận message trùng | Verify queue consumer idempotency on duplicate message |
+| Nhập email vào "Email" textbox | Enter email into the "Email" textbox |
+| "Platform" dropdown, "Select platform" placeholder | "Platform" dropdown, "Select platform" placeholder |
 
-**Pre-conditions:** Must begin with an action describing what must be performed before executing the test case.
+**Rule 3 — Content Logic.**
 
-| VI example | EN example |
-|---|---|
-| Bot đang ở trạng thái IDLE trong D1. | Bot is in IDLE state in D1. |
-| UserLockDO không có lease đang hoạt động. | UserLockDO has no active lease. |
-| Gọi POST /api/exbot/start với token hợp lệ của ACT-02. | Call POST /api/exbot/start with a valid ACT-02 token. |
+- The content of all parts MUST NOT contain code or ID; all the UI objects must be referred to by their object names (the names used in the audited documentation), in "Double Quotes".
+- The Test title MUST begin with the verification verb (exp: Verify, Confirm, Check, Ensure that; Kiểm tra, Đảm bảo rằng).
+- The Test title MUST folow this pattern: `Verification verb + test subject name/function name/flow + state + context (if any)` (exp: Kiểm tra màn hình Tạo tài khoản admin khởi tạo khi mở từ Danh sách Admin - Verify the Create Admin screen initialization in case opening from Admin list screen, Kiểm tra nút "Create" - Check "Create" button, Kiểm tra Tạo Admin thành công - Verify that the Admin account is created successfully, Kiểm tra tạo tài khoản admin không thành công trong trường hợp bỏ trống trường email. - Verify Admin account creation fails when Email field is blank.)
+- The Test case ID always strictly adhere to the format `TC_[XXX]` — XXX is an incremental number (3 digits). Example: `TC_001`, `TC_002`.
+- The Pre-conditions MUST be written in present simple, follow this pattern: System/Subject + is/are + State + Context (if any) (exp: Màn hình "Create Admin account" đang mở - The "Create Admin Account" page is displayed, Người dùng đang đăng nhập là Super Admin - User is logged in as a Super Admin, Dữ liệu email "test@admin.com" đã được tạo trong hệ thống và có trạng thái hoạt động - The email "test@admin.com" already exists and actively in the system).
+- The Pre-conditions MUST be a single, one condition per row.
+- The Test steps must be a single, follow this pattern: `Imperative Verb + data describe (if any) + UI subject name` (exp: Đi tới trang Đăng nhập của hệ thống Admin - Navigate to the Login screen of the Admin portal, Nhấn vào nút "Đăng nhập" - Click/Tap on "Login" button, Nhập dữ liệu email hợp lệ (phuong.tran@gmail.com) vào trường "Email" - Enter a valid email (phuong.tran@gmail.com) into "Email" field, Để trống trường "Email" - Leave the "Email" field blank).
+- The Expected result MUST begin with a step number, explicitly describe the changed state of the UI ov
+- The Expected result MUST folow this pattern: 
 
-**Test Steps (Action-Oriented):**
-- Each step must be a single, discrete action or call.
-- Use active imperative verbs.
-
-| VI — verbs | EN — verbs |
-|---|---|
-| `Gửi`, `Gọi`, `Kiểm tra`, `Chú ý vào`, `Truy vấn`, `Enqueue` | `Send`, `Call`, `Verify`, `Observe`, `Query`, `Enqueue` |
-
-| VI example | EN example |
-|---|---|
-| <pre>1. Gọi POST /api/exbot/start với body:<br>    { "user_id": "uuid-valid" }<br>2. Kiểm tra response trả về.<br>3. Truy vấn D1: SELECT status FROM bots WHERE user_id = ?</pre> | <pre>1. Call POST /api/exbot/start with body:<br>    { "user_id": "uuid-valid" }<br>2. Verify the response returned.<br>3. Query D1: SELECT status FROM bots WHERE user_id = ?</pre> |
-
-**Expected Result:**
+**Expected Result (UI Verification):**
 - MUST begin with a step number (e.g., `1. <expected result>`).
 - Do NOT write generic statements.
-
-| VI — generic to avoid | EN — generic to avoid |
-|---|---|
-| "Hệ thống hoạt động bình thường" | "System works as expected" |
-
-- Must explicitly describe the changed state: HTTP status code + response body, D1 state change, queue enqueue confirmation, DO lease status, error code + message exact text.
-
-Functional Expected Result example:
-
-| VI | EN |
-|---|---|
-| <pre>2. Response: 200 OK<br>   { "status": "STARTING", "bot_id": "uuid" }<br>3. D1: bots.status = "STARTING", started_at = now<br>   QUE-XB-01 enqueued với bot_id + epoch_slot</pre> | <pre>2. Response: 200 OK<br>   { "status": "STARTING", "bot_id": "uuid" }<br>3. D1: bots.status = "STARTING", started_at = now<br>   QUE-XB-01 enqueued with bot_id + epoch_slot</pre> |
+- Must explicitly describe the changed state of the UI: messages displayed (with full text), popups/screens opened or closed, field states (enabled / disabled / placeholder), display rules (sort order, color), system reactions (allow / block input).
+- Do not write expected results from the API or database.
 
 ### Test cases example reference (pick by output language):
 

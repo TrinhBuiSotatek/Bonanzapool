@@ -2,12 +2,11 @@
 type: intake
 status: in-review
 created: 2026-05-19
-updated: 2026-06-12
+updated: 2026-06-02
 owner: "@hien.duong"
 engagement_mode: formal
 lang: en
 changelog:
-  - "2026-06-12 | /ba-do drift-2 | §3.2 Current State sync: WL Master Wallet + PF Distribution → ✅ Real API; WL Mgmt → 🟡 Partial; WL Member + WL Bot Monitor → 🔸 Mock UI"
   - "2026-06-04 | /ba-impact | sync WL_SPEC_SOTATEK_EN_v1.1 §4.4: thêm §4.2 LPBot constraint về dual-auth post-record (HMAC WL path vs X-Wallet-Address regular path); CORS N/A; explicit starter wallet"
   - "2026-06-04 | /ba-impact | sync with WL_SPEC_SOTATEK_EN_v1.0: BnzaSplitter→pfCollector; thêm WL member lifecycle + master wallet + bot activation monitor vào BNZA-ADMIN scope; update PF Distribution task; update Out of Scope; thêm Router wlMaster + LPBot stop constraints; resolve merge conflict"
   - "2026-06-02 | manual | Module 1A: rewrite WL Admin description — phân biệt rõ WL-ADMIN (PTL-06) vs BNZA-ADMIN (PTL-02); thêm portal/actor/folder ref; cleanup OQs; Module 2: thêm portal/actor/folder ref; rewrite \"what manages/does not manage\" boundary; update §4.6 auth model thêm row PTL-06 WL-ADMIN"
@@ -353,12 +352,10 @@ Mobile communicates with 3 distinct systems. Do not confuse them.
 - TOKEN management: burn/supply/vesting/treasury/builder-fee (mock OK, P3)
 
 **Current State** (verified from source 2026-05-21):
-- ✅ Real API ⚡ Dev-built: POOL management, User management, Audit logs, Access Control, Auth/RBAC, Bot configs, Bot positions, Rules, Notifications, Fee collections, Fee distributions, Daily snapshots, Relayer wallets, Plan specs, WL Master Wallet Mgmt, PF Distribution
+- ✅ Real API ⚡ Dev-built: POOL management, User management, Audit logs, Access Control, Auth/RBAC, Bot configs, Bot positions, Rules, Notifications, Fee collections, Fee distributions, Daily snapshots, Relayer wallets, Plan specs
 - ✅ Scaffold complete ⚡ Dev-built: 16 pages registered (dashboard, users, bots, logs, fee-distribution, access, system, builder-fee, burn, supply, vesting, treasury, ib, whitelabel, relayer, reports)
 - ✅ Wallet integration ⚡ Dev-built: @reown/appkit with X-Wallet-Address header
-- 🟡 Partial ⚡ Dev-built: WL Management (suspend/resume real API; list/CRUD still mock)
-- 🔸 Mock UI ⚡ Dev-built: WL Member Lifecycle, WL Bot Lifecycle Monitor (UI added post-2026-05-21, no real API)
-- 🔸 Mock/incomplete 📋 Spec: TOKEN mgmt, IB mgmt, Dashboard metrics, System Settings, Relayer monitoring, Reports
+- 🔸 Mock/incomplete 📋 Spec: TOKEN mgmt, IB mgmt, WL mgmt, PF distribution, Dashboard metrics, System Settings, Relayer monitoring, Reports
 
 **SOTATEK Tasks** (convert mock → real API):
 - **E: WL Management** — Partner onboarding, earnings tracking, payout history, logo dynamic switching; **thêm mới**: WL member lifecycle UI (register/leave/rejoin/epoch), master wallet management per chain, wl_code suspend/resume
@@ -432,50 +429,37 @@ Mobile communicates with 3 distinct systems. Do not confuse them.
 
 **Description**: Backend infrastructure for EXBOT (managed delta-hedged LP Bot). SOTATEK builds infra only — trading logic is zen's proprietary.
 
-**Current Codebase State** (verified 2026-06-12, SPEC v5.2.6 + Google Doc + Sheet):
-ExBot runs as a **standalone Cloudflare Worker** at `apps/bnza-exbot/` — separate from OPERATOR. The OPERATOR is a **thin public-facing facade** that forwards only `start/status/close` into ExBot Worker via Cloudflare service binding + internal token. ExBot Worker is NOT directly public.
+**Current Codebase State** (verified 2026-05-21): No dedicated EXBOT package exists in monorepo. EXBOT infra will be built within `apps/bnza-operator/` (same Cloudflare Workers deployment). The OPERATOR already has:
+- D1 database with 22 migrations (core tables: bot_configs, bot_positions, bot_operations, rules, notifications, positions, users, fee_distributions, fee_collections, system_config, admin_wallets, etc.) ⚡ Dev-built
+- Queue system Stage 2 in progress: 3 queues defined (bnza-daily-collect-queue, bnza-bot-check-queue, bnza-rule-check-queue), producer bindings added, consumer handlers pending ⚡ Dev-built
+- Durable Objects: RelayerLockDO (TX serialization), PoolStateRefreshDO (pool state caching) ⚡ Dev-built
+- Hono 4.12.12 HTTP framework, 19 API endpoints operational ⚡ Dev-built
+- Relayer pool: HD wallet derivation (BIP39 mnemonic → 50 addresses) ⚡ Dev-built
 
-Dev progress as of tracker (Google Sheet):
-- Strategy & Math Engine: **Done** (duy.nguyen6)
-- HL SDK spike: **Done**; live HL adapter (signing, orders, position sync): **In Progress** (luong.tran)
-- Cron scheduler + Queue wiring: **Done** (structure only, handlers no-op) (duy.nguyen6)
-- Vault smart contracts (BnzaExVault.sol): **Todo** (truong.nguyen2)
-- Operator Facade API (`/api/exbot/*`): **Todo** (duy.nguyen11)
-- Pool UI — EXBOT tab: **Todo** (duy.nguyen11)
-
-**SOTATEK Tasks** (infrastructure per zen's interface specs, SPEC v5.2.6):
-- **D1 Schema** (primary tables per SPEC v5.2.6 Theme D): `bots`, `bot_runtime_state`, `hedge_legs`, `hl_agent_keys`, `queue_idempotency`; optimistic concurrency via `state_version` guard
-- **Queue Topology** (10 queues): `bot-scan`, `light-check`, `hedge-sync`, `reconcile`, `deep-audit`, `price-near-stop-audit`, `partial_repair`, `user_redeem` (highest priority, SLA 5 min), `notification`, `metrics-rollup`
-- **Durable Objects**: `HLRateLimitDO` (sliding-window rate limit for HL API), `UserLockDO` (lease-based 1-bot-per-user lock), `MarketDataDO` (price/tick cache for light-check)
-- **Cron Jobs**: deep-audit `*/360 * * * *`, other intervals TBD per SPEC
-- **Hyperliquid Adapter**: Rate limit handling (1,200 weight/min ceiling), cloid tracking, error parser, reconcile glue; light-check must NOT call HL directly (rate limit exceeded at 10k bots)
-- **Operator Facade API additions** (`/api/exbot/*`): `start`, `status`, `close`, `agent-key`, `margin` — proxied only, ExBot Worker owns logic
-- **Smart Contracts** (7 contracts, zen's scope + SOTATEK integration): BnzaExVault (core custodian), OpenPositionStrategyV1, ClosePosStrategyV1, RebalanceStrategyV1, BnzaExPositionManager (holds LP NFTs), TokenRouter (fee routing), RedemptionQueue (HL redemption tracking)
+**SOTATEK Tasks** (infrastructure per zen's interface specs):
+- **D1 Schema**: hl_agent_keys, subaccount_mappings, lp_positions, hedge_positions, funding_ledger, rebalance_attempts, circuit_breakers, stop_triggers, reconcile_log
+- **Queue Topology**: bot-scan, light-check, hedge-sync, reconcile, deep-audit, stop-audit
+- **Durable Objects**: HLRateLimitDO (rate limiting), UserLockDO (lease-based lock), MarketDataDO
+- **Cron Jobs**: `*/360 * * * *` for deep-audit, other intervals TBD
+- **Hyperliquid Adapter**: Rate limit handling, cloid, error parser, reconcile glue
+- **OPERATOR API additions**: start, stop, pause, status, agent-key-approval endpoints
 - **Integration tests**: Queue processing, HL API calls
 
-**Architecture Constraints** (SPEC v5.2.6):
-- ExBot Worker standalone — NOT co-deployed with OPERATOR
-- Producer/Consumer separation; 10,000 bot throughput = 33.3 bots/sec (Phase A: 1 D1 shard)
-- No per-bot HL API call in light-check (rate limit constraint)
-- Delta-only hedge adjustment: adjust only Δ(targetSize − actualSize); full close forbidden except for target=0 / emergency / manual reset
-- D1 write budget gate (Theme D): gated writes to prevent CF D1 write limit breach
-- Dual-chain from Phase 1: Base + Optimism LP side; `wethIndex` per chain; hedge side (HL ETH-USD perp) chain-independent
-- Agent key encryption: AES-GCM (crypto.subtle), DEK wrapped by master key (Cloudflare Secrets Store), rotation support
-- BnzaExVault naming: "BnzaExVault/Vault" = LP NFT custody Solidity contract; "vaultAddress/subaccount" = HL subaccount identifier — unrelated despite name similarity
+**Architecture Constraints** (from Queue v2 + verified codebase patterns):
+- Must follow Producer/Consumer responsibility separation (existing pattern in bot-checker.ts, rule-checker.ts)
+- Per-relayer mutation lock (RelayerLockDO pattern — already implemented)
+- D1 hot + R2 archive separation
+- 10,000 Bot scale assumption from day one
+- No per-Bot RPC in producer
+- Existing queue config: max batch 100, timeout 30s, max concurrency 1, max retries 3
 
 **Effort**: 3-4 weeks (1 BE engineer)
 
 **Dependencies**:
-- zen's interface specifications (SPEC v5.2.6 — zen-exclusive algorithm details; SOTATEK sees interface contracts only)
+- zen's interface specifications (SPEC_v5.2.5 NOT shared — only interface contracts; zen-exclusive, SOTATEK sees interface definitions only)
+- OPERATOR existing Queue v2 architecture (must integrate, not duplicate)
 - Hyperliquid API access (testnet first, mainnet Phase A2+)
-- BnzaExVault deployment + dual-chain addresses/operator/multiSig finalized (2 sets: Base + OP)
-- HL agent key encryption method finalized (Phase 0 gate condition)
-
-**Phase 0 Start Conditions** (all 4 must clear before Phase A):
-1. zen approves SPEC v5.2.6
-2. BnzaExVault deployed; Base + OP addresses, operator address, multiSig finalized
-3. HL agent key encryption method confirmed
-4. WL stability gate: 7 consecutive days post-launch, zero SAFE_MODE, no major incident
+- BnzaExVault — new EXBOT-exclusive Solidity contract (NOT Router extension; SPEC v5.2.1 Option C confirmed: new deploy, zen's scope)
 
 **Confidentiality**: Trading strategy logic (PositionCalc, hedge math, stop strategy, edge filter) is zen-exclusive. SOTATEK sees only infrastructure interfaces.
 
@@ -645,9 +629,9 @@ Dev progress as of tracker (Google Sheet):
 6. Hyperliquid testnet access is available for EXBOT integration testing
 7. WL launch decision (May 27) determines priority ordering — if deferred, EXBOT infra priority drops
 8. MOBILE will be created as new app `apps/bnza-mobile/` following same patterns as existing apps (Vite + React 19 + TS + Tailwind 4 + shadcn/ui + Reown AppKit)
-9. EXBOT infra is a **standalone Cloudflare Worker** at `apps/bnza-exbot/` — NOT co-deployed with `apps/bnza-operator/`. OPERATOR is a thin facade that proxies only `start/status/close` into ExBot Worker via service binding. ~~(v5.2.5 assumed co-deployment — corrected per v5.2.6 + Google Doc June 2026)~~
+9. EXBOT infra will be built within existing `apps/bnza-operator/` package (same CF Workers deployment), not as a separate app
 10. Existing POOL app (Next.js 16, fully operational) requires minimal refactoring for Step 7 multi-bot — primarily UI changes to bot page
-11. EXBOT Phase A cannot begin until Phase 0 completes all 4 gate conditions (SPEC v5.2.6 §0.3): (1) zen approves SPEC v5.2.6; (2) BnzaExVault deployed + Base + OP addresses/operator/multiSig finalized (2 sets); (3) HL agent key encryption method confirmed; (4) WL stability gate — 7 consecutive days post-launch with zero SAFE_MODE + no major incident
+11. EXBOT Phase A cannot begin until Phase 0 completes all 4 gate conditions (SPEC v5.2.5 §0.3): (1) zen approves SPEC v5.2.5; (2) BnzaExVault deployed + zen confirms address/operator/multiSig; (3) HL agent key encryption confirmed (Phase A default: Cloudflare Secrets Store); (4) WL stability gate — 7 consecutive days post-launch with no SAFE_MODE + no major incident
 
 ---
 
@@ -697,7 +681,7 @@ Dev progress as of tracker (Google Sheet):
 - [x] OQ-3: TradingView license — **Resolved: zen/MEGABUCKS funds. SOTATEK can procure if needed. Not blocking.**
 - [x] OQ-4: MOBILE WL gate — **Resolved: Mock first (Phase 1 UI verification). Production invite flow (server-side verify) implemented later when the OPERATOR endpoint is ready.**
 - [x] OQ-5: ADMIN TOKEN management — **Resolved: Keep mock, low priority. Not needed for WL launch.**
-- [x] OQ-6: ADMIN PF distribution — **Resolved: FM-ADM-02 is off-chain config only.** `fee_distributions` table records BNZA's internal PF allocation. The 70%/30% WL split is Helix's distribution concern — not SOTATEK/BNZA-ADMIN scope (BR-ADM-020). Real API live as of 2026-06-12.
+- [ ] OQ-6: ADMIN PF distribution — daily remittance mechanism? **Hold: documentation describes a daily-collector cron + fee_distributions table, but the WL-specific remittance flow (70% to WL partner) is not yet clear. Noted in backbone.**
 - [x] OQ-7: Testing strategy — **Resolved: Per-module strategy.** MOBILE/ADMIN: unit + E2E (critical flows). EXBOT infra: integration tests (queue, HL API). POOL/EX: unit tests (80%+ coverage).
 - [ ] OQ-8: Staging environment — **Hold: not yet decided.** Noted in backbone.
 

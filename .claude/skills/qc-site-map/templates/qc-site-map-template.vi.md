@@ -8,8 +8,9 @@
 **Baseline:** `project-context-master.md`  
 **Mục đích:** Cung cấp bản đồ site/screen/navigation theo góc nhìn QC để hỗ trợ review spec, thiết kế scenario/test case, đánh giá impact, regression và verify bug.
 
-> File này là screen-first QC site map.  
-> File này không thay thế `project-context-master.md`, feature list, spec, wireframe, API doc hoặc `qc-dashboard.md`.
+> File này là **screen-first QC site map**.  
+> File này không thay thế `project-context-master.md`, feature list, spec, wireframe, API doc, DB schema hoặc `qc-dashboard.md`.  
+> File này bổ sung góc nhìn **SCREEN-centric** trong bộ 3 trục QC context: **project / screen / data**.
 
 ---
 
@@ -23,6 +24,7 @@
 | Site map readiness | Ready / Partial / Blocked |
 | Source quality | Official / Derived / Mixed / Low confidence |
 | Dashboard relationship | Feature-level handoff only |
+| Data-map relationship | `qc-data-map.md` dùng file này làm screen baseline |
 | Ghi chú |  |
 
 ---
@@ -91,9 +93,9 @@
 
 ### Feature-level coverage summary for dashboard
 
-| Feature ID | Feature name | Mapped screen(s) | Site map status | Gap / Note |
-|---|---|---|---|---|
-|  |  |  | Mapped / Partial / Missing / Conflict / Need confirm |  |
+| Feature ID | Feature name | Site / Portal | Module | Mapped screen(s) | Folder alias(es) | In scope? | Site map status | Gap / Note |
+|---|---|---|---|---|---|---|---|---|
+|  |  |  |  |  |  | Yes / No / Need confirm | Mapped / Partial / Missing / Conflict / Need confirm |  |
 
 ---
 
@@ -102,6 +104,8 @@
 | Screen / Flow | Data object / API / Integration / State | Rule / lifecycle liên quan | QC impact | Source |
 |---|---|---|---|---|
 |  |  |  |  |  |
+
+> Chi tiết entity lifecycle, CRUD role, relationship và feature-entity coverage được quản lý trong `qc-data-map.md`. Section này chỉ giữ touchpoint ở góc nhìn screen/flow.
 
 ---
 
@@ -132,6 +136,17 @@
 | Data/API/integration/state touchpoints | Ready / Partial / Blocked / N/A |  |  |
 | Regression/impact usage | Ready / Partial / Blocked |  |  |
 | Dashboard feature-level handoff | Ready / Partial / Blocked |  |  |
+| Data-map baseline usability | Ready / Partial / Blocked / N/A |  |  |
 
 **Kết luận:** Đủ / Tạm đủ / Chưa đủ  
 **Ghi chú cho QC Lead:** [Các điểm cần review hoặc bổ sung trước khi downstream QC Agents sử dụng.]
+
+---
+
+## 13. Folder alias map (Mode 3 only)
+
+> Section này chỉ dùng khi `qc-dashboard-sync` phát hiện UC folder orphan và `qc-site-map` Mode 3 đã reconcile alias. Giữ section này để dashboard có thể map Folder ID trên disk về Feature ID canonical.
+
+| Canonical Feature ID | Feature name | Folder alias(es) | Source / Reason | Last reconciled |
+|---|---|---|---|---|
+|  |  |  | Mode 3 exact match / user-confirmed alias / new feature | [YYYY-MM-DD] |

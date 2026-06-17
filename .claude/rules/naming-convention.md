@@ -26,6 +26,7 @@ trigger: always_on
 
 | Type              | Suffix Value          | Extension | Skill              |
 | :---------------- | :-------------------- | :-------- | :----------------- |
+| Smoke Review      | `smoke`               | `.md`     | qc-uc-smoke               |
 | Audited Req       | `audited`             | `.md  `   | qc-uc-review-report       |
 | Scenario          | `scenarios`           | `.md`     | qc-scenario-design-report |
 | Test Case         | `testcases`           | `.xlsx`   | qc-tc-design-report       |

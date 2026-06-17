@@ -1,22 +1,22 @@
 ---
 name: qc-dashboard-sync
-description: Owner of qc-dashboard.md. Step 3 of the top-down chain qc-context-master -> qc-site-map -> qc-dashboard-sync. Tracks the on-disk reality of UC artifact folders; does NOT decide In scope?. Operates in TWO modes. (1) Top-down — triggered by /qc-dashboard-sync or auto-invoked by qc-site-map. Requires project-context-master.md AND site-map-handoff.md to exist as upstream evidence. Surfaces the gap report already produced by qc-site-map (no duplicate conflict-check), then syncs the feature list from site-map-handoff into qc-dashboard.md and scans the existence/version of 6 artifact types (Specs, WF, Audited, Scenario, TC md, TC xlsx) into a single Files stt column. (2) Bottom-up — auto-invoked by per-UC skills (qc-uc-read, qc-func-scenario-design, qc-func-tc-design) for a single UC ID. Adds a row with In scope? = Need confirm AND appends an entry to .claude/skills/qc-site-map/inbox/dashboard-orphans.md so qc-site-map Mode 3 can later reconcile it. Does NOT prompt the user for In scope? decisions. Does NOT write the process-state columns UC review stt, Scenario design stt, TC design stt — those are owned by the respective review/design skills.
+description: SOLE writer of qc-dashboard.md (all columns including stt). Step 3 of the top-down chain qc-context-master -> qc-site-map -> qc-dashboard-sync. This skill checks that subfolder for in-progress detection, and sparse-parses output files (audited reports, ui-elements files) for done-state — only when the on-disk version is NEWER than the cached version already in the dashboard cell (token-efficient). Operates in TWO modes, (1) Top-down — auto-invoked by qc-site-map. Requires project-context-master.md AND site-map-handoff.md. Syncs feature list + scans disk for 6 artifact types into Files stt + populates stt columns via in-progress check + sparse done-state derivation. (2) Bottom-up — manual invoke by user. Auto-sorts rows per a single-line `Sorting:` directive above the table (auto-generated on first write, user-editable thereafter).
 ---
 
 # QC Dashboard Sync Skill
 
 ## Two operating modes
 
-This skill operates in two modes that are mutually exclusive within a single run:
+This skill operates in two modes that are mutually exclusive within a single run. **Both modes are triggered manually by the user** — per-UC skills no longer auto-invoke this skill.
 
 | Mode | Triggered by | Scope | Gap review | Prerequisite |
 |---|---|---|---|---|
-| **Top-down** | `/qc-dashboard-sync` (manual) OR auto-invoked by `qc-site-map` | Full feature list + 6-artifact scan for every UC | YES — surfaces site-map's gap tables (Feature-level gaps, Unmapped screens, Dashboard recommendation) and asks user proceed/cancel | `project-context-master.md` AND `.claude/skills/qc-dashboard-sync/inbox/site-map-handoff.md` must both exist |
-| **Bottom-up** | Auto-invoked by per-UC skills (`qc-uc-read`, `qc-func-scenario-design`, `qc-func-tc-design`) with a specific UC ID | Single UC: add row with `Need confirm` + run the 6-artifact scan for that UC only + append entry to `dashboard-orphans.md` inbox of `qc-site-map` (so Mode 3 can reconcile later) | NO | None — runs even if upstream context is missing |
+| **Top-down** | auto-invoked by `qc-site-map` (Initialization + after Mode 3) | Full feature list + 6-artifact disk scan + in-progress check + sparse done-state parse for every UC | YES — surfaces site-map's gap tables (Feature-level gaps, Unmapped screens, Dashboard recommendation) and asks user proceed/cancel | `project-context-master.md` AND `.claude/skills/qc-dashboard-sync/inbox/site-map-handoff.md` must both exist |
+| **Bottom-up** | User runs `/qc-dashboard-sync` manually | Per UC: add rows with `Need confirm` if missing + 6-artifact disk scan + in-progress check + sparse done-state parse for that UC only + append to `dashboard-orphans.md` inbox of `qc-site-map` if folder not in site-map | NO | None — runs even if upstream context is missing |
 
 The caller indicates the mode implicitly:
-- No UC ID passed → top-down.
-- A UC ID passed (`uc_id=<ID>`) → bottom-up for that single ID.
+- Auto-invoked by qc-site-map → top-down
+- Manual trigger by user → bottom-up for all ID that have new version or not existed in the current dashboard.
 
 ## Scope decision boundary
 
@@ -29,11 +29,10 @@ No interactive `In scope?` prompts are emitted from this skill. The user can man
 
 ## Trigger Conditions
 
-- **Manual top-down:** `/qc-dashboard-sync`, "sync dashboard", "đồng bộ dashboard", "update dashboard status".
-- **Auto-trigger top-down from `qc-site-map`** — at the end of its Phase 9, after writing `site-map-handoff.md`, in Initialization mode (or Update mode when the user accepts the prompt).
-- **Auto-trigger bottom-up from per-UC skills** (`qc-uc-read`, `qc-func-scenario-design`, `qc-func-tc-design`) — when the skill operates on a UC ID that is NOT yet a row in the dashboard, it MUST invoke this skill in bottom-up mode BEFORE proceeding so the dashboard always reflects on-disk reality.
+- **Manual bottom-up:** `/qc-dashboard-sync` — user manual invoke.
+- **Auto-trigger top-down from `qc-site-map`** — at the end of its Phase 9, after writing `site-map-handoff.md`, in Initialization mode (or Update mode when the user accepts the prompt) and after Mode 3 reconciliation.
 
-`qc-context-master` no longer triggers this skill. The dashboard receives its feature list exclusively via `qc-site-map`'s `site-map-handoff.md`.
+`qc-context-master` does not trigger this skill. The dashboard receives its feature list exclusively via `qc-site-map`'s `site-map-handoff.md`, and its stt columns via the in-progress check + sparse done-state derivation performed by this skill.
 
 ## Top-down prerequisites
 
@@ -45,11 +44,11 @@ In top-down mode this skill requires BOTH upstream artifacts to exist:
 If either is missing → STOP with the Vietnamese message:
 
 ```text
-Khong du dieu kien chay top-down sync:
+Không đủ điều kiện chạy top-down sync:
 - project-context-master.md: <found | MISSING>
 - site-map-handoff.md (tu qc-site-map): <found | MISSING>
 
-Hay chay chuoi theo thu tu: /qc-context-master -> /qc-site-map -> /qc-dashboard-sync.
+Hãy chạy lại chuỗi theo thứ tự: /qc-context-master -> /qc-site-map -> /qc-dashboard-sync.
 ```
 
 Do not fall through to bottom-up mode automatically — bottom-up is triggered only by per-UC skills with an explicit UC ID.
@@ -68,6 +67,52 @@ Resolve via `path-registry.md`:
 | `func-test-cases-draft` | Parent folder; per-`<ID>` sub-folders. | TC md scan. |
 | `func-test-cases` | Parent folder; per-`<ID>` sub-folders. | TC xlsx scan. |
 | `requirement-common-files` | — | **Exclusion path** during orphan scan (its folder is not a UC). |
+
+### Process-logging inputs (per-UC subfolder — existing checkpoint files)
+
+The 4 per-UC skills already maintain checkpoint files in **per-UC subfolders** for their own resume-from-interruption logic. This skill does NOT require any new file or schema — it reuses the existing checkpoints purely as an **in-progress indicator**:
+
+| Path pattern | Owner skill | Indicates |
+|---|---|---|
+| `.claude/skills/qc-uc-read/process-logging/<UC-ID>/progress.md` | `qc-uc-read` | A run is in-progress for that UC → `UC review stt` cell = current `status:` line |
+| `.claude/skills/qc-func-scenario-design/process-logging/<UC-ID>/progress.md` | `qc-func-scenario-design` | In-progress → `Scenario design stt` cell = current `status:` line |
+| `.claude/skills/qc-func-tc-design/process-logging/<UC-ID>/progress.md` | `qc-func-tc-design` | In-progress → `TC design stt` cell = current `status:` line |
+| `.claude/skills/qc-ui-extract/process-logging/<UC-ID>/progress.md` | `qc-ui-extract` | In-progress → `UI extract stt` cell = current `status:` line |
+
+**File existence semantics:** Each owner skill deletes its `<UC-ID>/` subfolder upon successful Phase 3 cleanup (per its `checkpoint-protocol.md` §5). So the file existing = the UC has an active or interrupted run; the file absent = either the UC has never been processed by that skill OR the skill finished successfully and cleaned up.
+
+This skill does NOT modify these files. It only reads them for in-progress detection.
+
+### Done-state derivation (when per-UC progress.md is absent)
+
+When a per-UC subfolder progress.md does NOT exist, the UC is either never-started or fully-done. To distinguish + populate the cell without exhausting tokens by parsing every output file each run, this skill uses a **sparse-parse** strategy:
+
+| stt column | Done-state source | Sparse-parse condition |
+|---|---|---|
+| `UC review stt` | The audited UC review report file (`<uc-review-report>/<Folder ID>/*_audited_*_v<N>.md`) — extract verdict + score from the "Tổng điểm" row of the scoring table | Only parse when `Audited: V<N>` from current Files stt scan is GREATER than `v<M>` parsed from the existing cell value. If versions match → keep cell verbatim (no parse). If no Audited file → cell BLANK. |
+| `Scenario design stt` | The Files stt `Scenario: V<N>` value directly — no file parse | Always derive from Files stt (no content parse). Format: `v<N> generated`. If no Scenario file → cell BLANK. |
+| `TC design stt` | The Files stt `TC xlsx: V<N>` value directly — no file parse | Always derive from Files stt. Format: `v<N> generated`. If TC xlsx missing but TC md exists → `v<N> draft`. If neither → cell BLANK. The historical `v<N> updated` value distinction (generate vs update workflow) is NO LONGER tracked — user can edit manually if desired. |
+| `UI extract stt` | The UI extract output folder (`docs/qc/ui-elements/<Folder ID>/*_v<N>.md`) — count distinct page files; parse one of them for `audited_version` reference | Only parse when the latest ui-elements version (from filename) is GREATER than `v<M>` parsed from the existing cell value. Format: `v<N> (audited v<M>) [<Kp]` where K = page count (omit `[Kp]` if K=1). If folder missing → cell BLANK. |
+
+**Cache extraction regex for existing cell values:**
+
+- `UC review stt`: existing pattern `(?:Ready|Conditionally Ready|Not Ready)\s+v(\d+)\s*\(Score` → capture group 1 = cached audited version. If cell doesn't match → treat as cached version 0 (forces re-parse).
+- `Scenario design stt` / `TC design stt`: `^v(\d+)\s+(generated|updated|draft)` → cached version. No "sparse" optimization needed since the source is Files stt (no file parse).
+- `UI extract stt`: `^v(\d+)\s+\(audited` → cached ui-extract version.
+
+**Audited file parse contract** (only used for `UC review stt` re-parse):
+
+The scoring summary row in the audited report follows the pattern:
+
+```
+| **Tổng điểm** | **<score>/100** | **<verdict>** | <reason> |
+```
+
+where `<verdict>` ∈ {`Ready`, `Conditionally Ready`, `Not Ready`} and `<score>` is a number (integer or 1-decimal). Regex: `\|\s*\*+Tổng điểm\*+\s*\|\s*\*+(\d+(?:\.\d+)?)/100\*+\s*\|\s*\*+(Ready|Conditionally Ready|Not Ready)\*+\s*\|`.
+
+Implementation hint: use `grep -n "Tổng điểm" <audited file>` to locate the line, then read just that line + the next column-value row via `head`/targeted Read — DO NOT load the whole report into context.
+
+Composed cell value: `<verdict> v<auditedVersion> (Score <score>/100)` — matches existing dashboard format.
 
 ### Top-down handoff input (from `qc-site-map`)
 
@@ -123,28 +168,42 @@ Resolve via `path-registry.md`:
 
   | Folder ID | Folder paths (per source) | Files stt | Detected at |
   |---|---|---|---|
-  | <ID extracted from folder name> | requirement-files: <path>; uc-review-report: <path>; ... | Specs: V1<br>WF: Missing<br>... | <ISO-8601 datetime> |
+  | <ID extracted from folder name> | requirement-files: <path>; uc-review-report: <path>; ... | Specs: V1<br>Scenario: V1 (or `No files yet`) | <ISO-8601 datetime> |
   ```
 
 ### Template
 
 - `templates/qc-dashboard-template.md` — used to bootstrap the dashboard when it does not exist.
 
-## Schema (11 columns)
+## Schema (10 baseline columns + optional self-injected columns)
 
-| # | Column | Owner | Type |
+### Baseline (10 columns — always present)
+
+`qc-dashboard-sync` is the SOLE writer of all 10 baseline columns. The data SOURCE for each column appears in the "Source" sub-column. stt columns use a 2-step source: in-progress check (per-UC subfolder progress.md existence) → done-state derivation (output file sparse parse OR Files stt mapping).
+
+| # | Column | Writer | Data source |
 |---|---|---|---|
-| 1 | `Site` | `qc-dashboard-sync` | metadata |
-| 2 | `<ID label>` | `qc-dashboard-sync` | metadata — **canonical** ID from site-map (or folder ID until reconciled) |
-| 3 | `Folder ID` | `qc-dashboard-sync` | metadata — ID/name as extracted from on-disk folder (used to match disk scan → row) |
-| 4 | `Module` | `qc-dashboard-sync` | metadata |
-| 5 | `Feature/Use case name` | `qc-dashboard-sync` | metadata |
-| 6 | `In scope?` | `qc-dashboard-sync` | metadata — copied from site-map handoff (top-down) or set to `Need confirm` (bottom-up) |
-| 7 | `Files stt` | `qc-dashboard-sync` | **file existence** (consolidated 6 file types) |
-| 8 | `UC review stt` | `qc-uc-read` | process state — preserved verbatim |
-| 9 | `Scenario design stt` | `qc-func-scenario-design` | process state — preserved verbatim |
-| 10 | `TC design stt` | `qc-func-tc-design` | process state — preserved verbatim |
-| 11 | `Execute stt` | — (pending) | placeholder — preserved verbatim |
+| 1 | `Site` | `qc-dashboard-sync` | site-map handoff (top-down) / blank (bottom-up) |
+| 2 | `<ID label>` | `qc-dashboard-sync` | site-map handoff canonical ID / folder ID (bottom-up unreconciled) |
+| 3 | `Folder ID` | `qc-dashboard-sync` | on-disk folder name extraction |
+| 4 | `Module` | `qc-dashboard-sync` | site-map handoff (top-down) / blank (bottom-up) |
+| 5 | `Feature/Use case name` | `qc-dashboard-sync` | site-map handoff (top-down) / blank (bottom-up) |
+| 6 | `In scope?` | `qc-dashboard-sync` | site-map handoff verbatim (top-down) / `Need confirm` (bottom-up new row) |
+| 7 | `Files stt` | `qc-dashboard-sync` | disk scan (6 artifact types) |
+| 8 | `UC review stt` | `qc-dashboard-sync` | (in-progress) `qc-uc-read/process-logging/<UC-ID>/progress.md` status / (done) sparse parse of latest audited file |
+| 9 | `Scenario design stt` | `qc-dashboard-sync` | (in-progress) `qc-func-scenario-design/process-logging/<UC-ID>/progress.md` status / (done) derived from Files stt `Scenario: V<N>` |
+| 10 | `TC design stt` | `qc-dashboard-sync` | (in-progress) `qc-func-tc-design/process-logging/<UC-ID>/progress.md` status / (done) derived from Files stt `TC xlsx`/`TC md` version |
+
+### Optional columns
+
+| Order if present | Column | Writer | Data source |
+|---|---|---|---|
+| 11 | `UI extract stt` | `qc-dashboard-sync` | (in-progress) `qc-ui-extract/process-logging/<UC-ID>/progress.md` status / (done) sparse parse of latest ui-elements file at `docs/qc/ui-elements/<UC-ID>/` |
+| 12 (or 11 if no UI extract) | `Execute stt` | future `qc-execute` skill (placeholder) | (not yet implemented) |
+
+`UI extract stt` is auto-injected by this skill in Phase 5 if `docs/qc/ui-elements/` contains at least one `<UC-ID>/` subfolder with extracted files AND the column is missing from the dashboard header. `Execute stt` remains a manual user-injection placeholder until the future `qc-execute` skill exists.
+
+Valid column counts: **10** (baseline), **11** (with `UI extract stt` only, or `Execute stt` only), **12** (both). `qc-dashboard-sync` accepts any of these.
 
 ### `Folder ID` column semantics
 
@@ -162,34 +221,103 @@ Disk scan in Phase 1 always matches a folder back to a row via `Folder ID` — n
 
 ## Outputs
 
-- **`qc-dashboard`** — this skill is the **sole owner of the file** (creates + structures it). Writes columns **1, 2, 3, 4, 5, 6, 7**. Preserves columns **8, 9, 10, 11** verbatim.
-- **`dashboard-orphans.md`** — at `.claude/skills/qc-site-map/inbox/dashboard-orphans.md`. Written (append + dedupe by Folder ID) every time bottom-up adds a brand-new row. Sole consumer + deleter is `qc-site-map` Mode 3.
-- Console report: new rows, Files-stt updates, orphans appended, summary.
+- **`qc-dashboard`** — this skill is the **SOLE writer of every column** (creates + structures + maintains the file). Writes columns **1, 2, 3, 4, 5, 6, 7** from site-map handoff + disk scan, and columns **8, 9, 10, 11** via in-progress check (per-UC subfolder progress.md) + sparse done-state derivation (output file parse or Files stt mapping). Preserves `Execute stt` (col 12) verbatim from user edits (no current owner skill writes it).
+- **`Sorting:` directive line** — single line above the table header. Auto-generated on first write; respected verbatim on subsequent runs (user edits preserved unless the level no longer applies — see "Sort order directive").
+- **`dashboard-orphans.md`** — at `.claude/skills/qc-site-map/inbox/dashboard-orphans.md`. Written (append + dedupe by Folder ID) every time top-down detects an orphan folder OR bottom-up adds a brand-new row. Sole consumer + deleter is `qc-site-map` Mode 3.
+- Console report: new rows, Files-stt updates, stt updates, orphans appended, sort decision, summary.
 - `worklog-per-device` — log every phase boundary per the protocol at `docs/qc-lead/agent-work-log.local/README.md`. Do NOT touch the master `agent-work-log`.
 
 ## `Files stt` cell format
 
-Single-cell, 6 lines joined by `<br>`. One line per artifact type, in this fixed order:
+Single-cell. Lists only the artifact types that were FOUND on disk; absent types are OMITTED (no `Missing` line). Lines are joined by `<br>` and appear in this fixed order (skipping any absent type):
 
 ```
-Specs: V<N> | Missing
-WF: V<N> | Missing
-Audited: V<N> | Missing
-Scenario: V<N> | Missing
-TC md: V<N> | Missing
-TC xlsx: V<N> | Missing
+Specs: V<N>
+WF: V<N>
+Audited: V<N>
+Scenario: V<N>
+TC md: V<N>
+TC xlsx: V<N>
 ```
 
-Rendered example (one cell):
+Rendered examples:
+- Some files found:
+  ```
+  Specs: V2<br>WF: V1<br>Scenario: V1<br>TC md: V2
+  ```
+- No files found at all (after scan):
+  ```
+  No files yet
+  ```
+
+Use `V<N>` (capital V) where `<N>` is the highest version detected. When the scan finds NO artifact across all 6 types, write the literal string `No files yet` as the sole cell content.
+
+## Process-log parse contract
+
+Per-UC subfolder progress.md format is OWNED by each owner skill (see their respective `workflows/checkpoint-protocol.md` files). This skill ONLY reads `status:` line — best-effort — and does NOT require any schema change from the owner skill.
+
+### Parse algorithm (in-progress detection)
+
+For each row + each per-UC skill, with `<UC-ID>` = the row's `Folder ID`:
+
+1. Check if `.claude/skills/<skill>/process-logging/<UC-ID>/progress.md` exists.
+2. If NO → fall through to done-state derivation (see "Done-state derivation" section above).
+3. If YES → read the file (small, single-state overwrite per checkpoint protocol). Extract the `status:` line via regex `^[-*]?\s*status\s*:\s*(.+)$` (case-insensitive). If found → cell value = the captured raw status string verbatim (e.g., `Running — Phase 3`, `Phase 3 done`).
+4. If progress.md exists but has no `status:` line → cell value = `Running (status không xác định)` and emit a warning in the Phase 6 report.
+
+### Best-effort tolerance
+
+- Free-form markdown bullets, frontmatter, or comments are all tolerated. The skill only cares about the `status:` key.
+- If parsing fails entirely → cell value = `Running (parse failed)` and emit a warning.
+- This skill NEVER writes to any per-UC subfolder progress.md. The owner skill remains the sole writer.
+
+## Sort order directive
+
+Above the dashboard header table, this skill writes (and respects on re-run) a single-line directive:
+
 ```
-Specs: V2<br>WF: V1<br>Audited: Missing<br>Scenario: V1<br>TC md: V2<br>TC xlsx: Missing
+Sorting: <value1> >> <value2> >> <value3>
 ```
 
-Use literal string `Missing` when the file is absent. Use `V<N>` (capital V) where `<N>` is the highest version detected.
+### Purpose
+
+Controls row order. The user can edit the directive at any time; subsequent runs honor the edited order.
+
+### Auto-generation logic (Phase 5)
+
+1. Compute `distinctSites = set of column 1 values` and `distinctModules = set of column 4 values` across all rows.
+2. **Pick the sort level:**
+   - If `len(distinctSites) > 1` → sort level = `Site` (column 1).
+   - Else if `len(distinctModules) > 1` → sort level = `Module` (column 4).
+   - Else → no `Sorting:` line written (single-module case; rows default to ascending by canonical ID).
+3. **Compose values:** alphabetical ascending of the distinct values at the chosen level. This is the default ordering on first generation.
+4. Write `Sorting: v1 >> v2 >> v3` immediately above the table header (separated from the surrounding markdown by a blank line on each side).
+
+### Re-run logic (Phase 5)
+
+1. Parse the existing dashboard. Look for `^Sorting:\s*(.+)$` anywhere above the table header line.
+2. If found, split the value list by `>>` (trim each token). Call this `userSortList`.
+3. Determine which column `userSortList` refers to by majority-match:
+   - Count how many tokens of `userSortList` are members of `distinctSites`. Call this `siteMatches`.
+   - Count how many tokens are members of `distinctModules`. Call this `moduleMatches`.
+   - The level with the larger match count wins; ties go to `Site` (higher level).
+4. **Determine if regeneration is needed:**
+   - If the picked level disagrees with the auto-generation logic above (e.g., user wrote module names but auto would pick `Site` since `distinctSites > 1`) → respect the user's level. The user can intentionally sort by Module within a multi-portal project.
+   - If `userSortList` is missing some values that exist on disk → append the missing values alphabetically at the end of `userSortList`, then rewrite the `Sorting:` line. Print a notice.
+   - If `userSortList` contains values no longer on disk → drop them. Print a notice.
+   - If `userSortList` matches NEITHER `distinctSites` nor `distinctModules` (zero matches) → log a warning and fall back to auto-generation; overwrite the `Sorting:` line.
+5. **Apply sort:**
+   - Group rows by their value at the chosen sort level, in the order given by `userSortList`. Rows whose level-value is not in `userSortList` (after step 4 append) go last in alphabetical order.
+   - Within each group, sort by the next-lower level alphabetically (e.g., if sort level is `Site`, sub-sort by `Module` ascending; then by canonical ID ascending).
+   - Levels below the sort level are NEVER written into the directive — they always default to ascending by canonical ID.
+
+### Single-module / single-portal case
+
+When neither Site nor Module has more than 1 distinct value, the `Sorting:` line is NOT written. The skill removes any pre-existing `Sorting:` line in that case (with a notice) and sorts rows by canonical ID ascending.
 
 ## Workflow
 
-The workflow below is the **top-down workflow** (Phases 0 → 0.5 → 0.6 → 1 → 2 → 3 → 4 → 5 → 6). For bottom-up, see the dedicated section after Phase 6.
+The workflow below is the **top-down workflow** (Phases 0 → 0.5 → 0.6 → 1 → 2 → 3a → 3b → 4 → 5 → 6). For bottom-up, see the dedicated section after Phase 6.
 
 ### Phase 0 — Mode detection, prerequisites & input parse
 
@@ -208,18 +336,46 @@ This phase is purely read-only. No dashboard file is created or modified here; t
    - Build `aliasIndex = Map<FolderID → FeatureID>` from the `FolderAliases` lists — for each (FeatureID, alias) pair, record `aliasIndex[alias] = FeatureID`. If a FeatureID has no aliases declared, treat the FeatureID itself as its own folder ID (i.e., `aliasIndex[FeatureID] = FeatureID`). If the same alias appears under two different FeatureIDs → STOP with a Vietnamese error message (`Loi: folder alias <X> duoc khai bao trung lap o site-map-handoff cho ca hai feature <A> va <B>. Vui long sua qc-site-map.md hoac chay lai qc-site-map Mode 3.`).
    - Parse the `Feature-level gaps`, `Unmapped screens`, and `Dashboard update recommendation` tables — keep them as `siteMapGaps`, `unmappedScreens`, `dashboardRecommendations` for Phase 0.5.
 5. Resolve `qc-dashboard` path from `path-registry.md`. **Do NOT create or write the file yet.**
-   - If the dashboard file EXISTS: parse it now (header → `existingLabel`; data rows → `featureIndex` keyed by canonical ID in column 2; notes block captured verbatim). Run schema validation:
-     - **11 columns in canonical order** (column 3 = `Folder ID` present): parse `Folder ID` from column 3 into each `featureIndex` entry. Proceed normally.
-     - **10 columns (legacy schema without `Folder ID`)**: AUTO-MIGRATE in-memory before continuing. Safe to auto-fill because the legacy schema only existed before Mode 3 existed, so every row was top-down with `column 2 = folder name on disk` (no alias divergence yet possible). Migration steps:
-       1. Insert a new `Folder ID` column at position 3 in the header (between `<ID label>` and `Module`).
-       2. For every data row, insert a new cell at position 3 with value = column 2's value (self-reference). All existing column-3-onward cells shift one position right; no data is lost.
-       3. Append a migration note to the in-memory ghi-chú block (to be written in Phase 5):
-          ```text
-          > **<YYYY-MM-DD> — Schema migration v10→v11**: cot `Folder ID` da duoc them tu dong, gia tri = cot `<ID label>` (self-reference). Mode 3 cua qc-site-map se update gia tri khi reconcile orphan voi alias mapping khac.
-          ```
-       4. Print a single info line on console: `Da auto-migrate dashboard tu 10 cot sang 11 cot (them Folder ID = self-reference cho <N> row).`
-       5. Continue Phase 0 with the migrated in-memory state. The actual file write happens in Phase 5.
-     - **Other mismatches** (wrong column count, wrong header order, missing required column): STOP and report. Do NOT auto-fix beyond the v10→v11 case.
+   - If the dashboard file EXISTS: parse it now (header → `existingLabel`; data rows → `featureIndex` keyed by canonical ID in column 2; notes block captured verbatim). Detect the schema variant and apply auto-migration when needed:
+
+     | Detected schema | Action |
+     |---|---|
+     | **Baseline 10 cols** (`Site | <ID> | Folder ID | Module | Name | In scope? | Files stt | UC review stt | Scenario design stt | TC design stt`) | Proceed normally. Existing stt cells (cols 8/9/10) are KEPT (cached values needed for sparse-parse comparisons in Phase 3b); they will be OVERWRITTEN in Phase 5 only when the corresponding source has a newer version. |
+     | **11 cols** = baseline + (`UI extract stt` OR `Execute stt`) after `TC design stt` | Proceed normally. `UI extract stt` cached value kept for sparse-parse; `Execute stt` is preserved VERBATIM into `featureIndex[ID].executeStt`. |
+     | **12 cols** = baseline + both `UI extract stt` and `Execute stt` (in that order) after `TC design stt` | Proceed normally. `UI extract stt` cached for sparse-parse; `Execute stt` preserved verbatim. |
+     | **Legacy v10** (10 cols WITHOUT `Folder ID`, header `Site | <ID> | Module | …`) | AUTO-MIGRATE: insert `Folder ID` at position 3 = column 2 self-reference; shift rest right. |
+     | **Legacy v11-old** (header contains `Specs stt`, `WF stt`, `Test scenario stt`, `Test cases stt` as separate columns — typical pre-consolidation shape: `Site | <ID> | Module | Name | In scope? | Specs stt | WF stt | Test scenario stt | Test cases stt | [UI extract stt] | [Execute stt]`) | AUTO-MIGRATE per "Legacy v11-old → new" steps below. |
+     | **Other** (wrong header order, unknown column names, can't classify) | STOP and report. Do NOT auto-fix. |
+
+     **Legacy v10 → new** migration steps (in-memory):
+     1. Insert `Folder ID` column at position 3 in the header.
+     2. For every data row, insert cell at position 3 = column 2's value (self-reference).
+     3. Append migration note:
+        ```text
+        > **<YYYY-MM-DD> — Schema migration v10→new**: cot `Folder ID` da duoc them tu dong, gia tri = cot `<ID label>` (self-reference). Mode 3 cua qc-site-map se update gia tri khi reconcile orphan voi alias mapping khac.
+        ```
+     4. Print: `Da auto-migrate dashboard: them Folder ID = self-reference cho <N> row.`
+
+     **Legacy v11-old → new** migration steps (in-memory, purely STRUCTURAL — values of the 4 file cols are DROPPED, not transformed, because the new `Files stt` format requires a fresh disk scan):
+     1. Header transformation:
+        - Insert `Folder ID` at position 3.
+        - Replace the 4 cols (`Specs stt`, `WF stt`, `Test scenario stt`, `Test cases stt`) with a single `Files stt` column at position 7.
+        - Insert `UC review stt`, `Scenario design stt`, `TC design stt` at positions 8, 9, 10.
+        - Preserve `UI extract stt` if present (becomes col 11 optional).
+        - Preserve `Execute stt` if present (becomes col 11 if no UI extract, or col 12).
+     2. For every data row:
+        - Insert col 3 = col 2 (self-reference).
+        - Set col 7 `Files stt` = EMPTY (force next sync to populate via fresh scan).
+        - Set cols 8, 9, 10 = EMPTY (no prior process-state values existed).
+        - Carry over `UI extract stt` value if column existed.
+        - Carry over `Execute stt` value if column existed.
+     3. Append migration note:
+        ```text
+        > **<YYYY-MM-DD> — Schema migration v11-old→new**: hop nhat 4 cot (`Specs stt`, `WF stt`, `Test scenario stt`, `Test cases stt`) thanh `Files stt` (cell trong, se duoc populate bang next sync); them `Folder ID`, `UC review stt`, `Scenario design stt`, `TC design stt`. Cac cot stt (8/9/10/11 neu co `UI extract stt`) se duoc populate tu in-progress check + sparse done-state derivation o Phase 3b. Cot `Execute stt` neu co duoc giu lai verbatim. Gia tri 4 cot file cu duoc DROP (khong transform) vi format moi yeu cau scan lai.
+        ```
+     4. Print: `Da auto-migrate dashboard tu v11-old sang schema moi (<N> row, <K> cot optional duoc giu).`
+     5. Continue Phase 0 with the migrated in-memory state. The actual file write happens in Phase 5.
+
    - If the dashboard file does NOT exist: skip parsing. `featureIndex` is empty. The `<ID label>` will be determined in Phase 0.6 from the handoff and a user prompt.
 
    Build `folderIDIndex = Map<FolderID → FeatureID>` from `featureIndex` (column 3 → column 2) so Phase 1 can match observed folders back to existing rows even when the on-disk folder uses an alias.
@@ -307,18 +463,32 @@ Update worklog: `Status = Phase 0.6 done`.
    - `func-test-cases` (covers TC xlsx; skip if same parent as `func-test-cases-draft`)
    For each existing parent folder, list immediate sub-folder names.
 
-2. **Exclude + extract Folder ID from each sub-folder name.** Different sources may name the same UC differently — e.g., BA uses compound names like `UC1_TrangChuDashboard`, `UC258_UC259_ThongBaoHeThong`, while QC uses bare IDs like `UC1`, `UC258_UC259`. The skill MUST extract a `Folder ID` from each folder name and use it as the link to the dashboard row (column 3). For each sub-folder name `<folderName>`:
+2. **Exclude + extract Folder ID from each sub-folder name** using a regex list built dynamically from the project's actual ID patterns. Different sources may name the same UC differently — e.g., BA uses compound names like `UC-CLY-005_LoyaltyRules` or `UC1_TrangChuDashboard`, while QC uses bare IDs like `UC-CLY-005` or `UC1`. A single dự án may use multiple ID formats simultaneously (e.g., `UC-CLY-005` for new modules + legacy `F-100`). The skill MUST extract a `Folder ID` and use it as the link to the dashboard row (column 3).
+
+   **Step 2a — Build `regexList` (dynamic pattern detection):**
+   - Source IDs for pattern detection:
+     - Top-down: all `Feature ID` values from `handoffList` (Phase 0 step 4) PLUS all column 2 values from existing `featureIndex`.
+     - Bottom-up: the single `uc_id` passed by caller.
+   - For each source ID, compute its **shape signature**:
+     - Split the ID by `-` and `_` into tokens.
+     - Classify each token as `L` (all-letters), `N` (all-digits), or `M` (mixed — rare; treat as `L`).
+     - Signature = tokens joined by their original separator (vd: `UC-CLY-005` → `L-L-N`; `UC1` → `LN` (no separator merges adjacent classes); `F-100` → `L-N`; `UC258_UC259` → `LN_LN`).
+   - Group source IDs by signature; for each distinct signature, build ONE regex with **capture group 1** = the canonical ID portion:
+     - `L`, `M` tokens → `[A-Z]+` (case-insensitive match).
+     - `N` tokens → `\d+`.
+     - Separators preserved verbatim (`-` or `_`).
+     - Optional trailing continuation segments (to handle compound disk names like `UC1_61_TrangChu`): append `(?:[-_]\d+)*` ONLY when the LAST token is `N`. Don't append for IDs that end with letters.
+     - Examples produced: `L-L-N` → `^([A-Z]+-[A-Z]+-\d+(?:[-_]\d+)*)`; `L-N` → `^([A-Z]+-\d+(?:[-_]\d+)*)`; `LN` → `^([A-Z]+\d+(?:[-_]\d+)*)`; `LN_LN` → `^([A-Z]+\d+_[A-Z]+\d+(?:[-_]\d+)*)`.
+   - Sort `regexList` by **specificity descending** (longer signatures first, more separators first) so a compound-prefix regex matches before its shorter superset.
+   - If `regexList` is empty (no source IDs at all — bootstrap edge case): fall back to a single permissive regex `^([A-Z]+[-_]?\d+(?:[-_]\d+)*)`. Continue with whole-name fallback for non-matches.
+
+   **Step 2b — For each sub-folder name `<folderName>`:**
    - **Exclude** the folder if it satisfies ANY of:
      - Equals the basename (or any path segment) of the `requirement-common-files` resolved path.
      - Starts with `Common`, `Shared`, `_template`, `Old`, `Archive`, `_`, `.` (case-insensitive).
-   - **Extract Folder ID prefix** — apply the regex derived from the `<ID label>` to the START of `<folderName>` and take **capture group 1**. The regex is greedy on the ID portion and stops at the first segment that is not an ID continuation (i.e., the first segment that starts with a non-digit / non-`UC`-prefixed letter):
-     - Default (`Use Case ID`): `^(UC\d+(?:[-_](?:UC)?\d+)*)`
-       - Examples: `UC1_TrangChuDashboard` → `UC1` · `UC42-44_QuanLyDatLich` → `UC42-44` · `UC53_63-65_PhanAnhKienNghi` → `UC53_63-65` · `UC258_UC259_ThongBaoHeThong` → `UC258_UC259` · `UC56-57_66_68_TinTuc` → `UC56-57_66_68` · `UC1` → `UC1`.
-     - Feature ID: `^(F(?:EAT)?[\-_]?\d+(?:[-_]\d+)*)`
-     - Story ID: `^(S(?:TORY)?[\-_]?\d+(?:[-_]\d+)*)`
-     - Otherwise: ask the user during Phase 0 to confirm a Folder-ID extraction regex (must contain exactly one capture group); store as one-shot for this run.
-   - If the regex does NOT match → the folder may still be a valid UC with a non-ID-pattern name (e.g., `TrangChuDashboard`). In that case fall back to `Folder ID = <folderName>` verbatim and continue. Do NOT silently skip — these folders are exactly the orphans that `qc-site-map` Mode 3 needs to reconcile.
-   - Record the mapping in `sourceFolderMap[<sourceArtifact>][<folderID>] = <full folder path>`. `<sourceArtifact>` is one of `requirement-files | uc-review-report | func-test-scenarios | func-test-cases-draft | func-test-cases`. The same `<folderID>` may legitimately resolve to different folder paths across sources (e.g., `requirement-files/UC1_TrangChuDashboard/` and `uc-review-report/UC1/` both map to Folder ID `UC1`).
+   - **Extract Folder ID** — try each regex in `regexList` order (first match wins); take capture group 1.
+   - If NO regex matches → fall back to `Folder ID = <folderName>` verbatim. Do NOT silently skip — these folders are exactly the orphans that `qc-site-map` Mode 3 needs to reconcile.
+   - Record the mapping in `sourceFolderMap[<sourceArtifact>][<folderID>] = <full folder path>`. `<sourceArtifact>` is one of `requirement-files | uc-review-report | func-test-scenarios | func-test-cases-draft | func-test-cases`. The same `<folderID>` may legitimately resolve to different folder paths across sources (e.g., `requirement-files/UC-CLY-005_LoyaltyRules/` and `uc-review-report/UC-CLY-005/` both map to Folder ID `UC-CLY-005`).
    - If two folders within the SAME source extract to the same Folder ID → warn in the run report and pick the first encountered (lexicographic order); user must resolve manually.
 
 3. Build `observedFolderIDs = Set<FolderID>` deduplicated as the union of `<folderID>` keys across all 5 source maps.
@@ -352,14 +522,13 @@ For each `observedFolderID`, `folderToFeature[observedFolderID]` is the canonica
 
 Notes:
 - A folder that appeared on disk for a feature whose `In scope?` was previously `No` is still scanned — Files stt always reflects disk reality regardless of scope. The user keeps full control of `In scope?` via manual edit.
-- Detection of "doc disappeared" (Files stt previously had `V<N>`, now `Missing`) is informational only — surfaced in the Phase 6 report. It does NOT auto-change `In scope?`. The folder still exists; the user decides whether the feature is truly removed.
-- "Folder fully removed" (canonicalID was in existingFeatures with a Folder ID but no folder matches it now) is the **EXISTING-NO-FOLDER** bucket above. Same rule: surface in report, do not auto-change scope.
+- "Folder fully removed" (canonicalID was in existingFeatures with a Folder ID but no folder matches it now) is the **EXISTING-NO-FOLDER** bucket above. Surface in report, do not auto-change scope.
 
 Update worklog: `Status = Phase 2 done`.
 
-### Phase 3 — `Files stt` Computation + Transition Detection
+### Phase 3a — `Files stt` Computation (disk scan)
 
-For each row, run all 6 sub-scans against its `Folder ID` (column 3). Each sub-scan looks inside the folder path recorded for that Folder ID in `sourceFolderMap[<sourceArtifact>][<folderID>]` (from Phase 1). If no folder path was recorded for that source (the source has no folder matching the Folder ID — e.g., BA has `UC1_TrangChuDashboard` but QC never created `UC1/` in `func-test-scenarios`) → that sub-scan returns `Missing` without attempting to read disk. Otherwise the sub-scan returns `V<max-N>` or `Missing` based on file contents of the recorded folder.
+For each row, run all 6 sub-scans against its `Folder ID` (column 3). Each sub-scan looks inside the folder path recorded for that Folder ID in `sourceFolderMap[<sourceArtifact>][<folderID>]` (from Phase 1). If no folder path was recorded for that source (the source has no folder matching the Folder ID — e.g., BA has `UC1_TrangChuDashboard` but QC never created `UC1/` in `func-test-scenarios`) → that sub-scan returns no result (artifact absent) without attempting to read disk. Otherwise the sub-scan returns `V<max-N>` when matching files are found, or no result when none.
 
 | Item | Source artifact (folder via `sourceFolderMap`) | Match | Version detection |
 |---|---|---|---|
@@ -370,16 +539,65 @@ For each row, run all 6 sub-scans against its `Folder ID` (column 3). Each sub-s
 | `TC md` | `func-test-cases-draft` | filename matches `_testcases_*.md` (covers both `_testcases_draft.md` and `_testcases_*_v<N>.md`) | Same |
 | `TC xlsx` | `func-test-cases` | filename matches `_testcases_*_v<N>.xlsx` | Same |
 
-Compose `newFilesStt` string in the fixed order, joined by `<br>`:
-```
-Specs: <V or Missing><br>WF: <V or Missing><br>Audited: <V or Missing><br>Scenario: <V or Missing><br>TC md: <V or Missing><br>TC xlsx: <V or Missing>
-```
+Compose `newFilesStt`:
+- Walk the 6 artifact types in the fixed order (Specs, WF, Audited, Scenario, TC md, TC xlsx) and keep only the ones whose sub-scan returned `V<N>`.
+- Format each kept item as `<Type>: V<N>` and join with `<br>`.
+- If NO item is found across all 6 types → set the cell to the literal string `No files yet`.
 
-**Transition detection** — parse the row's previous `Files stt` cell (split on `<br>`, split each line on `:` to get type → value). Compare per-item to the new value:
-- Any item that was `V<N>` and is now `Missing` → record in `docDisappearedReport` for the Phase 6 summary (informational only — no `In scope?` change).
-- Upgrades (`Missing` → `V<N>`) and version bumps (`V1` → `V2`) → applied silently.
+Do NOT compare against the previous `Files stt` value; this skill no longer tracks transitions (upgrades/regressions). The new cell always reflects current disk reality verbatim.
 
-Update worklog: `Status = Phase 3 done`.
+Update worklog: `Status = Phase 3a done`.
+
+### Phase 3b — stt columns Computation (in-progress check + sparse done-state derivation)
+
+This phase populates columns 8 (`UC review stt`), 9 (`Scenario design stt`), 10 (`TC design stt`), and 11 (`UI extract stt` if present or auto-injectable). The strategy minimizes token cost by parsing audited reports only when their version is newer than the cached value already in the cell.
+
+For every dashboard row (`<UC-ID>` = the row's `Folder ID`), and for each of the 4 stt columns:
+
+#### Step 1 — In-progress check
+
+Check whether `.claude/skills/<owner-skill>/process-logging/<UC-ID>/progress.md` exists (`<owner-skill>` per the "Process-logging inputs" table). If yes → read it, extract `status:` line per the "Process-log parse contract" parse algorithm, and set the cell to the raw status string. SKIP step 2 for this column.
+
+#### Step 2 — Done-state derivation (only when in-progress file is absent)
+
+Apply the per-column rule from the "Done-state derivation" table:
+
+- **`UC review stt`:**
+  1. From the row's Files stt, extract `currentAuditedVer` (digit after `Audited: V`). If no Audited line → cell BLANK; skip.
+  2. From the row's existing cell value, extract `cachedAuditedVer` via regex `(?:Ready|Conditionally Ready|Not Ready)\s+v(\d+)\s*\(Score`. If no match → `cachedAuditedVer = 0`.
+  3. If `currentAuditedVer <= cachedAuditedVer` → keep cell verbatim (NO PARSE — token saving).
+  4. Else → locate the highest-version audited file at `<uc-review-report>/<UC-ID>/*_audited_*_v<currentAuditedVer>.md`. Use `grep -n "Tổng điểm"` to find the scoring line, then targeted-read 1 line. Extract `score` + `verdict` via the regex in "Done-state derivation" → audited file parse contract. Compose new cell value `<verdict> v<currentAuditedVer> (Score <score>/100)`.
+  5. If grep fails (no scoring row found in file) → emit warning + keep cell verbatim.
+
+- **`Scenario design stt`:**
+  1. From the row's Files stt, extract `scenarioVer` (digit after `Scenario: V`). If no Scenario line → cell BLANK.
+  2. Else → cell = `v<scenarioVer> generated` (no file parse).
+
+- **`TC design stt`:**
+  1. From the row's Files stt, extract `tcXlsxVer` and `tcMdVer`.
+  2. If `tcXlsxVer` present → cell = `v<tcXlsxVer> generated`.
+  3. Else if `tcMdVer` present → cell = `v<tcMdVer> draft`.
+  4. Else → cell BLANK.
+
+- **`UI extract stt`** (only if column exists OR Step 3 auto-injection triggers):
+  1. Scan `<ui-elements>/<UC-ID>/` (resolve `ui-elements` from `path-registry`). List files matching `*_v<N>.md`. If folder absent or empty → cell BLANK; skip.
+  2. Compute `currentUiVer = max(N across files)`, `pageCount = count of distinct page-name in files at version currentUiVer`.
+  3. From the row's existing cell, extract `cachedUiVer` via `^v(\d+)\s+\(audited`. If no match → `cachedUiVer = 0`.
+  4. If `currentUiVer <= cachedUiVer` → keep cell verbatim (no parse).
+  5. Else → open ONE file from the highest-version set; grep for a reference to the audited version (pattern `audited[_\s-]*v(\d+)` in the file's header/frontmatter). Extract `auditedRefVer`. If not found → fallback to current Files stt's `Audited: V<N>` value.
+  6. Compose cell value: `v<currentUiVer> (audited v<auditedRefVer>)`. Append ` [<pageCount>p]` only when `pageCount > 1`.
+
+#### Step 3 — `UI extract stt` auto-injection check
+
+If the dashboard header does NOT yet have a `UI extract stt` column AND `<ui-elements>/` parent folder has at least one `<UC-ID>/` subfolder with extracted files → mark `injectUIExtractColumn = true`. Phase 5 inserts the column at position 11 (before `Execute stt` if present, else at the end).
+
+#### Step 4 — Store results
+
+Store the computed values in `stttCells[<rowID>][<columnName>] = formattedValue`. Phase 5 writes them into the rendered table.
+
+**Idempotency note:** Phase 3b reads at most: (a) the per-UC subfolder progress.md files (small, fast) and (b) one grep + targeted read per UC that has a NEWER audited or ui-elements version than its cached cell. Steady-state (no new audited reports since last sync) → ZERO file reads.
+
+Update worklog: `Status = Phase 3b done`.
 
 ### Phase 4 — Export orphan handoff (no user prompt)
 
@@ -397,18 +615,56 @@ This skill is non-interactive after Phase 0.5. Phase 4 performs ONE write outsid
 
 Update worklog: `Status = Phase 4 done`.
 
-### Phase 5 — Write Dashboard
+### Phase 5 — Compose sort + write Dashboard
 
-1. Re-render the markdown table:
-   - For every row, write columns **1, 2, 3, 4, 5, 6, 7** with the values computed above.
-     - Column 2 `<ID label>` = canonical Feature ID.
-     - Column 3 `Folder ID` = folder-name ID linking the row to disk. NEVER blank — for top-down rows without an alias, equals column 2.
-     - Column 6 `In scope?` = copied from handoff (top-down) or `Need confirm` (ORPHAN-FOLDER bucket) or preserved (EXISTING-NO-FOLDER bucket).
-   - **Columns 8 (`UC review stt`), 9 (`Scenario design stt`), 10 (`TC design stt`), 11 (`Execute stt`) are preserved verbatim** from `featureIndex[ID]` (blank for new rows).
-   - Preserve the header row, **applying label migration if `labelMigrationNeeded` was set in Phase 0.6 case B**: replace `<existingLabel>` with `<expectedLabel>` in column 2 of the header. Otherwise keep the header verbatim.
-   - Row order: existing rows in their original order, then new rows (sorted by Site alphabetical, then by canonical ID).
-2. Preserve the ghi-chú/notes block below the table verbatim (do not rewrite from template). **If a label migration note was prepared in Phase 0.6 case B, append it to the END of the ghi-chú block as a new bullet line** — do not overwrite existing notes.
-3. Write back to the `qc-dashboard` path. **In-place edit** (per path-registry's versioning exception for meta-config files).
+This skill is the SOLE writer of every column in the dashboard. Phase 5 composes the final row order via the `Sorting:` directive, writes all cells (including stt columns from Phase 3b), and persists to disk.
+
+#### Step 1 — Optional column injection check
+
+- If Phase 3b set `injectUIExtractColumn = true` → insert a `UI extract stt` column at position 11 (before `Execute stt` if it already exists, else at the end). Pre-existing rows get blank values until Phase 3b later finds entries for them.
+- Otherwise preserve the header as-is.
+
+#### Step 2 — Compute sort order
+
+Apply the algorithm in "Sort order directive" section above:
+
+1. Compute `distinctSites` and `distinctModules`.
+2. Read any pre-existing `Sorting:` line from the in-memory parsed dashboard.
+3. Decide the sort level + the `userSortList` per the re-run logic. If no pre-existing line OR re-run logic triggers fresh generation → auto-generate alphabetical ascending of the chosen level.
+4. Record the final `sortLevel` (`Site` | `Module` | `None`) and `sortList`.
+5. If `sortLevel == None` (single-portal single-module case) and a pre-existing `Sorting:` line is present → mark it for removal with a notice in Phase 6 output.
+
+#### Step 3 — Apply sort to rows
+
+1. Group rows by their value at `sortLevel`:
+   - For each group in the order given by `sortList`, append the group's rows.
+   - Append any rows whose level-value is not in `sortList` last, alphabetical ascending.
+2. Within each group, sort by the next-lower level alphabetically (`Site` → sub-sort by `Module` ascending; then by canonical ID ascending). If `sortLevel == Module`, sub-sort by canonical ID ascending. If `sortLevel == None`, sort all rows by canonical ID ascending.
+
+#### Step 4 — Render the table
+
+For every row, write ALL columns:
+
+- Columns **1, 2, 3, 4, 5, 6, 7** with the values computed in Phases 0–3a (per the bucket rules in Phase 2 and the disk scan in Phase 3a).
+  - Column 2 `<ID label>` = canonical Feature ID.
+  - Column 3 `Folder ID` = folder-name ID linking the row to disk. NEVER blank — for top-down rows without an alias, equals column 2.
+  - Column 6 `In scope?` = copied from handoff (top-down) or `Need confirm` (ORPHAN-FOLDER bucket) or preserved (EXISTING-NO-FOLDER bucket).
+- Columns **8, 9, 10** with the values from Phase 3b's `stttCells` map. If no value was computed → BLANK.
+- Optional columns (`UI extract stt`, `Execute stt`):
+  - `UI extract stt` (column 11) → value from Phase 3b. BLANK if no entry.
+  - `Execute stt` — preserved VERBATIM from the parsed dashboard if present (no current owner skill writes it; the user may have written it manually).
+- Preserve the header row, applying label migration if `labelMigrationNeeded` was set in Phase 0.6 case B.
+
+#### Step 5 — Write `Sorting:` directive
+
+- If `sortLevel != None` → write the line `Sorting: <v1> >> <v2> >> ...` immediately above the table header. Place it on its own line with one blank line on each side.
+- If `sortLevel == None` AND a pre-existing `Sorting:` line was present → remove it.
+- If `sortLevel == None` AND no pre-existing line → write nothing.
+
+#### Step 6 — Preserve notes block + write file
+
+- Preserve the ghi-chú/notes block below the table verbatim (do not rewrite from template). If a label migration note or v10/v11-old migration note was prepared earlier, append it to the END of the ghi-chú block as a new bullet — do not overwrite existing notes.
+- Write back to the `qc-dashboard` path. In-place edit.
 
 Update worklog: `Status = Phase 5 done`. Add `qc-dashboard.md` to the Output column. If `orphanQueue` was non-empty in Phase 4, also append `dashboard-orphans.md` to the Output column.
 
@@ -424,8 +680,13 @@ Update worklog: `Status = Phase 5 done`. Add `qc-dashboard.md` to the Output col
    - New rows added (top-down handoff):           <N>  (<list canonical IDs>)
    - Orphan folders appended to site-map inbox:   <N>  (<list Folder IDs>)
    - Features in dashboard không còn trong handoff (cần user review): <N>  (<list canonical IDs>)
-   - Rows with `Files stt` upgrades (Missing → V<N> hoặc bump version): <N>  (<list IDs>)
-   - Rows with `Files stt` regressions (V<N> → Missing): <N>  (<list IDs + items)
+   - stt cells updated (in-progress hoặc sparse-parse done): <N>  (<list "col:UC-ID" entries, max 10 then "... và <K> mục khác">)
+   - Audited file re-parses (token cost):          <N>  (<list "UC-ID v<old>→v<new>" entries>)
+   - `UI extract stt` column auto-injected:        <Yes | No>
+
+   **Sort order:**
+   - Sort level:    <Site | Module | None — single module>
+   - Sorting line:  <`Sorting: ...` written | removed | unchanged | auto-generated>
 
    Dashboard tại: `<resolved path>`
    Orphan inbox: `<inbox path>` (<orphanQueue count> entries this run; total <total dedup count> trong file)
@@ -445,37 +706,57 @@ Update worklog: `Status = Phase 5 done`. Add `qc-dashboard.md` to the Output col
 
 ## Bottom-up workflow
 
-Triggered by per-UC skills (`qc-uc-read`, `qc-func-scenario-design`, `qc-func-tc-design`) when they encounter a UC ID that is not yet a row in `qc-dashboard.md`. The caller passes `uc_id=<ID>` where `<ID>` is the folder-ID-style identifier (per-UC skills derive it from the folder they are operating on).
+Triggered ONLY by the user running `/qc-dashboard-sync <UC-ID>` manually. Per-UC skills do not auto-invoke this skill anymore — they only maintain their existing per-UC subfolder progress.md for resume; the user runs `/qc-dashboard-sync <UC-ID>` to refresh the dashboard row.
 
 ### Bottom-up steps
 
 1. Generate `run_id` and append worklog row `Status = Running (bottom-up, uc_id=<ID>)`.
-2. Resolve `qc-dashboard` path. If the file does not exist → create it from `templates/qc-dashboard-template.md` with `<ID label> = Use Case ID` (default) so the per-UC skill can proceed; do NOT prompt for the label here (top-down handles the prompt; in bottom-up the default is safe).
-3. Parse the existing dashboard (header + `featureIndex` keyed by column 2 + `folderIDIndex` keyed by column 3). Schema validation: if mismatch → STOP and report.
+2. Resolve `qc-dashboard` path. If the file does not exist → create it from `templates/qc-dashboard-template.md` with `<ID label> = Use Case ID` (default). Do NOT prompt for the label here (top-down handles the prompt; in bottom-up the default is safe).
+3. Parse the existing dashboard (header + `featureIndex` keyed by column 2 + `folderIDIndex` keyed by column 3). Schema validation + auto-migration: same as top-down Phase 0 step 5. If mismatch and not auto-migratable → STOP and report.
 4. **Single-UC scope check (matches by Folder ID, not canonical ID):**
-   - If `<ID>` matches an existing `Folder ID` (column 3 of any row) → exit early. Report `<ID> da co trong dashboard (Folder ID khop), khong can add`. The per-UC skill should use the matched row's canonical ID (column 2) for any downstream lookups.
-   - Else if `<ID>` matches an existing `<ID label>` (column 2) but the row's `Folder ID` (column 3) is different → exit early with the same message. Per-UC skill uses the row's canonical ID.
-   - Otherwise → continue.
-5. Run the 6-artifact sub-scans for `<ID>` only (same logic as top-down Phase 3 but limited to a single ID; resolve folder paths inside `requirement-files/<ID>/`, `uc-review-report/<ID>/`, etc., applying the same ID-extraction regex on sub-folder names — if no folder matches the regex, fall back to a literal-name match `<ID>` exactly).
-6. Add a new row to `featureIndex`:
+   - If `<ID>` matches an existing `Folder ID` (column 3 of any row) → SKIP "add new row" step but PROCEED with stt + Files stt refresh for that matched row. Print `<ID> da co trong dashboard (Folder ID khop), se refresh Files stt va stt columns`.
+   - Else if `<ID>` matches an existing `<ID label>` (column 2) but the row's `Folder ID` (column 3) is different → same as above (the row exists; refresh only).
+   - Otherwise → mark `addNewRow = true` and continue.
+5. Run the 6-artifact disk sub-scans for `<ID>` only. Build a single-entry `regexList` from `<ID>` itself using the same shape-signature algorithm as top-down Phase 1 step 2a (so compound disk names like `<ID>_SomeSuffix` will match back to `<ID>`). Resolve folder paths inside `requirement-files/<...>`, `uc-review-report/<...>`, etc., scanning sub-folders and extracting Folder IDs via the regex; if no folder matches, fall back to a literal-name match `<ID>` exactly. Compose `Files stt` per "Files stt cell format" section.
+6. **stt computation for `<ID>` only.** Apply the exact same algorithm as top-down Phase 3b, scoped to this single UC:
+   - **In-progress check:** for each of the 4 per-UC skills, check whether `.claude/skills/<skill>/process-logging/<ID>/progress.md` exists. If yes → cell = `status:` line read verbatim.
+   - **Done-state derivation** (only when in-progress file is absent): per the "Done-state derivation" table — sparse-parse audited file for `UC review stt` (only when `Audited: V<N>` from step 5 is greater than the cached cell version of the existing row, if any); derive from Files stt for `Scenario design stt` and `TC design stt`; sparse-parse latest ui-elements file for `UI extract stt`.
+   - If `docs/qc/ui-elements/<ID>/` has at least one extracted file AND the dashboard does NOT yet have a `UI extract stt` column → mark `injectUIExtractColumn = true`.
+7. **If `addNewRow == true`:** add a new row to `featureIndex`:
    - Column 2 `<ID label>` → `<ID>` (folder-derived; will be replaced with canonical ID once `qc-site-map` Mode 3 reconciles).
    - Column 3 `Folder ID` → `<ID>` (same as column 2 until reconciliation).
-   - `Site / Module / Feature/Use case name` → leave BLANK (no upstream context to fill them).
+   - `Site / Module / Feature/Use case name` → BLANK (no upstream context to fill them).
    - `In scope?` → `Need confirm`.
-   - `Files stt` → composed from step 5.
-   - Process-state columns (8-11) → blank.
-7. **Optional upstream alignment check:**
+   - `Files stt` → from step 5.
+   - Columns 8, 9, 10, 11 → from step 6 (may be blank).
+
+   **Otherwise (row exists):** update only `Files stt` (col 7) + stt cells (cols 8, 9, 10, 11) on the matched row. Do NOT touch `Site / Module / Feature/Use case name / In scope?` — those are owned by top-down and should not be overwritten by a bottom-up refresh.
+
+8. **Optional upstream alignment check:**
    - If `project-context-master.md` exists, read its feature list. If `<ID>` is NOT present → set `outOfContext = true`.
    - If `site-map-handoff.md` exists in dashboard inbox, read it. If `<ID>` is NOT present (neither as Feature ID nor as a Folder alias) → set `outOfHandoff = true`.
-8. Write the dashboard back (in-place).
-9. **Write to site-map orphan inbox.** Resolve `.claude/skills/qc-site-map/inbox/dashboard-orphans.md`. Apply append+dedupe semantics (same as top-down Phase 4):
-   - File missing → create from schema in "Bottom-up output handoff".
-   - File present + entry for `<ID>` already there → update only `Detected at` to current ISO timestamp.
-   - File present + entry for `<ID>` missing → append a new row with `<ID>` + its `Folder paths (per source)` + the just-computed `Files stt` + current timestamp.
-10. Emit the user message:
+9. **Sort + write dashboard.** Apply the same Phase 5 sort logic as top-down (Step 2 + Step 3 + Step 5). For a single-UC bottom-up that adds a row, the sort level may have changed (e.g., the new row introduces a new Site/Module) — re-evaluate and update the `Sorting:` line if needed. Then write the dashboard back (in-place).
+10. **Write to site-map orphan inbox** (only if `addNewRow == true`). Resolve `.claude/skills/qc-site-map/inbox/dashboard-orphans.md`. Apply append+dedupe semantics (same as top-down Phase 4):
+    - File missing → create from schema in "Bottom-up output handoff".
+    - File present + entry for `<ID>` already there → update only `Detected at` to current ISO timestamp.
+    - File present + entry for `<ID>` missing → append a new row with `<ID>` + its `Folder paths (per source)` + the just-computed `Files stt` + current timestamp.
+
+    If `addNewRow == false` → SKIP this step. The row already exists; no need to orphan-track again.
+
+11. Emit the user message:
 
     ```text
-    ✅ Da them row moi cho <ID> vao qc-dashboard.md (In scope? = Need confirm, Folder ID = <ID>).
+    ✅ <message tuy theo trang thai>:
+       - <addNewRow==true>:   Da them row moi cho <ID> vao qc-dashboard.md (In scope? = Need confirm, Folder ID = <ID>).
+       - <addNewRow==false>:  Da refresh Files stt + stt columns cho row <ID> trong qc-dashboard.md.
+
+    📊 stt columns sau scan process-log:
+       - UC review stt:       <value | (blank — chua co progress.md entry)>
+       - Scenario design stt: <value | (blank)>
+       - TC design stt:       <value | (blank)>
+       - UI extract stt:      <value | (blank | column chua duoc inject)>
+
+    <only when addNewRow==true:>
     ✅ Da ghi <ID> vao .claude/skills/qc-site-map/inbox/dashboard-orphans.md cho qc-site-map Mode 3 reconcile.
 
     ⚠️ <ID> chua co trong tai lieu upstream:
@@ -485,78 +766,56 @@ Triggered by per-UC skills (`qc-uc-read`, `qc-func-scenario-design`, `qc-func-tc
     De reconcile orphan thanh canonical feature, hay chay /qc-site-map va chon Mode 3 (confirm orphans from dashboard).
     ```
 
-    Suppress the warning paragraph (only show the two success lines) when both upstream files already contain `<ID>` — in that case the orphan inbox write is still safe (Mode 3 will detect the alias mapping and dedupe quickly).
+    Suppress the upstream-warning paragraph when both `outOfContext` and `outOfHandoff` are false.
 
-11. Worklog: `Status = Done (bottom-up)`. Append `qc-dashboard.md` and `dashboard-orphans.md` as the Output.
+12. Worklog: `Status = Done (bottom-up)`. Append `qc-dashboard.md` (always) and `dashboard-orphans.md` (only if appended) as the Output.
 
 ### Bottom-up boundaries
 
 - Bottom-up does NOT delete or consume `site-map-handoff.md`.
 - Bottom-up does NOT delete `dashboard-orphans.md` — it only appends/dedupes.
 - Bottom-up does NOT run the site-map gap review (Phase 0.5 is top-down only).
-- Bottom-up does NOT prompt the user during the run (per-UC skills run within a larger flow; an extra prompt would derail them); the warning is emitted as text only. The per-UC skill itself emits its own pre-run warning (see "Per-UC skill precheck contract" below).
+- Bottom-up does NOT prompt the user during the run — it is a one-shot manual invocation; warnings are emitted as text only.
 - Bottom-up may create the dashboard file from template if missing, with the default ID label.
+- Bottom-up DOES re-evaluate + rewrite the `Sorting:` line if the row added changed the sort level (e.g., introduces a new portal in a previously single-portal dashboard).
 
 ## Boundaries
 
-- **OWNER** of `qc-dashboard.md`. Creates the file from template on first run; updates in-place on subsequent runs.
-- Writes columns **1, 2, 3, 4, 5, 6, 7**.
-- **NEVER writes** columns 8 (`UC review stt`), 9 (`Scenario design stt`), 10 (`TC design stt`), 11 (`Execute stt`). Always preserved verbatim.
-- **No soft-delete via `Removed`.** This skill does NOT auto-set `In scope? = Removed`. The `Removed` value remains a legal user-edit value, but the skill itself never writes it. Rows whose folder is gone keep their `In scope?` unchanged; their `Files stt` reflects all-Missing.
-- **No interactive prompts** in either mode. All decisions are auto-applied per Phase 2 bucket rules. The only interactive prompt in the entire skill is the Phase 0.5 gap-review proceed/cancel (top-down only) and the Phase 0.6 ID-label confirmation when bootstrapping.
-- The skill does NOT invent values for Site / Module / Feature name — in top-down mode they come from the site-map handoff; in bottom-up they remain BLANK.
+- **SOLE writer** of `qc-dashboard.md`. Creates the file from template on first run; updates in-place on subsequent runs. NO other skill is allowed to open this file for writing.
+- Writes ALL columns: **1, 2, 3, 4, 5, 6, 7** from disk scan + handoff; **8, 9, 10, 11** via in-progress check + sparse done-state derivation per Phase 3b. Preserves `Execute stt` (col 12) verbatim — no current owner skill writes it.
+- Writes the `Sorting:` directive line above the header. Respects user edits to the line on subsequent runs.
+- **No soft-delete via `Removed`.** This skill does NOT auto-set `In scope? = Removed`. The `Removed` value remains a legal user-edit value, but the skill itself never writes it. Rows whose folder is gone keep their `In scope?` unchanged; their `Files stt` reflects `No files yet` (or a partial list of remaining artifacts).
+- **No interactive prompts** in either mode except: Phase 0.5 gap-review proceed/cancel (top-down only) and Phase 0.6 ID-label confirmation when bootstrapping (top-down only).
+- The skill does NOT invent values for Site / Module / Feature name — in top-down mode they come from the site-map handoff; in bottom-up they remain BLANK on newly added rows, and are PRESERVED on existing rows during a refresh.
 - Folders matching the exclusion rules (Common, Shared, _template, …) are NEVER added as rows. Folders whose name does not match the ID regex but is otherwise valid (e.g., `TrangChuDashboard`) ARE added — they are exactly the orphans that Mode 3 reconciles.
-- Schema mismatch → STOP and report. Do NOT auto-fix.
+- Schema mismatch → STOP and report. Do NOT auto-fix (except the explicit auto-migrations in Phase 0 step 5).
 - Site-map handoff file (`site-map-handoff.md`) is consumed (read only). This skill does NOT delete it — `qc-site-map` overwrites it on its next run.
 - Dashboard orphans file (`dashboard-orphans.md`) is written (append + dedupe). This skill does NOT delete it — `qc-site-map` Mode 3 owns deletion.
+- Per-UC subfolder progress.md files (`<skill>/process-logging/<UC-ID>/progress.md`) are consumed (read only) — this skill NEVER writes to them. Output files (audited reports under `<uc-review-report>/<UC-ID>/`, ui-elements under `docs/qc/ui-elements/<UC-ID>/`) are also read-only; this skill only does sparse-parse for verdict/score/version extraction.
 
 ## Cross-skill contract
 
 - **`qc-context-master`** — Step 1 of the top-down chain. Writes `project-context-master.md` only. NEVER writes any handoff file for this skill. NEVER invokes this skill directly. In Initialization mode it invokes `qc-site-map`; in Update mode it suggests the user to run `qc-site-map`.
 
-- **`qc-site-map`** — Step 2 of the top-down chain. Writes `qc-site-map.md` + `.claude/skills/qc-dashboard-sync/inbox/site-map-handoff.md`. In Initialization mode + after Mode 3 completes it invokes this skill directly. In Update mode it suggests the user to run `/qc-dashboard-sync`. The handoff file it writes is the SOLE upstream feature list source for top-down sync. The `Folder alias(es)` column inside the handoff is the SOLE source of truth for column 3 `Folder ID` of any non-trivial alias (top-down rows whose folder name differs from the canonical Feature ID).
+- **`qc-site-map`** — Step 2 of the top-down chain. Writes `qc-site-map.md` + `.claude/skills/qc-dashboard-sync/inbox/site-map-handoff.md`. In Initialization mode + after Mode 3 completes it invokes this skill directly (top-down mode). In Update mode it suggests the user to run `/qc-dashboard-sync`. The handoff file it writes is the SOLE upstream feature list source for top-down sync. The `Folder alias(es)` column inside the handoff is the SOLE source of truth for column 3 `Folder ID` of any non-trivial alias (top-down rows whose folder name differs from the canonical Feature ID).
 
-- **`qc-uc-read`** — before reviewing a UC, MUST check whether the UC's Folder ID matches column 3 of any row in `qc-dashboard.md`. If absent, MUST invoke this skill in BOTTOM-UP mode (pass `uc_id=<folder-derived-ID>`). After running, `qc-uc-read` writes its own column 8 (`UC review stt`). Per-UC skills must also surface a user-facing warning when they trigger bottom-up OR when the UC row's Folder ID is still listed in `dashboard-orphans.md` (see "Per-UC skill precheck contract" below).
+- **`qc-uc-read`** — MUST NOT open `qc-dashboard.md` for read or write. Continues to use its EXISTING per-UC subfolder `process-logging/<UC-ID>/progress.md` (per its `workflows/checkpoint-protocol.md`) for resume-from-interruption — no schema change required. This skill (qc-dashboard-sync) reads that file for in-progress detection and parses the latest audited file (sparse) for done-state verdict + score.
 
-- **`qc-func-scenario-design`** — same bottom-up precheck contract. Writes column 9 (`Scenario design stt`).
+- **`qc-func-scenario-design`** — same contract. Existing per-UC subfolder progress.md is unchanged. Done-state value derived from the Scenario file version in Files stt — no file content parse.
 
-- **`qc-func-tc-design`** — same bottom-up precheck contract. Writes column 10 (`TC design stt`).
+- **`qc-func-tc-design`** — same contract. Existing per-UC subfolder progress.md is unchanged. Done-state value derived from the TC xlsx/md file version in Files stt — no file content parse. The historical `v<N> updated` vs `v<N> generated` distinction is lost; user can edit manually if desired.
 
-Other skills (e.g., a future `qc-execute` skill) follow the same bottom-up precheck pattern and own column 11 (`Execute stt`) when they exist.
+- **`qc-ui-extract`** — same contract. Existing per-UC subfolder progress.md is unchanged. Done-state value derived from the latest ui-elements file (sparse parse of one file at the highest version to read `audited_version` reference + count pages).
 
-### Per-UC skill precheck contract
+**User responsibility:** the dashboard-write code currently embedded in each per-UC skill workflow (e.g., `qc-uc-read/workflows/re-audit/re-audit.md:42`, `qc-func-scenario-design/SKILL.md:75/99/118`, `qc-func-tc-design/workflows/convert-md-to-xlsx.md:72/148`, `qc-ui-extract/SKILL.md:130-141`) needs to be REMOVED manually by the user. This skill does NOT depend on those writes — but as long as they exist, two writers may race on the dashboard file. The user has elected to remove those writes by hand without modifying the per-UC SKILL.md or workflow files via automation.
 
-Per-UC skills (`qc-uc-read`, `qc-func-scenario-design`, `qc-func-tc-design`) MUST run this precheck BEFORE their main workflow:
+Other skills (e.g., a future `qc-execute` skill) should follow the same contract: maintain their own per-UC subfolder progress.md for resume + produce a versioned output file that this skill can scan for done-state.
 
-1. Resolve `qc-dashboard.md` path. If the file does not exist → invoke this skill in bottom-up mode and continue.
-2. Parse the dashboard. Build a `folderIDIndex` from column 3 values.
-3. Derive the UC's folder ID (the actual on-disk folder name handled by the per-UC skill — typically `<UC-ID>` passed by user, but may be a non-pattern name).
-4. **Case A — UC NOT in dashboard:** The UC has no row at all. Before triggering bottom-up, emit the following Vietnamese warning + prompt:
+### Why no precheck contract anymore
 
-   ```text
-   ⚠️ UC `<ID>` chua co trong qc-dashboard.md va se duoc them moi (Folder ID = <ID>, In scope? = Need confirm).
-   Day la dau hieu UC nay chua duoc reconcile voi site-map.
+Previous versions required per-UC skills to run a "Case A/B/C precheck" against the dashboard and auto-invoke bottom-up on Case A. That contract is REMOVED because:
 
-   Ban muon:
-   1. `site-map first` — Dung lai. Chay /qc-site-map (chon Mode 3) truoc de reconcile orphans, roi quay lai chay <ten skill nay>.
-   2. `continue` — Tiep tuc. Bottom-up se add row + ghi vao dashboard-orphans.md; ban co the chay /qc-site-map Mode 3 sau de reconcile.
-   ```
-
-   - User answers `site-map first` → STOP the per-UC skill. Do NOT trigger bottom-up. Print a one-line hint to run `/qc-site-map`.
-   - User answers `continue` → invoke `qc-dashboard-sync` bottom-up with `uc_id=<ID>`, then proceed.
-
-5. **Case B — UC IS in dashboard but its Folder ID is still listed in `.claude/skills/qc-site-map/inbox/dashboard-orphans.md`:** The row exists from a prior bottom-up run, but `qc-site-map` Mode 3 has not yet reconciled it. Emit the same two-choice Vietnamese warning but adapted:
-
-   ```text
-   ⚠️ UC `<ID>` da co trong qc-dashboard.md nhung VAN dang nam trong dashboard-orphans.md (qc-site-map Mode 3 chua reconcile).
-   Ket qua cua <ten skill nay> co the bi rename/realign khi Mode 3 chay sau.
-
-   Ban muon:
-   1. `site-map first` — Dung lai. Chay /qc-site-map (chon Mode 3) truoc de reconcile, roi quay lai chay <ten skill nay>.
-   2. `continue` — Tiep tuc. Output se duoc tracking duoi Folder ID hien tai; co the can rename sau khi Mode 3 chay.
-   ```
-
-   - User answers `site-map first` → STOP.
-   - User answers `continue` → proceed (no bottom-up trigger needed — row already exists).
-
-6. **Case C — UC IS in dashboard AND not in the orphan inbox:** proceed normally, no warning, no prompt. This is the happy path (the UC has been reconciled by Mode 3, or was always a clean top-down row).
+- Per-UC skills should no longer open the dashboard at all, so they cannot perform a precheck against it.
+- Concurrent runs of multiple per-UC skills no longer race on the dashboard file (once the user has removed the embedded dashboard-write code).
+- The user is now responsible for running `/qc-dashboard-sync <UC-ID>` (or full top-down) when they want to see the latest stt in the dashboard.
+- If the user wants to be reminded that a UC is not in the dashboard (the old Case A warning) or is still in `dashboard-orphans.md` (the old Case B warning), they can run `/qc-dashboard-sync <UC-ID>` BEFORE starting the per-UC skill — bottom-up will surface those signals in its end-of-run message.

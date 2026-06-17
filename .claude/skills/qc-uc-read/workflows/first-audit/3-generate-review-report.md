@@ -1,8 +1,8 @@
 # First Audit · Phase 3 — Generate Review Report
 
-> **Friendly name (for worklog & dashboard):** `Generating Review Report` (EN) / `Tạo báo cáo review` (VI).
+> **Friendly name (for worklog):** `Generating Review Report` (EN) / `Tạo báo cáo review` (VI).
 >
-> **Inputs:** `process-logging/<UC-ID>/01_synthesis.md` + `02_scoring.md` (Phase 1 & 2 outputs).
+> **Inputs:** `process-logging/<UC-ID>/01_synthesis.md` + `02_scoring.md` (Phase 1 & 2 outputs) + `UC_readiness_review_template_v3.md`
 >
 > **Output:** `uc-review-report v[N].md` written to the UC's output folder (resolved via `path-registry.md`). This file IS the final deliverable — no separate `03_*.md` checkpoint.
 
@@ -13,13 +13,34 @@
 Per `workflows/checkpoint-protocol.md` §2:
 
 1. **Worklog**: rewrite last entry → `status = "Running (Phase 3)"`.
-2. **qc-dashboard.md**: update the UC's `UC review stt` cell → `Running — Generating Review Report` (skip if column missing).
 
 If this run is a **resume from Phase 3**: first load `01_synthesis.md` and `02_scoring.md` into memory per `checkpoint-protocol.md` §4 Resume load table.
 
 ---
 
-## Step 1: Fill the UC Readiness Review Template
+## Step 1 — Load checkpoint inputs
+
+Open:
+
+1. `process-logging/<UC-ID>/01_synthesis.md`
+2. `process-logging/<UC-ID>/02_scoring.md`
+3. `.claude/skills/qc-uc-read/templates/UC_readiness_review_template_v3.md`
+4. `.claude/skills/qc-uc-read/references/qc-writting-rules.md`, if available
+
+Do **not** reload or re-extract raw UC, design, prototype, API, common-rule, or site-map files by default.
+
+Use checkpoint outputs as follows:
+
+| Checkpoint        | Use in Phase 3                                   |
+| ----------------- | ------------------------------------------------ |
+| `01_synthesis.md` | Fill the business understanding content in `UC_readiness_review_template_v3.md`.                                                   |
+| `02_scoring.md`   | Fill readiness conclusion, scoring result, Section 10 issues/questions, Audit Summary, blockers, major issues, and recommendation. |
+
+If one of there files are missing, stop and warning user.
+
+---
+
+## Step 2: Fill the UC Readiness Review Template
 
 The report is based on the **UC Readiness Review Template** at `.claude/skills/qc-uc-read/templates/UC_readiness_review_template_v3.md`. Open the template file, fill every section based on what was found (or not found) in the provided artefacts.
 
@@ -40,84 +61,73 @@ The report is based on the **UC Readiness Review Template** at `.claude/skills/q
 
 **Section 8 — Acceptance Criteria:** Based on the AC synthesis performed in Phase 1 Step 2 (item 5), populate Section 8 of the template with concrete Given/When/Then acceptance criteria derived from the analyzed workflows, business rules, and UI behaviors. Even if the source document lacks explicit AC, the agent MUST generate them from the synthesized understanding. Score this section based on the source document's AC, but always provide generated AC in the output.
 
-**Status markers used throughout the report** (also defined in `references/scoring-rubric.md`):
-- ✅ **Complete** — explicitly stated and unambiguous
-- ⚡ **Partial** — present but vague, incomplete, or only inferred (half marks)
-- ⚠️ **Missing** — absent from all provided artefacts (zero marks)
-- *(inferred)* — the reviewer inferred information rather than finding it explicitly; these are candidates for confirmation before test design begins
+**Section 10. Gap, mâu thuẫn và câu hỏi mở:** Use the Issue Register and AC Candidate Review from `02_scoring.md` to fill this section.
+
+Section 10.1 is the canonical gap/question table for the final report.
+
+Do not create another duplicated gap/question table elsewhere.
+
+Rules for Section 10.1:
+
+* Include blocker issues first.
+* Include major issues after blockers.
+* Include medium/minor issues only when they still require BA/QC Lead/PO/Tech Lead confirmation.
+* Merge duplicated or overlapping questions.
+* Keep only issues relevant to the reviewed UC.
+* Write each row as a clear Vietnamese question or action request.
+* If the issue is a conflict, describe exactly which sources conflict.
+* If the issue is missing information, describe exactly what is missing and why it affects test design.
+* If the issue comes from AC candidates, include it only when the AC requires confirmation, is unsupported, or may exceed the UC scope.
+* Default status is `Open`.
+
+Use Section 10.2 for dependencies from Phase 2, including blocked artefacts, unavailable related sources, unresolved upstream decisions, environment dependencies, or integration dependencies.
 
 ---
 
-## Step 2: Add the Audit Summary at the End
+## Step 3: Add the Audit Summary under Section 10
 
-Append the **Audit Summary** section at the end of the report, with these subsections:
+Add the audit summary **inside Section 10**, after Section 10.1 and Section 10.2.
 
-### Audit Summary Table
+Use this heading:
 
-> **Note:** Knowledge area numbers map to template sections as follows:
-> #1 → Section 0 · #2 → Section 1 · #3 → Section 2 · #4 → Section 3 · #5 → Section 4 · #6 → Section 5 · #7 → Section 6 · #8 → Section 7 · #9 → Section 8 · #10 → Section 9
+```md
+### 10.3 Audit Summary
+```
 
-Use the same Max Pts as in `references/scoring-rubric.md` (totals 130 → normalized to 100):
+The Audit Summary must be concise. Do not duplicate the full issue register.
 
-| #         | Knowledge Area                          | Max Pts | Score | Status      |
-| --------- | --------------------------------------- | ------- | ----- | ----------- |
-| 1         | Feature Identity                        | 5       | X/5   | ✅ / ⚡ / ⚠️ |
-| 2         | Objective & Scope                       | 5       | X/5   | ✅ / ⚡ / ⚠️ |
-| 3         | Actors & User Roles                     | 10      | X/10  | ✅ / ⚡ / ⚠️ |
-| 4         | Preconditions & Postconditions          | 10      | X/10  | ✅ / ⚡ / ⚠️ |
-| 5         | UI Object Inventory & Mapping           | 15      | X/15  | ✅ / ⚡ / ⚠️ |
-| 6         | Object Attributes & Behavior Definition | 20      | X/20  | ✅ / ⚡ / ⚠️ |
-| 7         | Functional Logic & Workflow Decomposition | 20    | X/20  | ✅ / ⚡ / ⚠️ |
-| 8         | Functional Integration Analysis         | 20      | X/20  | ✅ / ⚡ / ⚠️ |
-| 9         | Acceptance Criteria                     | 20      | X/20  | ✅ / ⚡ / ⚠️ |
-| 10        | Non-functional Requirements             | 5       | X/5   | ✅ / ⚡ / ⚠️ |
-| **Total** |                                         | **130** |       | **XX/130 → XX/100** |
+Include only the following subsections:
 
-### Unified Gap & Question Report
+```md
+#### Bảng điểm đánh giá
 
-Synthesize all gaps, missing info, warnings, conflicts, and open questions from all analyzed sections into a single comprehensive table for the BA to review. Ensure there is no duplicated content.
+[Render the scoring table from `02_scoring.md` exactly according to Phase 2 result.]
+| Nhóm đánh giá | Điểm | Trạng thái | Nhận xét ngắn | 
+|---|---:|---|---| 
+| <Scoring area from Phase 2> | <X/Y> | <Status from Phase 2> | <Short rationale from Phase 2, rewritten in Vietnamese> | 
+| **Tổng điểm** | **<X/100>** | **<Verdict>** | **<One-sentence readiness summary>** |
 
-**Mandatory inclusion — Platform-specific gaps:** Scan the Phase 2 KA evidence for any entries prefixed with `Platform-specific gap (<variant>):` (added per rubric § "Platform-Aware Gap Detection"). Each such marked gap MUST appear as its own row in this table, with `Ref` citing the KA + the source section, `Question` stating what platform-specific behavior the BA needs to clarify, and `Why It Matters` explaining the impact on test design for that platform variant. This is what makes the gap visible to `qc-qna` for auto-transfer to the question-backlog.
+#### Blocker cần xử lý
 
-| ID            | Priority                  | Ref                                       | Question                          | Why It Matters                          | Status |
-| ------------- | ------------------------- | ----------------------------------------- | --------------------------------- | --------------------------------------- | ------ |
-| *(e.g., Q1)*  | *(High / Medium / Low)*   | *(Exact excerpt from requirement. Skip if Missing)* | *(Main content to clarify or fix)* | *(Why this is an issue, impact on testability)* | *(Open)* |
+[List only blocker issues from `02_scoring.md`. If none, write `Không có blocker được ghi nhận.`]
 
-- **ID**: ID of the question (e.g., Q1, Q2)
-- **Priority**:
-  - **High**: Blockers (critical knowledge areas scoring 0, missing critical info).
-  - **Medium**: Warnings, Cross-artefact conflicts, Partial/Vague details.
-  - **Low**: Suggestions for improvement, minor open questions.
-- **Ref**: Exact excerpt from the requirement that led to this question. If the issue is something completely missing, write "N/A (Missing)".
-- **Question**: Clearly state what needs to be answered, provided, or corrected by the BA. Make sure to include the description of the issue as currently found.
-- **Why It Matters**: Explain the specific reason for raising this question (e.g., impact on test design, potential bugs, data inconsistency).
-- **Status**: Default to "Open".
+#### Vấn đề lớn cần xử lý
 
-### 🟢 What's Good
+[List only major issues from `02_scoring.md`. If none, write `Không có major issue được ghi nhận.`]
 
-Briefly acknowledge what is well-documented. Give the author credit for what is ✅ Complete.
+#### Khuyến nghị
 
-### 🧪 Testability Outlook
+[One short paragraph based on Phase 2 verdict and blocker/major issue status.]
+```
 
-**What CAN be tested now:**
+Rules:
 
-- [Test areas with enough information to start]
-
-**What CANNOT be tested yet (blocked by gaps):**
-
-- [Test areas blocked by ⚠️ Missing or ⚡ Partial sections]
-
-**Suggested test focus areas** *(once gaps are resolved)*:
-
-- Happy path: [based on Section 5. Object Attributes & Behavior Definition]
-- Alternative scenarios: [based on Section 5. Object Attributes & Behavior Definition]
-- Boundary & validation tests: [based on Section 5. Object Attributes & Behavior Definition]
-- Error & exception scenarios: [based on Section 5. Object Attributes & Behavior Definition]
-- UI-specific checks: [based on Section 5. Object Attributes & Behavior Definition, if design/wireframe was provided]
-
-### 📌 Summary & Recommendation
-
-One paragraph: overall state of the artefact set, key actions required, and a clear recommendation — hold until fixed / fix specific items and proceed / proceed now.
+* Do not restate scoring area definitions from `scoring-rubric.md`.
+* Do not restate status marker definitions from `scoring-rubric.md`.
+* Do not include all minor issues in Audit Summary.
+* Do not duplicate Section 10.1.
+* The score and verdict must match `02_scoring.md`.
+* If `02_scoring.md` contains a rubric warning, include it in `#### Bảng điểm đánh giá`.
 
 ---
 
@@ -138,7 +148,7 @@ Write the completed report to the resolved path.
 
 ## Step 4: Transfer Open Questions to Question Backlog (auto-trigger `qc-qna`)
 
-After the `uc-review-report v[N].md` is written successfully, **invoke the `qc-qna` skill via the Skill tool** to transfer all `Open` rows from the report's `### 📋 Unified Gap & Question Report` table into the project's `question-backlog` file (so the BA can answer them).
+After the `uc-review-report v[N].md` is written successfully, **invoke the `qc-qna` skill via the Skill tool** to transfer all `Open` rows from the report's `### 10.1 Bảng gap và câu hỏi cần xác nhận` table into the project's `question-backlog` file (so the BA can answer them).
 
 - Pass the just-written report path + `<UC-ID>` as input context.
 - Wait for `qc-qna` to return. Capture its summary (new question IDs created, file path of the backlog).
@@ -154,8 +164,7 @@ This auto-trigger is the documented kit flow: first-audit always produces fresh 
 Per `workflows/checkpoint-protocol.md` §5 and §6:
 
 1. **Worklog**: rewrite last entry → `status = "Done"`, `end = now`, `duration_min = computed`. Add the output file name to `output`. If `qc-qna` wrote to `question-backlog`, also add it to `output`.
-2. **qc-dashboard.md**: update the UC's `UC review stt` cell → `<Verdict> v[N] (Score <X>/100)` (e.g., `Conditionally Ready v1 (Score 73.1/100)`). Skip if column missing.
-3. **Cleanup**: delete the entire `.claude/skills/qc-uc-read/process-logging/<UC-ID>/` folder. Cleanup only happens on successful completion.
+2. **Cleanup**: delete the entire `.claude/skills/qc-uc-read/process-logging/<UC-ID>/` folder. Cleanup only happens on successful completion.
 
 ---
 
