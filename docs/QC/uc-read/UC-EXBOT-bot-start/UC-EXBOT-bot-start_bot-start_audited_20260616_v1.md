@@ -292,12 +292,12 @@ Enable a USDC Investor to start a new ExBot that automatically manages a delta-h
 |---|---|---|---|---|---|
 | Q1 | High | uc-bot-start.md §3 | `POST /api/exbot/start` request body schema — what fields, types, constraints? | Tester cannot verify request validation without schema | Open |
 | Q2 | High | uc-bot-start.md §3 | Success response schema from `POST /api/exbot/start` — fields, types? | Tester cannot verify happy path response | Open |
-| Q3 | Medium | uc-bot-start.md §3 Step 3 (preflight) | Exact error message when builder fee (5bps) not confirmed? | AC cannot be written as testable Given/When/Then without verbatim message | Open |
-| Q4 | Medium | uc-bot-start.md §3 Step 3 (preflight) | Exact error message when LP mint simulation fails (preflight check 5)? | Needed for negative path AC | Open |
+| Q3 | Medium | uc-bot-start.md §3 Step 3 (preflight) + spec.md E-EXBOT-005 | Exact error message when builder fee (5bps) not confirmed? → **E-EXBOT-005:** `"HL builder fee (5bps) approval required before starting ExBot."` HTTP 400 | AC cannot be written as testable Given/When/Then without verbatim message | Answered |
+| Q4 | Medium | uc-bot-start.md §3 Step 3 (preflight) + spec.md E-EXBOT-006 | Exact error message when LP mint simulation fails (preflight check 5)? → **E-EXBOT-006:** `"LP mint simulation failed. Check pool liquidity or adjust deposit amount."` HTTP 400 | Needed for negative path AC | Answered |
 | Q5 | Medium | uc-bot-start.md §4 A4 | "Return funds" on LP mint failure — which funds, via what mechanism, to where? | Without definition, recovery path cannot be tested | Open |
 | Q6 | High | uc-bot-start.md §3 Step 8 | Error flow when post-order reconcile fails — what lifecycle state, is LP unwound? | No alternate flow defined; reconcile-fail test case cannot be written | Open |
-| Q7 | High | uc-bot-start.md §3 Step 10 | Error flow when stop placement fails — what lifecycle state, is LP+hedge unwound? | No alternate flow defined; critical path to `active` state | Open |
-| Q8 | Medium | uc-bot-start.md §4 A3 + us-001.md AC-4 | Exact error message when agent key not approved/expired? Both documents use vague wording. | AC-04 cannot be precisely tested | Open |
+| Q7 | High | uc-bot-start.md §3 Step 10 + spec.md E-EXBOT-009 | Error flow when stop placement fails — what lifecycle state, is LP+hedge unwound? **E-EXBOT-009** (`"Failed to place native stop on Hyperliquid. Bot cannot activate without a stop."` HTTP 502) defines the message, but lifecycle state held + LP/hedge rollback path is NOT defined in UC or spec. | No alternate flow defined; critical path to `active` state | Open |
+| Q8 | Medium | uc-bot-start.md §4 A3 + us-001.md AC-4 + spec.md E-EXBOT-003/E-EXBOT-004 | Exact error message when agent key not approved/expired? → **E-EXBOT-003** (pending): `"Agent key is awaiting approval. Please complete the approval process before starting."` HTTP 400. **E-EXBOT-004** (expired): `"Your HL agent key has expired. Please submit a new one."` HTTP 400. | AC-04 cannot be precisely tested | Answered |
 | Q9 | Medium | uc-bot-start.md §3 | Behavior if OPERATOR receives duplicate `POST /api/exbot/start` (idempotency)? | No idempotency mechanism described; duplicate submission could create two bot records | Open |
 | Q10 | Low | spec.md FR-EXBOT-004 | FR-EXBOT-004 (dual-chain) is in spec.md but absent from frd.md §4 — intentional split? | Tester reading only frd.md misses a P0 requirement | Open |
 | Q11 | Low | spec.md FR-EXBOT-025 vs frd.md FR-EXBOT-023 | Post-order reconcile is "FR-EXBOT-025" in spec.md vs "FR-EXBOT-023" in frd.md — which is canonical? | Traceability gap for downstream test case FR references | Open |
@@ -315,15 +315,14 @@ Enable a USDC Investor to start a new ExBot that automatically manages a delta-h
 ### 🧪 Testability Outlook
 
 **Can test now:**
-- AC-01 (happy path), AC-02 (one-bot), AC-03 (margin), AC-04 (agent key — with clarified message Q8), AC-05 (stop before active), AC-06 (BigDecimal), AC-07 (lifecycle sequence), AC-08 (distinct errors), AC-09 (postconditions), AC-11 (service binding)
+- AC-01 (happy path), AC-02 (one-bot), AC-03 (margin), AC-04 (agent key — E-EXBOT-003/E-EXBOT-004 confirmed), AC-05 (stop before active), AC-06 (BigDecimal), AC-07 (lifecycle sequence), AC-08 (distinct errors), AC-09 (postconditions), AC-11 (service binding)
+- Builder fee fail (E-EXBOT-005 confirmed), LP mint sim fail (E-EXBOT-006 confirmed) — Q3/Q4 resolved
 
 **Cannot test (blocked):**
 - AC-10 (wethIndex per chain) — blocked: NV-12
 - Stop placement and stop_verified→active path — blocked: NV-1/NV-3
-- Reconcile fail error flow (Step 8) — blocked: Q6
-- Stop placement fail error flow (Step 10) — blocked: Q7
-- Builder fee fail exact message — blocked: Q3
-- LP mint sim fail exact message — blocked: Q4
+- Reconcile fail error flow (Step 8) — blocked: Q6 (lifecycle state + rollback path undefined)
+- Stop placement fail error flow (Step 10) — blocked: Q7 (E-EXBOT-009 message known, but lifecycle state held + LP/hedge rollback path undefined)
 - Return funds mechanism (A4) — blocked: Q5
 - Duplicate start idempotency — blocked: Q9
 
@@ -333,7 +332,7 @@ UC-EXBOT-bot-start has a well-defined happy path and one-bot policy enforcement,
 
 The two NV blockers (NV-12 and NV-1/NV-3) affect the LP amount computation chain and the entire stop system, respectively. Until confirmed, ~3 ACs are untestable.
 
-**Recommendation:** BA should (a) add a §2 API/Interface section to uc-bot-start.md with explicit request/response schema; (b) define error flows for Steps 8 and 10; (c) provide verbatim error messages for A3/A5/A6; (d) track NV-12/NV-1/NV-3 resolution. QA can begin test design for AC-01 through AC-03 and AC-05 through AC-09 and AC-11 immediately.
+**Recommendation:** BA should (a) add a §2 API/Interface section to uc-bot-start.md with explicit request/response schema; (b) define error flows for Steps 8 and 10 — including lifecycle state held on failure and whether LP+hedge are unwound; (c) track NV-12/NV-1/NV-3 resolution. Error messages for preflight checks (Q3/Q4/Q8) are now resolved via spec.md §5. QA can begin test design for AC-01 through AC-04 and AC-05 through AC-09 and AC-11 immediately.
 
 
 ---
