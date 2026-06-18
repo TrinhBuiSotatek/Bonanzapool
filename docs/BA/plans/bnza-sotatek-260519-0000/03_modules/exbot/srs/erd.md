@@ -1,5 +1,5 @@
 ---
-type: diagram-erd
+type: srs-erd
 module: exbot
 status: draft
 created: 2026-06-12

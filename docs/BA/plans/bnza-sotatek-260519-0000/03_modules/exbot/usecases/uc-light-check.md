@@ -3,14 +3,21 @@ type: use-case
 module: exbot
 status: draft
 created: 2026-06-12
-updated: 2026-06-12
+updated: 2026-06-18
 owner: "@hienduong"
-linked_stories: [US-EXBOT-005, US-EXBOT-006]
+linked_stories: [US-EXBOT-005, US-EXBOT-006, US-EXBOT-007, US-EXBOT-008]
 changelog:
+  - 2026-06-18 | /ba-do | add US-007 (LP rebalance trigger) and US-008 (circuit breaker) to linked_stories
   - 2026-06-12 | /ba-start srs | initial draft
 ---
 
 # UC-EXBOT-light-check: Execute Periodic Light-Check
+
+## Trigger
+
+User navigates to the relevant screen or initiates the described action.
+
+---
 
 ## 1. Actors
 - **Primary:** ExBot System Operator (Cron Worker → Scan Worker → Light-Check Worker)
@@ -46,8 +53,30 @@ changelog:
 - `next_light_check_at` updated in D1 (batch write per shard)
 - HL API call count: 0 (invariant)
 
+---
+
+## Postconditions
+
+- System state reflects the completed operation
+- Relevant audit log entries recorded (NFR-ADM-005)
+- Affected bot state transitions persisted in D1
+
 ## 6. Business Rules
 - BR-EXBOT-003 (HL weight = 0), BR-EXBOT-005 (stop_trigger_crossed_at write-once)
+
+---
+
+## Diagram
+
+> **No diagram yet.** Add a Mermaid sequence diagram or PlantUML flow chart documenting the actor-system interaction for this use case.
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant System
+    User->>System: Trigger action
+    System-->>User: Response
+```
 
 ## 7. FR Trace
 FR-EXBOT-013, FR-EXBOT-014, FR-EXBOT-015, FR-EXBOT-016, FR-EXBOT-023, FR-EXBOT-032

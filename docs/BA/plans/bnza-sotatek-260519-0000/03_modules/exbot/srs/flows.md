@@ -15,35 +15,35 @@ changelog:
 
 ```mermaid
 sequenceDiagram
-    participant Cron as Cron Worker (1 min)
-    participant ScanQ as bot-scan queue
-    participant ScanW as Scan Worker
-    participant LCQ as light-check queue
-    participant LCW as Light-Check Worker
-    participant HSQ as hedge-sync queue
-    participant PSAQ as price-near-stop-audit queue
-    participant D1 as D1 (state_db_shard)
-    participant MDO as MarketDataDO
+    participant Cron as "Cron Worker (1 min)"
+    participant ScanQ as "bot-scan queue"
+    participant ScanW as "Scan Worker"
+    participant LCQ as "light-check queue"
+    participant LCW as "Light-Check Worker"
+    participant HSQ as "hedge-sync queue"
+    participant PSAQ as "price-near-stop-audit queue"
+    participant D1 as "D1"
+    participant MDO as "MarketDataDO"
 
-    Cron->>ScanQ: sendBatch({shardId, cursor, limit=500, now}) via chunkSendBatch
+    Cron->>ScanQ: sendBatch via chunkSendBatch
     ScanQ->>ScanW: deliver batch
-    ScanW->>D1: SELECT bots WHERE status='active' AND next_light_check_at <= now LIMIT 500
-    ScanW->>LCQ: chunkSendBatch({botId, userId, shardId}) per bot
-    ScanW->>D1: batch UPDATE next_light_check_at (1 stmt/shard, now+5min+jitter)
+    ScanW->>D1: SELECT bots WHERE status = active
+    ScanW->>LCQ: chunkSendBatch per bot
+    ScanW->>D1: batch UPDATE next_light_check_at
 
     LCQ->>LCW: deliver message
-    LCW->>D1: read bot_runtime_state (last_known_hl_short_size, lifecycle_state)
+    LCW->>D1: read bot_runtime_state
     LCW->>MDO: read sqrtPriceX96, currentTick
-    LCW->>LCW: compute lpEthAmount (TickMath+LiquidityAmounts, zero HL calls)
-    LCW->>LCW: evaluate RebalanceReason[] from D1+MarketDataDO only
+    LCW->>LCW: compute lpEthAmount (zero HL calls)
+    LCW->>LCW: evaluate RebalanceReason list
 
-    alt rebalance needed AND circuit NOT open
-        LCW->>HSQ: enqueue {botId, reasons, stateVersion}
+    alt rebalance needed
+        LCW->>HSQ: enqueue hedge-sync
     else stop trigger detected
-        LCW->>D1: SET stop_trigger_crossed_at (guarded — only if NULL)
-        LCW->>PSAQ: enqueue {botId, markPriceUsd, stopPriceUsd, crossed}
+        LCW->>D1: SET stop_trigger_crossed_at
+        LCW->>PSAQ: enqueue price-near-stop-audit
     else circuit open
-        Note over LCW: suppress hedge-sync; stop monitoring continues
+        Note over LCW: suppress hedge-sync
     end
 ```
 
@@ -84,12 +84,12 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant INV as Investor (POOL UI)
+    participant INV as "Investor (POOL UI)"
     participant OP as Operator Facade
     participant EXW as ExBot Worker
     participant HL as Hyperliquid
     participant VAULT as BnzaExVault
-    participant D1 as D1 (control_db + shard)
+    participant D1 as "D1 (control_db + shard)"
 
     INV->>OP: POST /api/exbot/start
     OP->>EXW: forward via service binding
@@ -120,7 +120,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant INV as Investor
-    participant VAULT as BnzaExVault (on-chain)
+    participant VAULT as "BnzaExVault (on-chain)"
     participant EVWATCHER as Redeem Event Watcher
     participant UREQ as user_redeem queue
     participant UREW as Redeem Worker
@@ -153,12 +153,12 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant TRIGGER as Trigger (circuit/margin/admin)
+    participant TRIGGER as "Trigger (circuit/margin/admin)"
     participant CLOSEW as Close Worker
     participant HL as Hyperliquid
     participant VAULT as BnzaExVault
     participant D1 as D1
-    participant REENTRY as Re-Entry Worker (60min interval)
+    participant REENTRY as "Re-Entry Worker (60min interval)"
 
     TRIGGER->>CLOSEW: initiate bot_safe_close
     CLOSEW->>D1: close_operations (kind=bot_safe_close, state=requested)

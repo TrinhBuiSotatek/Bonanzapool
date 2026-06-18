@@ -3,7 +3,7 @@ type: frd
 module: exbot
 status: draft
 created: 2026-06-12
-updated: 2026-06-12
+updated: 2026-06-18
 owner: "@hienduong"
 version: 0.1.0
 sources:
@@ -11,6 +11,7 @@ sources:
   - Google Doc: EXBOT System & Smart Contract Overview (Daniel, June 2026)
   - Google Sheet: BNZA ExBot Feature Tracker
 changelog:
+  - 2026-06-18 | /ba-do hld-decisions | ACT-M removed; bot_safe_close flow updated (drop park/re-entry); lifecycle states cooldown/parked removed; emergencyTransfer authority updated
   - 2026-06-12 | /ba-impact | gap fill v5.2.6 X-5: §4.2 FR-011 add deltaErrorUsd formula + 3-way price split (uniPoolPrice/hlMarkPrice/hlOraclePrice); add stop_replacing_started_at primary detection bullet
   - 2026-06-12 | /ba-start frd | initial draft from SPEC v5.2.6 + Google Doc + Sheet
 links:
@@ -42,8 +43,9 @@ links:
 | ACT-I | Investor (End User) | Deposits USDC, starts/monitors/closes ExBot via POOL UI |
 | ACT-O | OPERATOR (System) | Executes strategy via queue workers; calls BnzaExVault and HL |
 | ACT-A | Admin (zen) | Manages system config, force-closes, emergency operations |
-| ACT-M | Multi-sig | Emergency authority (rotate operator, pause/unpause contract, emergency transfer) |
 | ACT-Z | zen | Owns trading algorithm; provides interface specs only |
+
+> **Emergency authority (HLD 2026-06-18):** `emergencyTransfer(user, botId)` is executed by `OPERATOR_ROLE` when contract is paused. No recipient parameter — funds return to user's own address only. Emits `EmergencyRecovery` event. Multi-sig is not required.
 
 ---
 
@@ -104,12 +106,12 @@ hedge_post_confirmed → stop_placing → stop_verified → active
 | `active` | Normal monitoring, light-check every 5 min |
 | `lp_rebalancing` | LP range rebalance in progress; light-check skips |
 | `hedge_stopped_cooldown` | Stop fired; hedge-sync suppressed; 4h cooldown |
-| `cooldown` | Post bot_safe_close; re-entry judgment every 60 min |
-| `parked` | 3rd bot_safe_close within 7 days; re-entry interval 24h + admin escalation |
 | `lp_closing` | Close operation in progress |
 | `closed` | Fully closed |
 | `safe_mode` | No mutations; monitor only |
 | `error` | Admin intervention required |
+
+> **Note (HLD 2026-06-18):** `cooldown` and `parked` lifecycle states removed — park/redeploy feature dropped. After bot_safe_close, lifecycle transitions directly to `closed`.
 
 **PAUSED behavior:** `bots.status='paused'` only. `lifecycle_state` keeps pre-pause value. Hedge and LP both maintained. No new mutations.
 
@@ -375,24 +377,12 @@ Triggers:
 - partial_repair exhausted
 - Compliance/admin force close
 
-Order: `hedge → LP → funds_parked` (USDC parked into `uninvested_balances`).
-After completion: automatic re-entry via §16.7 cooldown closed loop.
+Order: hedge → LP (via executeStrategy(RedeemStrategyV1)) → RedemptionQueue.createRequest → Operator fulfillRequest pays user FIFO on-chain.
+
+After bot_safe_close completes: bots.status='closed'. User receives notification "Bot safely closed. Funds have been returned to your wallet."
 
 **Both systems tracked in `close_operations` ledger** (`idempotency_key UNIQUE` prevents double settlement).
 
-#### FR-EXBOT-071 — Automatic Re-Entry (Closed Loop)
-**Priority:** P0
-
-After `bot_safe_close`:
-1. `lifecycle_state='cooldown'` (60 min default)
-2. Re-entry judgment at 60-min interval:
-   - Condition: 7d funding APR > −15% AND preflight passes (2.0x buffer)
-   - Pass → re-run open flow from §16.1, consume `uninvested_balances` fully
-   - Fail → wait for next interval
-3. 3rd `bot_safe_close` within 7 days → `lifecycle_state='parked'` (24h interval) + admin escalation
-4. Recovery from `parked` also autonomous under same conditions
-
-User notification required on: cooldown entry, re-entry success, parked transition.
 
 ---
 

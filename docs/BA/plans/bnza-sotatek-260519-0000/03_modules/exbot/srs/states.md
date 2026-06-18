@@ -1,11 +1,12 @@
 ---
-type: srs
+type: srs-states
 module: exbot
 status: draft
 created: 2026-06-12
-updated: 2026-06-12
+updated: 2026-06-18
 owner: "@hienduong"
 changelog:
+  - 2026-06-18 | /ba-do hld-decisions | remove cooldown/parked states from state machine; remove funds_parked from close_operations; update bot_safe_close terminal transition
   - 2026-06-12 | /ba-start srs | initial draft
 ---
 
@@ -38,13 +39,10 @@ stateDiagram-v2
     hedge_stopped_cooldown --> safe_mode : re-hedge fails
     active --> lp_closing : close request (user_redeem or bot_safe_close)
     lp_closing --> closed : close complete (user_redeem path)
-    lp_closing --> cooldown : close complete (bot_safe_close path)
-    cooldown --> active : re-entry conditions met
-    cooldown --> parked : 3rd bot_safe_close within 7 days
-    parked --> active : re-entry conditions met (24h interval)
+    lp_closing --> closed : close complete (bot_safe_close path — funds via RedemptionQueue)
     active --> safe_mode : SAFE_MODE triggers
     safe_mode --> active : auto-recovery (3 reconciles + margin ok)
-    safe_mode --> cooldown : irrecoverable → bot_safe_close
+    safe_mode --> closed : irrecoverable → bot_safe_close
     active --> error : critical bug / LP NFT anomaly
     error --> [*] : admin resolution required
 ```
@@ -64,13 +62,13 @@ stateDiagram-v2
 | `active` | active | Normal monitoring | every 5 min | event-driven | every 6h |
 | `hedge_stopped_cooldown` | active | Stop fired; hedge-sync suppressed 4h | run (no hedge-sync) | suppressed | every 6h |
 | `lp_rebalancing` | active | LP range rebalance in progress | **skip** | skip | skip |
-| `cooldown` | active | Post bot_safe_close; re-entry judgment 60 min | skip | skip | every 6h |
-| `parked` | active | Repeated safe_close; 24h re-entry interval | skip | skip | every 6h |
 | `lp_closing` | closing | Close in progress | **skip** | skip | skip |
 | `closed` | closed | Fully closed | skip | skip | skip |
 | `safe_mode` | safe_mode | No mutations; monitor only | limited (no HL) | blocked | when HL recovers |
 | `error` | error | Admin required | skip | skip | skip |
 | (pre-pause value) | paused | Hedge maintained; no new mutations | skip | skip | every 6h |
+
+**Note (HLD 2026-06-18):** `cooldown` and `parked` lifecycle states removed — park/redeploy feature dropped. After bot_safe_close, lifecycle transitions directly to `closed`.
 
 ## Circuit Breaker States (`circuit_breakers.state`)
 
@@ -107,6 +105,6 @@ stateDiagram-v2
 | `funds_returned` | ✓ (LP-portion USDC to user in same tx) | — |
 | `hedge_close_pending` | ✓ (after funds_returned) | ✓ (first step after requested) |
 | `hedge_closed` | ✓ | ✓ |
-| `funds_parked` | — | ✓ (USDC → uninvested_balances) |
+| `redemption_queued` | — | ✓ (RedemptionQueue.createRequest enqueued) |
 | `residual_hl_liability` | if hedge close fails | if hedge close fails |
 | `done` | ✓ | ✓ |

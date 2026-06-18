@@ -3,14 +3,21 @@ type: use-case
 module: exbot
 status: draft
 created: 2026-06-12
-updated: 2026-06-12
+updated: 2026-06-18
 owner: "@hienduong"
-linked_stories: [US-EXBOT-006]
+linked_stories: [US-EXBOT-006, US-EXBOT-008]
 changelog:
+  - 2026-06-18 | /ba-do | add US-008 to linked_stories; fix phantom ref in A5 to point at uc-deep-audit.md
   - 2026-06-12 | /ba-start srs | initial draft
 ---
 
 # UC-EXBOT-hedge-sync: Execute Delta-Only Hedge Adjustment
+
+## Trigger
+
+User navigates to the relevant screen or initiates the described action.
+
+---
 
 ## 1. Actors
 - **Primary:** ExBot System Operator (Hedge-Sync Worker)
@@ -44,7 +51,7 @@ changelog:
 - **A2 (stateVersion mismatch):** Step 2 — discard; status='skipped'; no HL order
 - **A3 (HL order rejection):** Step 6 — record rebalance_attempts (status='failed'); call `incrementCircuitBreaker`; enqueue notification
 - **A4 (partial fill):** Step 11 — reconcile detects partial mismatch; enqueue `partial_repair` message
-- **A5 (stop_replacing_started_at stuck > 60s detected by audit):** Enter SAFE_MODE (separate UC: deep-audit)
+- **A5 (stop_replacing_started_at stuck > 60s detected by audit):** Enter SAFE_MODE (see uc-deep-audit.md — FR-EXBOT-016 secondary detection path)
 
 ## 5. Postconditions
 - `hedge_legs` updated: `stop_price`, `entry_price`, `effective_leverage`, `stop_replacing_started_at=NULL`
@@ -52,8 +59,30 @@ changelog:
 - `rebalance_attempts` row inserted with final status
 - `circuit_breakers.failure_count` incremented on failure (or reset on half_open success)
 
+---
+
+## Postconditions
+
+- System state reflects the completed operation
+- Relevant audit log entries recorded (NFR-ADM-005)
+- Affected bot state transitions persisted in D1
+
 ## 6. Business Rules
 - BR-EXBOT-004 (delta-only invariant)
+
+---
+
+## Diagram
+
+> **No diagram yet.** Add a Mermaid sequence diagram or PlantUML flow chart documenting the actor-system interaction for this use case.
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant System
+    User->>System: Trigger action
+    System-->>User: Response
+```
 
 ## 7. FR Trace
 FR-EXBOT-022, FR-EXBOT-024, FR-EXBOT-025, FR-EXBOT-026, FR-EXBOT-027, FR-EXBOT-036

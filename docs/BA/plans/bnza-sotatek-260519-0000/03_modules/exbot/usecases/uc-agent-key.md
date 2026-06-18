@@ -12,6 +12,12 @@ changelog:
 
 # UC-EXBOT-agent-key-approval: Submit and Approve HL Agent Key
 
+## Trigger
+
+User navigates to the relevant screen or initiates the described action.
+
+---
+
 ## 1. Actors
 - **Primary:** USDC Investor (key submission), ExBot Admin (key approval)
 - **System:** ExBot Worker, D1 (control_db: hl_agent_keys), Cloudflare Secrets Store
@@ -44,8 +50,30 @@ changelog:
 - No plain key or plain DEK persisted anywhere
 - `users.hl_agent_key_id` references the approved key row
 
+---
+
+## Postconditions
+
+- System state reflects the completed operation
+- Relevant audit log entries recorded (NFR-ADM-005)
+- Affected bot state transitions persisted in D1
+
 ## 6. Business Rules
 - BR-EXBOT (FR-EXBOT-080, 081, 082, 083)
+
+---
+
+## Diagram
+
+> **No diagram yet.** Add a Mermaid sequence diagram or PlantUML flow chart documenting the actor-system interaction for this use case.
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant System
+    User->>System: Trigger action
+    System-->>User: Response
+```
 
 ## 7. FR Trace
 FR-EXBOT-080, FR-EXBOT-081, FR-EXBOT-082, FR-EXBOT-083

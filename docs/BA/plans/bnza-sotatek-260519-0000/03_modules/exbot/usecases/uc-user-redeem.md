@@ -12,6 +12,12 @@ changelog:
 
 # UC-EXBOT-user-redeem: User-Initiated Redemption (LP-First)
 
+## Trigger
+
+User navigates to the relevant screen or initiates the described action.
+
+---
+
 ## 1. Actors
 - **Primary:** USDC Investor (on-chain tx + POOL UI)
 - **System:** BnzaExVault (Solidity), Redeem Event Watcher, user_redeem Worker, Hyperliquid
@@ -48,8 +54,30 @@ changelog:
 - HL-portion USDC sent post-hedge-close
 - `close_operations.state='done'` or `'residual_hl_liability'`
 
+---
+
+## Postconditions
+
+- System state reflects the completed operation
+- Relevant audit log entries recorded (NFR-ADM-005)
+- Affected bot state transitions persisted in D1
+
 ## 6. Business Rules
 - BR-EXBOT-006 (LP repayment unconditional — never blocked by hedge close failure)
+
+---
+
+## Diagram
+
+> **No diagram yet.** Add a Mermaid sequence diagram or PlantUML flow chart documenting the actor-system interaction for this use case.
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant System
+    User->>System: Trigger action
+    System-->>User: Response
+```
 
 ## 7. FR Trace
 FR-EXBOT-070, FR-EXBOT-071

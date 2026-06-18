@@ -2,7 +2,7 @@
 type: srs
 status: draft
 created: 2026-06-12
-updated: 2026-06-12
+updated: 2026-06-18
 owner: "@hienduong"
 module: exbot
 lang: en
@@ -12,6 +12,7 @@ links:
   - ../usecases/index.md
   - ../userstories/index.md
 changelog:
+  - 2026-06-18 | /ba-do hld-decisions | FR-070/071/073 update: drop park/re-entry; IC-EXBOT-002 remove uninvestedBalanceOf stub; scope FM-XB-08 update; us-012 emergency authority
   - 2026-06-12 | /ba-impact | §9 add OQ-EXBOT-10/11/12: range_boundary_near formula, lpValueUsd computation, 7d APR aggregation — all pending zen confirm
   - 2026-06-12 | /ba-impact | gap fill v5.2.6: FR-012 add stop_replacing_started_at primary detection + uniPoolPrice 3-way split note; FR-033 add primary light-check detection (≤5min) vs deep-audit secondary backstop
   - 2026-06-12 | /ba-start srs --update | gap fill: added FR-015,016,036,072,073,082,083,091,092,093; section 10 Integration Constraints; fixed UC inventory traces
@@ -46,7 +47,7 @@ This SRS covers FM-XB-01 through FM-XB-08 for Phase A (1–100 bots, Base + Opti
 | FM-XB-05 | HL Adapter (rate limit, cloid, delta-only, reconcile, agent key decrypt) | P1 |
 | FM-XB-06 | Operator Facade API (`/api/exbot/*` — 5 endpoints) | P1 |
 | FM-XB-07 | Lifecycle State Machine (18 states) | P0 |
-| FM-XB-08 | Close/Redeem Operations (user_redeem + bot_safe_close) | P0 |
+| FM-XB-08 | Close/Redeem Operations (user_redeem + bot_safe_close via RedemptionQueue FIFO — park/redeploy dropped HLD 2026-06-18) | P0 |
 
 ### 1.3 Out of Scope
 
@@ -404,19 +405,12 @@ Two separate close systems exist, both tracked in the `close_operations` ledger 
 
 **user_redeem (LP-first):** The on-chain `BnzaExVault.redeem(tokenId)` transaction instantly liquidates the LP and returns the LP-portion USDC to the investor in the same transaction (on-chain guarantee). The worker then closes the HL hedge independently (SLA: 5 minutes from event detection). Hedge close failure results in `residual_hl_liability` state; it never blocks the LP-portion repayment.
 
-**bot_safe_close (hedge-first):** Triggered by system conditions (circuit breaker exhausted, margin critical, 3 stops in 7 days, admin force-close). Order: close HL hedge → close LP via BnzaExVault → park USDC in `uninvested_balances`. USDC is available for user withdrawal at any time.
+**bot_safe_close (hedge-first):** Triggered by system conditions (circuit breaker exhausted, margin critical, 3 stops in 7 days, admin force-close). Order: close HL hedge → executeStrategy(RedeemStrategyV1) → RedemptionQueue.createRequest → Operator fulfillRequest pays user FIFO on-chain. No park/redeploy loop (dropped HLD 2026-06-18).
 
-**Acceptance criteria:** Duplicate `close_operations` row attempt (same `idempotency_key`) is rejected by UNIQUE constraint. LP-portion USDC is returned to investor in the redeem tx regardless of hedge close outcome. `bot_safe_close` USDC is accessible via `uninvestedBalanceOf` on-chain immediately after parking.
+**Acceptance criteria:** Duplicate `close_operations` row attempt (same `idempotency_key`) is rejected by UNIQUE constraint. LP-portion USDC is returned to investor in the redeem tx regardless of hedge close outcome. `bot_safe_close` funds are returned to user via RedemptionQueue fulfillRequest (on-chain FIFO). No uninvested_balances or uninvestedBalanceOf API used.
 
 ---
 
-### FR-EXBOT-071 — Automatic Re-Entry After bot_safe_close
-**Trace:** FM-XB-08, US-EXBOT-009
-**Priority:** P0
-
-After `bot_safe_close` completes, `lifecycle_state` transitions to `cooldown` (60 minutes). Re-entry judgment runs every 60 minutes: if 7-day funding APR > −15% AND preflight (2.0× buffer) passes AND on-chain `uninvested_balances > 0`, the system automatically re-deploys USDC and re-starts the open flow. The third `bot_safe_close` within 7 days transitions to `parked` (24-hour interval) with admin escalation. Recovery from `parked` is also autonomous under the same conditions.
-
-**Acceptance criteria:** After cooldown, a bot with sufficient margin and positive funding APR restarts automatically without user action. The user receives notification on cooldown entry, re-entry success, and parked transition. On-chain balance (not D1) is the canonical source for re-entry capital check.
 
 ---
 
@@ -434,9 +428,9 @@ The system shall initiate `bot_safe_close` when any of the following conditions 
 **Trace:** FM-XB-08
 **Priority:** P0
 
-The `bot_safe_close` execution follows a fixed hedge-first sequence tracked atomically in `close_operations`: (1) `requested` — trigger received, `close_operations` row created; (2) `hedge_close_pending` — close HL short position fully (target = 0); (3) `hedge_closed` — HL position confirmed closed, stop cancelled; (4) `lp_closed` — call `BnzaExVault.redeem(tokenId)` on-chain, LP NFT burned; (5) `funds_parked` — USDC credited to `uninvested_balances` on-chain, accessible via `uninvestedBalanceOf`; (6) `done` — `bots.lifecycle_state` transitions to `cooldown` for automatic re-entry (FR-EXBOT-071). On hedge close failure, the system retries up to 3 times before escalating to admin and holding at `hedge_close_pending`. LP close is not attempted until hedge is confirmed closed.
+The `bot_safe_close` execution follows a fixed hedge-first sequence tracked atomically in `close_operations`: (1) `requested` — trigger received, `close_operations` row created; (2) `hedge_close_pending` — close HL short position fully (target = 0); (3) `hedge_closed` — HL position confirmed closed, stop cancelled; (4) `lp_closed` — call `BnzaExVault.redeem(tokenId)` on-chain, LP NFT burned; (5) `redemption_queued` — RedemptionQueue.createRequest(user, botId, tokenId, hlPortionId) enqueued; RequestCreated event emitted; (6) `done` — Operator calls fulfillRequest(tokens, amounts); FIFO pop; safeTransferFrom(operator, user, amount) on-chain; RequestFulfilled event emitted; bots.status='closed'. On hedge close failure, the system retries up to 3 times before escalating to admin and holding at `hedge_close_pending`. LP close is not attempted until hedge is confirmed closed.
 
-**Acceptance criteria:** `close_operations` state transitions are sequential — no step is skipped. LP close is never attempted before `hedge_closed`. USDC is accessible via `uninvestedBalanceOf` immediately after `funds_parked`. A failure at any step holds `close_operations.status` at the failed step — does not silently advance.
+**Acceptance criteria:** `close_operations` state transitions are sequential — no step is skipped. LP close is never attempted before `hedge_closed`. RedemptionQueue request is enqueued at step 5; user funds are returned on-chain when Operator calls fulfillRequest. A failure at any step holds `close_operations.status` at the failed step — does not silently advance.
 
 ---
 
@@ -596,7 +590,7 @@ Full UC specs in `../usecases/`. Each file contains: actors, preconditions, main
 | `uc-light-check` | Periodic scan (zero HL calls) → fan-out to hedge-sync or price-near-stop-audit | FR-EXBOT-012, 013, 014, 015, 016, 032 |
 | `uc-hedge-sync` | Delta-only hedge adjustment + INV-STOP protocol + post-order reconcile | FR-EXBOT-020, 021, 022, 024, 025, 026, 027, 035 |
 | `uc-user-redeem` | LP-first instant redemption + HL hedge close SLA 5 min | FR-EXBOT-070, 071 |
-| `uc-bot-safe-close` | Hedge-first system close + USDC park + automatic re-entry closed loop | FR-EXBOT-070, 071, 072, 073 |
+| `uc-bot-safe-close` | Hedge-first system close → executeStrategy(RedeemStrategyV1) → RedemptionQueue FIFO payout to user | FR-EXBOT-070, 072, 073 |
 | `uc-agent-key` | AES-GCM envelope encryption for HL agent key + admin approval flow | FR-EXBOT-080, 081, 082, 083 |
 
 ---
@@ -618,7 +612,7 @@ Full story files in `../userstories/`. 12 stories across 4 epics.
 | US-EXBOT-009 | Risk & Safety | ExBot System Operator | bot_safe_close + automatic re-entry closed loop | P0 |
 | US-EXBOT-010 | Risk & Safety | ExBot System Operator | Margin warning/critical → SAFE_MODE | P0 |
 | US-EXBOT-011 | Agent Key & Admin | USDC Investor | Submit + encrypt HL agent key (AES-GCM) | P0 |
-| US-EXBOT-012 | Agent Key & Admin | ExBot Admin (zen) | Admin force-close + emergency multi-sig path | P1 |
+| US-EXBOT-012 | Agent Key & Admin | ExBot Admin (zen) | Admin force-close + emergencyTransfer (Operator-only when paused, no recipient param, EmergencyRecovery event) | P1 |
 
 ---
 
@@ -646,6 +640,6 @@ Full story files in `../userstories/`. 12 stories across 4 epics.
 | IC ID | External Dependency | Constraint | Blocks |
 |---|---|---|---|
 | IC-EXBOT-001 | Hyperliquid REST API (info + exchange endpoints) | BNZA budget capped at 800 weight/min. All outbound calls routed through HLRateLimitDO (FR-EXBOT-091). Weight table per endpoint category must be maintained in code. HL API schema changes (field renames, endpoint deprecations) require immediate SRS review. | FR-EXBOT-060, 091 |
-| IC-EXBOT-002 | BnzaExVault Solidity contract (LP NFT custody, redeem, uninvested_balances) | SOTATEK integrates via ABI only — no contract development. Final ABI confirmed when zen deploys at Phase 0 (OQ-EXBOT-08). Until ABI is confirmed, `BnzaExVault.redeem()` and `uninvestedBalanceOf()` calls are stubbed. Contract address (Base + Optimism) must be injected via Cloudflare Secrets Store, not hardcoded. | FR-EXBOT-015, 070, 071, 073 |
+| IC-EXBOT-002 | BnzaExVault Solidity contract (LP NFT custody, redeem) + RedemptionQueue (FIFO payout) | SOTATEK integrates via ABI only — no contract development. Final ABI confirmed when zen deploys at Phase 0 (OQ-EXBOT-08). Until ABI is confirmed, vault.executeStrategy(RedeemStrategyV1, user, botId, params) and RedemptionQueue.createRequest/fulfillRequest calls are stubbed. uninvestedBalanceOf() is no longer part of the integration surface. Contract address (Base + Optimism) must be injected via Cloudflare Secrets Store, not hardcoded. | FR-EXBOT-015, 070, 073 |
 | IC-EXBOT-003 | Uniswap V3 Pool (Base + Optimism, USDC/WETH 0.3%) | Pool addresses and `wethIndex` confirmed via Phase 0 NV-12 verification (OQ-EXBOT-03). `MarketDataDO` (FR-EXBOT-093) must be pointed to the correct pool address per chain. Pool address changes (e.g., pool migration) require coordinated deploy of new DO configuration. | FR-EXBOT-004, 093 |
 | IC-EXBOT-004 | Cloudflare Platform (Workers, D1, Queues, Durable Objects, Secrets Store) | ExBot Worker is deployed exclusively as a Cloudflare Worker. Service binding to OPERATOR is required for all Facade API calls. Max 6 simultaneous outbound connections per Worker invocation (NFR-EXBOT-011). D1 concurrent write limits apply; batch patterns (FR-EXBOT-013) are required by design. Cloudflare platform outages are a SAFE_MODE trigger condition. | All FR-EXBOT-* |

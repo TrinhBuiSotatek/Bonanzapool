@@ -3,18 +3,26 @@ type: use-case
 module: exbot
 status: draft
 created: 2026-06-12
-updated: 2026-06-12
+updated: 2026-06-18
 owner: "@hienduong"
-linked_stories: [US-EXBOT-009]
+linked_stories: [US-EXBOT-009, US-EXBOT-010, US-EXBOT-012]
 changelog:
+  - 2026-06-18 | /ba-do hld-decisions | rewrite: drop park/redeploy/re-entry loop; new flow: executeStrategy(RedeemStrategyV1) → RedemptionQueue FIFO → user receives funds
+  - 2026-06-18 | /ba-do | add US-010 (SAFE_MODE/margin critical trigger) and US-012 (admin force-close trigger) to linked_stories
   - 2026-06-12 | /ba-start srs | initial draft
 ---
 
 # UC-EXBOT-bot-safe-close: System-Initiated Safe Close + Auto Re-Entry
 
+## Trigger
+
+User navigates to the relevant screen or initiates the described action.
+
+---
+
 ## 1. Actors
-- **Primary:** ExBot System Operator (Close Worker, Re-Entry Worker)
-- **System:** Hyperliquid, BnzaExVault, D1
+- **Primary:** ExBot System Operator (Close Worker)
+- **System:** Hyperliquid, BnzaExVault, BnzaExPositionManager, RedemptionQueue, D1
 
 ## 2. Preconditions
 - Trigger condition met: circuit breaker retries exhausted, OR margin critical + SAFE_MODE irrecoverable, OR 3 stops within 7 days, OR admin force-close
@@ -24,35 +32,43 @@ changelog:
 2. Close Worker: acquire `UserLockDO` lease; full close HL short (`closeShortReduceOnlyIoc`)
 3. Cancel stop via `§19.5 replaceStopProtected` with size=0
 4. Reconcile: verify HL size = 0; update `close_operations.state='hedge_closed'`
-5. Call `BnzaExVault.vaultClose(tokenId, dest=UNINVESTED)`
-6. `FundsParked(user, botId, amount)` event emitted; `close_operations.state='funds_parked'`
-7. D1 `uninvested_balances` updated with parked USDC amount
-8. `close_operations.state='done'`; `bots.lifecycle_state='cooldown'` (60 min default)
-9. Investor notification: "Bot safely closed. USDC parked. Re-entry will be attempted automatically."
-
-**Re-Entry Loop (every 60 min during cooldown):**
-10. Re-Entry Worker reads `funding_daily_metrics` (last 7 rows) — 7d funding APR
-11. Reads `uninvestedBalanceOf(user, botId)` **on-chain** (canonical, not D1)
-12. If 7d APR > −15% AND preflight (2.0× buffer) passes AND on-chain balance > 0:
-    a. Acquire `UserLockDO` lease
-    b. Call `BnzaExVault.redeploy(botId)` → `FundsRedeployed` event confirmed
-    c. D1 `uninvested_balances` updated to 0 (CAS UPDATE)
-    d. Run open flow (§16.1): preflight → lp_opening → ... → active
-    e. Investor notification: "Bot re-started automatically."
-13. Else: keep `lifecycle_state='cooldown'`; retry next interval
+5. Call `vault.executeStrategy(RedeemStrategyV1, user, botId, params)` — closes LP position via BnzaExPositionManager
+6. RedeemStrategyV1: earned fees routed via LpFeeOps (operation fee + performance fee in pair currency); principal returned in pair currency (optional convertPrincipalToUsdc)
+7. `close_operations.state='lp_closed'`; `PositionClosed` event emitted by BnzaExPositionManager
+8. `RedemptionQueue.createRequest(user, botId, tokenId, hlPortionId)` — enqueue HL portion payout
+9. `close_operations.state='redemption_queued'`; `RequestCreated` event emitted
+10. Operator closes HL portion off-chain → calls `RedemptionQueue.fulfillRequest(tokens, amounts)` — FIFO pop, `safeTransferFrom(operator, user, amount)` on-chain
+11. `close_operations.state='done'`; `RequestFulfilled` event emitted; `bots.status='closed'`
+12. Investor notification: "Bot safely closed. Funds have been returned to your wallet."
 
 ## 4. Alternate Flows
-- **A1 (3rd safe_close within 7 days):** After step 8 → `lifecycle_state='parked'` (24h interval) + admin escalation
-- **A2 (hedge close impossible):** Step 3 — `close_operations.state='residual_hl_liability'` + SAFE_MODE; do NOT touch LP
-- **A3 (on-chain balance = 0 at re-entry):** Step 11 — correct D1 to match on-chain; abort re-entry; carry over to next interval
-- **A4 (redeploy tx reverts — concurrent withdraw):** Step 12b — structural backstop by Vault on-chain balance enforcement; abort re-entry; carry over
+- **A1 (hedge close impossible):** Step 3 — `close_operations.state='residual_hl_liability'` + SAFE_MODE; do NOT touch LP until hedge confirmed closed
+- **A2 (LP close reverts):** Step 5 — retry up to 3 times; on failure escalate to admin, hold at `lp_closed` pending
+- **A3 (RedemptionQueue fulfillRequest fails):** Step 10 — request stays in queue; Operator retries; user funds not lost (request remains enqueued)
+- **A4 (3rd bot_safe_close trigger within 7 days):** Step 1 — create `close_operations` row; proceed with same flow; admin escalation notification sent concurrently
 
 ## 5. Postconditions
-- After safe_close: `lifecycle_state='cooldown'` or `'parked'`, USDC in `uninvested_balances`
-- After re-entry success: `lifecycle_state='active'`, `uninvested_balances=0`
+- `bots.status='closed'`, `close_operations.state='done'`
+- LP position fully closed; HL hedge fully closed
+- Funds returned to user wallet via RedemptionQueue fulfillRequest (on-chain)
+- Audit log entries recorded
 
 ## 6. Business Rules
 - BR-EXBOT-007 (SAFE_MODE not a terminal state)
 
+---
+
+## Diagram
+
+> **No diagram yet.** Add a Mermaid sequence diagram or PlantUML flow chart documenting the actor-system interaction for this use case.
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant System
+    User->>System: Trigger action
+    System-->>User: Response
+```
+
 ## 7. FR Trace
-FR-EXBOT-072, FR-EXBOT-073
+FR-EXBOT-070, FR-EXBOT-072, FR-EXBOT-073

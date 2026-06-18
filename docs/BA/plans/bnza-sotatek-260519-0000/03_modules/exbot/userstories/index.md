@@ -1,8 +1,14 @@
 ---
+owner: "@hien.duong"
+updated: 2026-06-18
 type: userstories-index
+status: draft
+created: 2026-06-12
 module: exbot
 generated_at: 2026-06-12
 stale_status: unknown
+changelog:
+  - 2026-06-18 | /ba-do | backfill Linked UCs column for all 12 stories
 ---
 
 # User Stories Index — exbot
@@ -22,18 +28,18 @@ stale_status: unknown
 
 | Story ID | File | Actor | Feature / FR | AC Count | Linked UCs | Linked Screens | Source Backbone IDs | Stale |
 |---|---|---|---|---|---|---|---|---|
-| US-EXBOT-001 | `us-001.md` | USDC Investor | FR-EXBOT-001, FR-EXBOT-002 | 4 | — | — | FM-XB-07 | unknown |
-| US-EXBOT-002 | `us-002.md` | USDC Investor | FR-EXBOT-002, FR-EXBOT-050 | 3 | — | — | FM-XB-07 | unknown |
-| US-EXBOT-003 | `us-003.md` | USDC Investor | FR-EXBOT-003 | 4 | — | — | FM-XB-07 | unknown |
-| US-EXBOT-004 | `us-004.md` | USDC Investor | FR-EXBOT-070 | 3 | — | — | FM-XB-08 | unknown |
-| US-EXBOT-005 | `us-005.md` | ExBot System Operator | FR-EXBOT-011, FR-EXBOT-012 | 4 | — | — | FM-XB-02, FM-XB-07 | unknown |
-| US-EXBOT-006 | `us-006.md` | ExBot System Operator | FR-EXBOT-020–023 | 4 | — | — | FM-XB-05, FM-XB-02 | unknown |
-| US-EXBOT-007 | `us-007.md` | ExBot System Operator | FR-EXBOT-002, FR-EXBOT-080 | 4 | — | — | FM-XB-07, FM-XB-05 | unknown |
-| US-EXBOT-008 | `us-008.md` | ExBot System Operator | FR-EXBOT-040 | 4 | — | — | FM-XB-07 | unknown |
-| US-EXBOT-009 | `us-009.md` | ExBot System Operator | FR-EXBOT-070, FR-EXBOT-071 | 4 | — | — | FM-XB-08, FM-XB-07 | unknown |
-| US-EXBOT-010 | `us-010.md` | ExBot System Operator | FR-EXBOT-050, FR-EXBOT-060 | 4 | — | — | FM-XB-07 | unknown |
-| US-EXBOT-011 | `us-011.md` | USDC Investor (agent key) | FR-EXBOT-081 | 4 | — | — | FM-XB-01 | unknown |
-| US-EXBOT-012 | `us-012.md` | ExBot Admin (zen) | FR-EXBOT-070, FR-EXBOT-002 | 4 | — | — | FM-XB-08, FM-XB-07 | unknown |
+| US-EXBOT-001 | `us-001.md` | USDC Investor | FR-EXBOT-001, FR-EXBOT-002 | 4 | `uc-bot-start` | — | FM-XB-07 | unknown |
+| US-EXBOT-002 | `us-002.md` | USDC Investor | FR-EXBOT-002, FR-EXBOT-050 | 3 | `uc-monitor-status` | — | FM-XB-07 | unknown |
+| US-EXBOT-003 | `us-003.md` | USDC Investor | FR-EXBOT-003 | 4 | `uc-pause-resume` | — | FM-XB-07 | unknown |
+| US-EXBOT-004 | `us-004.md` | USDC Investor | FR-EXBOT-070 | 3 | `uc-user-redeem` | — | FM-XB-08 | unknown |
+| US-EXBOT-005 | `us-005.md` | ExBot System Operator | FR-EXBOT-011, FR-EXBOT-012 | 4 | `uc-light-check` | — | FM-XB-02, FM-XB-07 | unknown |
+| US-EXBOT-006 | `us-006.md` | ExBot System Operator | FR-EXBOT-020–023 | 4 | `uc-light-check, uc-hedge-sync` | — | FM-XB-05, FM-XB-02 | unknown |
+| US-EXBOT-007 | `us-007.md` | ExBot System Operator | FR-EXBOT-002, FR-EXBOT-080 | 4 | `uc-light-check` | — | FM-XB-07, FM-XB-05 | unknown |
+| US-EXBOT-008 | `us-008.md` | ExBot System Operator | FR-EXBOT-040 | 4 | `uc-light-check, uc-hedge-sync` | — | FM-XB-07 | unknown |
+| US-EXBOT-009 | `us-009.md` | ExBot System Operator | FR-EXBOT-070, FR-EXBOT-071 | 4 | `uc-bot-safe-close` | — | FM-XB-08, FM-XB-07 | unknown |
+| US-EXBOT-010 | `us-010.md` | ExBot System Operator | FR-EXBOT-050, FR-EXBOT-060 | 4 | `uc-bot-safe-close` | — | FM-XB-07 | unknown |
+| US-EXBOT-011 | `us-011.md` | USDC Investor (agent key) | FR-EXBOT-081 | 4 | `uc-agent-key` | — | FM-XB-01 | unknown |
+| US-EXBOT-012 | `us-012.md` | ExBot Admin (zen) | FR-EXBOT-070, FR-EXBOT-002 | 4 | `uc-bot-safe-close` | — | FM-XB-08, FM-XB-07 | unknown |
 
 ## Epic Summary
 

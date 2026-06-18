@@ -12,6 +12,12 @@ changelog:
 
 # UC-EXBOT-bot-start: Start ExBot
 
+## Trigger
+
+User navigates to the relevant screen or initiates the described action.
+
+---
+
 ## 1. Actors
 - **Primary:** USDC Investor (via POOL UI → Operator Facade → ExBot Worker)
 - **System:** ExBot Worker, BnzaExVault (Solidity), Hyperliquid
@@ -48,8 +54,30 @@ changelog:
 - HL short open with reduce-only stop placed
 - `hedge_legs.stop_price`, `stop_cloid`, `entry_price`, `effective_leverage` populated
 
+---
+
+## Postconditions
+
+- System state reflects the completed operation
+- Relevant audit log entries recorded (NFR-ADM-005)
+- Affected bot state transitions persisted in D1
+
 ## 6. Business Rules
 - BR-EXBOT-001 (one-bot policy), BR-EXBOT-010 (standalone Worker)
+
+---
+
+## Diagram
+
+> **No diagram yet.** Add a Mermaid sequence diagram or PlantUML flow chart documenting the actor-system interaction for this use case.
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant System
+    User->>System: Trigger action
+    System-->>User: Response
+```
 
 ## 7. FR Trace
 FR-EXBOT-001, FR-EXBOT-002, FR-EXBOT-004, FR-EXBOT-020, FR-EXBOT-030, FR-EXBOT-031
