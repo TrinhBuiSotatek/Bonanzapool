@@ -1,17 +1,19 @@
 ---
+type: backbone-index
+status: draft
+created: 2026-06-08
+updated: 2026-06-17
+owner: "@hien.duong"
 name: backbone-index
 description: Navigator index for bnza-sotatek-260519-0000 backbone — section anchors, trace IDs, module/feature hints
-metadata:
-  type: project
-  index_type: backbone
-  source_artifact: plans/bnza-sotatek-260519-0000/02_backbone/backbone.md
-  source_hash: 34db19208a5caf2fd3c236e76aa2d96793c1b44a69153a4941cfa261a00ce912
-  generated_at: 2026-06-08T00:00:00Z
-  generated_by_command: ba-start srs --slug bnza-sotatek --date 260519-0000 --module operator
-  stale_status: ok
-  validated_at: "2026-06-09"
-  validated_by: ""
-  coverage_summary: Actors, Portal Matrix, Permissions, Feature Map (PTL-01–06), Cross-Project Deps, Priority Ordering, System Constraints, Delivery Structure
+source_artifact: plans/bnza-sotatek-260519-0000/02_backbone/backbone.md
+source_hash: 34db19208a5caf2fd3c236e76aa2d96793c1b44a69153a4941cfa261a00ce912
+generated_at: 2026-06-08T00:00:00Z
+generated_by_command: ba-start srs --slug bnza-sotatek --date 260519-0000 --module operator
+stale_status: ok
+validated_at: "2026-06-09"
+validated_by: ""
+coverage_summary: Actors, Portal Matrix, Permissions, Feature Map (PTL-01–06), Cross-Project Deps, Priority Ordering, System Constraints, Delivery Structure
 ---
 
 # Backbone Index — bnza-sotatek-260519-0000
@@ -30,7 +32,7 @@ metadata:
 | §4.4 | Permissions — EXBOT Infra (PTL-04) | ACT-06, ACT-04 | operator | OPERATOR system actions; admin: force-stop, wrangler tail |
 | §5.0 | Feature Map — WL Admin (PTL-06) | FM-WLA-01→07 | wl-admin | OOS (Helix scope). Distribution pipeline, reward engine, RewardDistributor, reconciliation. |
 | §5.0B | Feature Map — WL Mobile (PTL-01) | FM-MOB-01→11 | wl-mobile | OOS (Helix scope). SIWE auth, reward display, claim, bot ops, community, multi-tenant. |
-| §5.2 | Feature Map — BNZA-ADMIN (PTL-02) | FM-ADM-01→11 | bnza-admin | P0 WL launch critical. WL partner onboarding (FM-ADM-01), PF config (FM-ADM-02), WL bot monitor (FM-ADM-10), IB (FM-ADM-03), bot type config (FM-ADM-04), dashboard (FM-ADM-05), reports (FM-ADM-06), user management (FM-ADM-11). |
+| §5.2 | Feature Map — BNZA-ADMIN (PTL-02) | FM-ADM-01→12 | bnza-admin | P0 WL launch critical. WL partner onboarding (FM-ADM-01), PF config (FM-ADM-02), WL bot monitor (FM-ADM-10), audit log viewer (FM-ADM-12), IB (FM-ADM-03), bot type config (FM-ADM-04), dashboard (FM-ADM-05), reports (FM-ADM-06), user management (FM-ADM-11). |
 | §5.3 | Feature Map — BNZA-EX (PTL-03) | FM-EX-01→06 | bnza-ex | P2 non-blocking. Hyperliquid integration, PnL display, margin deposit (CCTP), leaderboard. |
 | §5.4 | Feature Map — EXBOT Infra (PTL-04) | FM-XB-01→08 | operator / exbot | P0 WL launch critical. Bot lifecycle API, fee collection, access control, queue v2, relayer, EXBOT endpoints (FM-XB-06/08 deferred post-WL). |
 | §5.5 | Feature Map — BNZA-POOL (PTL-05) | FM-POOL-01→09 | bnza-pool | P1 post-WL. Steps 7–8. ZapMint UI, position management, earnings display, rebalance, stop. |

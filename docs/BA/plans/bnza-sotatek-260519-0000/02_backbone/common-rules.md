@@ -2,9 +2,11 @@
 type: common-rules
 status: draft
 created: 2026-06-02
-updated: 2026-06-09
+updated: "2026-06-17"
 owner: "@hien.duong"
 changelog:
+  - "2026-06-17 | /ba-do propagation | update frontmatter"
+  - "2026-06-16 | manual | restore BR-ADM-036–039 (removed by mistake in commit ad17b0a); update updated date"
   - "2026-06-09 | /ba-do F1 | removed PL-SCREEN section (lines 167–226); CR-BEH/CR-DIS/CR-VAL/BR-0x codes are screen-local — canonical source is each screen file §5"
   - "2026-06-02 | /ba-qc-export | initial compile: extracted BR-MOB, BR-EX, BR-PL, BR-ADM, BR-WLA from module srs/spec.md and ascii-screen files"
 ---
@@ -90,7 +92,7 @@ changelog:
 | BR-ADM-002 | Only `super_admin` can create, update, or disable WL partners. | FRD §1.4 |
 | BR-ADM-003 | `fixed_deposit_usd` must be one of: 1000, 5000, 10000. | FRD §1.4 |
 | BR-ADM-004 | Disabling a WL partner does not affect existing active bots. | FRD §1.4 |
-| BR-ADM-005 | Logo upload must be stored in CF R2; URL stored in `logo_url`. | FRD §1.4 |
+| BR-ADM-005 | Logo upload must be stored in CF R2; URL stored in `logo_url`. Accepted formats: PNG or SVG only. Maximum file size: 5 MB. Violations return E-ADM-004 (size) or E-ADM-005 (format). | FRD §1.4 |
 | BR-ADM-006 | `referral_code` auto-generation: 8-char alphanumeric, uppercase. | FRD §1.4 |
 | BR-ADM-007 | `wl_code` must be unique; once set, immutable without WL-ADMIN team coordination. | FRD §1.4 |
 | BR-ADM-008 | Boundary: FM-ADM-01 manages WL partner records only; daily MLM ops are PTL-06 scope. | FRD §1.4 |
@@ -120,7 +122,27 @@ changelog:
 | BR-ADM-032 | Retry set re-checks `wl_members.status='active'` AND `wl_codes.status='active'` before firing `setBotWlMaster`. | FRD §10.4 |
 | BR-ADM-033 | `failed_set` bots stuck for 48h are auto-force-normalized by OPERATOR cron. | FRD §10.4 |
 | BR-ADM-034 | `needs_repair` bots are excluded from daily/rebalance delivery. Only admin recovery action returns them to `active`. | FRD §10.4 |
-
+| BR-ADM-035 | The [View] detail drawer shows the entity's old value and new value at the time of the operation. | FRD §12.3 |
+| BR-ADM-036 | Form actions [Cancel] and [Save Partner] are mandatory implementation details for the WL Partner creation/edit UI, and `wl_code` is a required input field, regardless of WBS omission. | FRD §1.4 |
+| BR-ADM-037 | WL Member list and forms must include standard UI elements (e.g., list filters, `wl_code`, `wallet address`, [Register Member], [Save/Cancel]) as required implementation details, even if omitted from WBS. | FRD §1.5 |
+| BR-ADM-038 | WL Master Wallet list and forms must explicitly include 'Created Date', list filters, 'wl_code', 'master wallet address', 'reason note', and standard action buttons (e.g., [Register master wallet], [Suspend/Resume WL], [Save/Cancel]) as required implementation details, regardless of WBS omission. | FRD §1.6 |
+| BR-ADM-039 | User Compensation (Bot lifecycle): If a bot generates net profit while in `pending_set` or `failed_set`, the on-chain `wlMaster` is 0x0. If the user manually stops the bot during this period, 100% of the net profit routes to the user instead of the partner. Smart contract handles race conditions: if System Unset runs before User Stop → `wlMaster=0` (profit to user); if User Stop runs before System Unset → `wlMaster!=0` (profit to partner). | FRD §10.4 |
+| BR-ADM-040 | Admin can force-stop any bot regardless of owner wallet — no ownership check on Stop action. | FRD §3.5.3 |
+| BR-ADM-041 | Force-stop requires non-empty reason string; submitted via POST body `{ reason: string }`. | FRD §3.5.3 |
+| BR-ADM-042 | Force-stop side effect: all active `bot_positions` for the stopped bot are closed with `close_reason='force_stopped'` atomically server-side. | FRD §3.5.3 |
+| BR-ADM-043 | When admin initiates suspend or resume of a WL, the FE must show a confirmation dialog with a mandatory reason field (free text, minimum 10 characters). The reason is submitted in the request body `{action: "suspend"\|"resume", reason: string}` and stored in the audit log. | FRD §1.10 |
+| BR-ADM-044 | `wl_codes` must be created before members can be registered for a WL. The `wl_code` field in `wl_members` is a FK to `wl_codes.wl_code`. | FRD §1.10 |
+| BR-ADM-045 | `wl_codes.api_key` (public, `wlk_` prefix) is returned by GET `/api/wl-admin/codes`. The HMAC secret is never stored in D1 and never returned by any API endpoint — it is placed in `WL_API_SECRETS` Workers Secret out-of-band by ops. | FRD §1.10 |
+| BR-ADM-046 | User Management is read-only: admins can view but not create or delete end-user accounts via the admin panel. Role changes (if needed) are handled via OPERATOR API directly. | FRD §11.3 |
+| BR-ADM-047 | `/api/users` requires OPERATOR auth (`operatorFetch` with `VITE_OPERATOR_API_URL`). Access is subject to the RBAC role check in `AdminLayout`. | FRD §11.3 |
+| BR-ADM-048 | Unblock Wallet action requires super_admin role. The option is hidden in ⋮ menu for admin and viewer roles. | FRD §11.3 |
+| BR-ADM-049 | Admin cannot block their own connected wallet address — attempting returns MSG-ERR-80 without opening the confirmation dialog. | FRD §11.3 |
+| BR-ADM-050 | Audit log is append-only — no edit or delete operations on log entries via this UI. | FRD §12.3 |
+| BR-ADM-051 | Date range filter max span is 90 days. | FRD §12.3 |
+| BR-ADM-052 | Key rotation is a breaking change for the WL partner. The old `api_key` is invalidated immediately. Admin must coordinate updating the HMAC secret in `WL_API_SECRETS` and notifying the WL partner before triggering the `rotate-key` action. | FRD §1.10 |
+| BR-ADM-053 | New member registration (`POST /api/wl-admin/members`) must be rejected if the WL partner status is 'suspended', returning HTTP 409 `wl_code_suspended`. | FRD §1.10 |
+| BR-ADM-054 | Optimistic locking on member transitions: updates must verify the expected state and return HTTP 409 `not_found_or_wrong_state` on stale data, requiring a frontend re-fetch and retry. | FRD §1.10 |
+| BR-ADM-055 | Master wallet registration is bookkeeping-only. It is restricted to chain IDs Base (8453) and OP (10). Only one master wallet is allowed per `(wl_code, chain_id)` — duplicate registration returns HTTP 409 `already_exists_for_chain`. | FRD §1.10 |
 ---
 
 ## WLA — WL Admin (wl-admin)
@@ -188,3 +210,4 @@ changelog:
 | bnza-pool | 01–49 |
 | bnza-admin | 50–99 |
 | wl-admin | 100–149 |
+
