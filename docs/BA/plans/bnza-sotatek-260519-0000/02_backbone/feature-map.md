@@ -2,12 +2,13 @@
 type: feature-map
 status: in-review
 created: 2026-05-20
-updated: 2026-06-08
+updated: "2026-06-17"
 owner: "@hien.duong"
 lang: en
 links:
   - ../../02_backbone/backbone.md
 changelog:
+  - "2026-06-17 | /ba-do propagation | add FM-ADM-12 (Audit Log Viewer) row to feature map table; add FM-ADM-12 to T0 priority tier"
   - "2026-06-08 | manual | scope correction per WL_SPEC_SOTATEK_EN_v1.1.md Appendix B: mark FM-WLA-01→07 and FM-MOB-01→11 OOS (Helix scope); mark PTL-01/PTL-06 and ACT-03/ACT-07 OOS; add §3.6 WL Smart Contracts (FM-WLC-01) and §3.7 BNZA-OPERATOR WL Backend (FM-OPW-01→07); update §4 deps and §5 tiers"
   - "2026-06-07 | manual | QC-C3: add FM-ADM-11 User Management (📋 Spec — admin SPEC.md Feature F, /users, useUsers, Step 8-5.6)"
   - "2026-06-04 | manual | fix FM-ADM-10: redefine as WL Bot Lifecycle Monitor (was incorrectly set to Audit Logs); move FM-ADM-10 from T2 to T1; priority P2→P1"
@@ -73,13 +74,13 @@ changelog:
 
 | FM-ID | Name | Scope Description | Priority | Dependencies | Target Artifact | Source |
 |-------|-----|----------------|----------|-----------|---------------|--------|
-| FM-WLA-01 | Distribution Pipeline **[OOS — Helix]** | Daily state machine BOT_SYNC → LEDGER_FETCH → PENDING_SNAPSHOT → SNAPSHOT → UPLINE → COMPUTED → ENQUEUED → ONCHAIN → VALIDATED → COMPLETED. BLOCKED recovery per phase (refetch / retry / requeue / refill / abandon). paused_waiting when distributor is paused. | P0 | BNZA Ledger API, BNZA Bot API | `03_modules/admin/wl-admin/frd.md` § Distribution Pipeline | 📋 Spec |
-| FM-WLA-02 | Reward Computation Engine **[OOS — Helix]** | Fee reward (net × rank rate 30–62%) + title differential V1–V7 (MLM-pool basis, structurally non-breakable) + same-rank bonus (5% envelope, equal split) + leader token airdrop (V4+, non-USDC, bonus_airdrops). Floor to 6 decimals. Cap double-check before ONCHAIN. | P0 | FM-WLA-01, tenant config (rank/title/referral tables) | `03_modules/admin/wl-admin/frd.md` § Reward Computation | 📋 Spec |
-| FM-WLA-03 | RewardDistributor Integration **[OOS — Helix]** | Push (auto when claimable ≥ minPayout, WL bears gas) + Claim (user-initiated, user bears gas). clientNonce idempotency. Emergency Pause (PAUSER hot wallet, immediate) / Unpause via multisig proposal. Per-chain (Base 8453 + OP 10). | P0 | RewardDistributor contract (Base + OP), CF Secrets Store (distributor key) | `03_modules/admin/wl-admin/frd.md` § RewardDistributor | 📋 Spec |
-| FM-WLA-04 | BNZA API Integration **[OOS — Helix]** | Stream 1: Ledger API HMAC-SHA256 pull (`/api/wl/ledger`, net per user per chain). Stream 2: Position API (`/api/wl/portfolio`, AUM for rank/Cap). Stream 3: Bot Operations API (`/internal/bot/sync`, sync bot_positions_mirror for BOT_SYNC phase). | P0 | BNZA OPERATOR API (api.bnza.io) | `03_modules/admin/wl-admin/frd.md` § BNZA API | 📋 Spec |
-| FM-WLA-05 | Admin Console — 7 Pages **[OOS — Helix]** | Dashboard (KPI + health + emergency stop) / Distribution Jobs (state machine progress + BLOCKED recovery + batch list) / Users (cumulative + Cap + lineage) / Referral Tree (hierarchy view + parent change + omission resolution) / Distributor Contract (balance + refill + multisig proposals) / Reward Settings (rank/title/referral/Cap tabs) / Admins & Auth (roles + 2FA + session policy). All writes require reason note + Slack audit mirror. | P0 | FM-WLA-01→04 | `03_modules/admin/wl-admin/ascii-screen/wl-*.md` | 📋 Spec |
-| FM-WLA-06 | Multi-tenant Config **[OOS — Helix]** | Tenant config per WL operator: branding (name/logo/theme), chains [8453,10], wallet addresses (pool/distributor/treasury per chain), rank_table, title_table, referral_levels, reward_settings (Cap/minPayout/same_rank/leader). No WL-specific values hardcoded. | P1 | CF D1 `tenants` table | `03_modules/admin/wl-admin/frd.md` § Multi-tenant | 📋 Spec |
-| FM-WLA-07 | Daily Reconciliation **[OOS — Helix]** | 6-point cron (UTC 06:00): (1) ledger↔compute, (1b) WL treasury sanity, (2) compute↔accrual, (3) payment↔on-chain, (4) cumulative invariant, (5) pool validation, (6) unexpected addRewards detection. Strong alert on any delta. | P1 | FM-WLA-01, CF D1 all distribution tables | `03_modules/admin/wl-admin/frd.md` § Reconciliation | 📋 Spec |
+| FM-WLA-01 | Distribution Pipeline **[OOS — Helix]** | Daily state machine BOT_SYNC → LEDGER_FETCH → PENDING_SNAPSHOT → SNAPSHOT → UPLINE → COMPUTED → ENQUEUED → ONCHAIN → VALIDATED → COMPLETED. BLOCKED recovery per phase (refetch / retry / requeue / refill / abandon). paused_waiting when distributor is paused. | P0 | BNZA Ledger API, BNZA Bot API | OOS — Helix scope (no local artifact) | 📋 Spec |
+| FM-WLA-02 | Reward Computation Engine **[OOS — Helix]** | Fee reward (net × rank rate 30–62%) + title differential V1–V7 (MLM-pool basis, structurally non-breakable) + same-rank bonus (5% envelope, equal split) + leader token airdrop (V4+, non-USDC, bonus_airdrops). Floor to 6 decimals. Cap double-check before ONCHAIN. | P0 | FM-WLA-01, tenant config (rank/title/referral tables) | OOS — Helix scope (no local artifact) | 📋 Spec |
+| FM-WLA-03 | RewardDistributor Integration **[OOS — Helix]** | Push (auto when claimable ≥ minPayout, WL bears gas) + Claim (user-initiated, user bears gas). clientNonce idempotency. Emergency Pause (PAUSER hot wallet, immediate) / Unpause via multisig proposal. Per-chain (Base 8453 + OP 10). | P0 | RewardDistributor contract (Base + OP), CF Secrets Store (distributor key) | OOS — Helix scope (no local artifact) | 📋 Spec |
+| FM-WLA-04 | BNZA API Integration **[OOS — Helix]** | Stream 1: Ledger API HMAC-SHA256 pull (`/api/wl/ledger`, net per user per chain). Stream 2: Position API (`/api/wl/portfolio`, AUM for rank/Cap). Stream 3: Bot Operations API (`/internal/bot/sync`, sync bot_positions_mirror for BOT_SYNC phase). | P0 | BNZA OPERATOR API (api.bnza.io) | OOS — Helix scope (no local artifact) | 📋 Spec |
+| FM-WLA-05 | Admin Console — 7 Pages **[OOS — Helix]** | Dashboard (KPI + health + emergency stop) / Distribution Jobs (state machine progress + BLOCKED recovery + batch list) / Users (cumulative + Cap + lineage) / Referral Tree (hierarchy view + parent change + omission resolution) / Distributor Contract (balance + refill + multisig proposals) / Reward Settings (rank/title/referral/Cap tabs) / Admins & Auth (roles + 2FA + session policy). All writes require reason note + Slack audit mirror. | P0 | FM-WLA-01→04 | OOS — Helix scope (no local artifact) | 📋 Spec |
+| FM-WLA-06 | Multi-tenant Config **[OOS — Helix]** | Tenant config per WL operator: branding (name/logo/theme), chains [8453,10], wallet addresses (pool/distributor/treasury per chain), rank_table, title_table, referral_levels, reward_settings (Cap/minPayout/same_rank/leader). No WL-specific values hardcoded. | P1 | CF D1 `tenants` table | OOS — Helix scope (no local artifact) | 📋 Spec |
+| FM-WLA-07 | Daily Reconciliation **[OOS — Helix]** | 6-point cron (UTC 06:00): (1) ledger↔compute, (1b) WL treasury sanity, (2) compute↔accrual, (3) payment↔on-chain, (4) cumulative invariant, (5) pool validation, (6) unexpected addRewards detection. Strong alert on any delta. | P1 | FM-WLA-01, CF D1 all distribution tables | OOS — Helix scope (no local artifact) | 📋 Spec |
 
 ### 3.1 BNZA-MOBILE (PTL-01)
 
@@ -88,17 +89,17 @@ changelog:
 
 | FM-ID | Name | Scope Description | Priority | Dependencies | Target Artifact | Source |
 |-------|-----|----------------|----------|-----------|---------------|--------|
-| FM-MOB-01 | SIWE Auth + WL Gate **[OOS — Helix]** | Wallet connect via Reown AppKit, SIWE sign-in (nonce → signature → 24h JWT), tenant resolution by subdomain, WL gate blocking unauthenticated routes | P0 | Admin System SIWE API | `03_modules/mobile/frd.md` § FM-MOB-01 | 📋 Spec |
-| FM-MOB-02 | Reward Display **[OOS — Helix]** | Cumulative reward card (fee + referral breakdown), rank & title, cap status (tenant-optional), revenue trend chart (1W/1M/3M/All), receipt history with status tags, leader perk (V4+) | P0 | Admin System `/api/mobile/summary`, `/api/mobile/history` | `03_modules/mobile/frd.md` § FM-MOB-02 | 📋 Spec |
-| FM-MOB-03 | Claim USDC **[OOS — Helix]** | Claimable balance display, Receive All confirmation, RewardDistributor.claim() via user wallet, post-claim sync, paused state when contract is_paused | P0 | RewardDistributor contract (Base + OP), Admin System `/api/mobile/sync-after-claim` | `03_modules/mobile/frd.md` § FM-MOB-03 | 📋 Spec |
-| FM-MOB-04 | Bot Operations **[OOS — Helix]** | Bot startup (3 sequential wallet TXs: USDC approve → setApprovalForAll → zapMint → OPERATOR register), bot stop (confirm → stop TX → UI update) | P0 | OPERATOR API `/api/bot/register`, LpBot contract | `03_modules/mobile/frd.md` § FM-MOB-04 | 📋 Spec |
-| FM-MOB-05 | LP Bot Status **[OOS — Helix]** | Active positions list (data from Admin API only — never raw LP reads), chain filter, total AUM, no raw uncollected fees shown | P0 | Admin System `/api/mobile/positions` | `03_modules/mobile/frd.md` § FM-MOB-05 | 📋 Spec |
-| FM-MOB-06 | Community / Referral Tree **[OOS — Helix]** | Team TVL stats, direct + total downline counts, downline list with referral rate, L1/L2/L3 rates from tenant config | P1 | Admin System `/api/mobile/community` | `03_modules/mobile/frd.md` § FM-MOB-06 | 📋 Spec |
-| FM-MOB-07 | Multi-tenant Branding **[OOS — Helix]** | Tenant config load on app start (name, logo, theme_color, chains, rank_table, title_table, referral_levels, cap_enabled, reown_project_id, supported_languages). Dynamic Reown project ID. | P1 | Admin System `/api/mobile/tenant-config` | `03_modules/mobile/frd.md` § FM-MOB-07 | 📋 Spec |
-| FM-MOB-08 | Chain Switching **[OOS — Helix]** | Header toggle Base (8453) / OP (10). Arbitrum excluded. Data re-filtered on switch. Wallet chain switch via Reown AppKit. Persists in localStorage. | P1 | Reown AppKit | `03_modules/mobile/frd.md` § FM-MOB-08 | 📋 Spec |
-| FM-MOB-09 | Settings **[OOS — Helix]** | Language selector (from tenant supported_languages, min ja/en), network display, wallet disconnect (JWT clear → connect screen). All persist in localStorage. | P1 | — (local state) | `03_modules/mobile/frd.md` § FM-MOB-09 | 📋 Spec |
-| FM-MOB-10 | PWA **[OOS — Helix]** | Web app manifest, service worker (cache-first static / network-first API), offline fallback, 100dvh fix, safe-area-inset for notch devices | P1 | — | `03_modules/mobile/frd.md` § FM-MOB-10 | 📋 Spec |
-| FM-MOB-11 | i18n **[OOS — Helix]** | Min ja + en. Additional languages per tenant supported_languages. Browser locale auto-detected on first visit. Intl.NumberFormat for amounts. Locale persists in localStorage. | P2 | — | `03_modules/mobile/frd.md` § FM-MOB-11 | 📋 Spec |
+| FM-MOB-01 | SIWE Auth + WL Gate **[OOS — Helix]** | Wallet connect via Reown AppKit, SIWE sign-in (nonce → signature → 24h JWT), tenant resolution by subdomain, WL gate blocking unauthenticated routes | P0 | Admin System SIWE API | OOS — Helix scope (no local artifact) | 📋 Spec |
+| FM-MOB-02 | Reward Display **[OOS — Helix]** | Cumulative reward card (fee + referral breakdown), rank & title, cap status (tenant-optional), revenue trend chart (1W/1M/3M/All), receipt history with status tags, leader perk (V4+) | P0 | Admin System `/api/mobile/summary`, `/api/mobile/history` | OOS — Helix scope (no local artifact) | 📋 Spec |
+| FM-MOB-03 | Claim USDC **[OOS — Helix]** | Claimable balance display, Receive All confirmation, RewardDistributor.claim() via user wallet, post-claim sync, paused state when contract is_paused | P0 | RewardDistributor contract (Base + OP), Admin System `/api/mobile/sync-after-claim` | OOS — Helix scope (no local artifact) | 📋 Spec |
+| FM-MOB-04 | Bot Operations **[OOS — Helix]** | Bot startup (3 sequential wallet TXs: USDC approve → setApprovalForAll → zapMint → OPERATOR register), bot stop (confirm → stop TX → UI update) | P0 | OPERATOR API `/api/bot/register`, LpBot contract | OOS — Helix scope (no local artifact) | 📋 Spec |
+| FM-MOB-05 | LP Bot Status **[OOS — Helix]** | Active positions list (data from Admin API only — never raw LP reads), chain filter, total AUM, no raw uncollected fees shown | P0 | Admin System `/api/mobile/positions` | OOS — Helix scope (no local artifact) | 📋 Spec |
+| FM-MOB-06 | Community / Referral Tree **[OOS — Helix]** | Team TVL stats, direct + total downline counts, downline list with referral rate, L1/L2/L3 rates from tenant config | P1 | Admin System `/api/mobile/community` | OOS — Helix scope (no local artifact) | 📋 Spec |
+| FM-MOB-07 | Multi-tenant Branding **[OOS — Helix]** | Tenant config load on app start (name, logo, theme_color, chains, rank_table, title_table, referral_levels, cap_enabled, reown_project_id, supported_languages). Dynamic Reown project ID. | P1 | Admin System `/api/mobile/tenant-config` | OOS — Helix scope (no local artifact) | 📋 Spec |
+| FM-MOB-08 | Chain Switching **[OOS — Helix]** | Header toggle Base (8453) / OP (10). Arbitrum excluded. Data re-filtered on switch. Wallet chain switch via Reown AppKit. Persists in localStorage. | P1 | Reown AppKit | OOS — Helix scope (no local artifact) | 📋 Spec |
+| FM-MOB-09 | Settings **[OOS — Helix]** | Language selector (from tenant supported_languages, min ja/en), network display, wallet disconnect (JWT clear → connect screen). All persist in localStorage. | P1 | — (local state) | OOS — Helix scope (no local artifact) | 📋 Spec |
+| FM-MOB-10 | PWA **[OOS — Helix]** | Web app manifest, service worker (cache-first static / network-first API), offline fallback, 100dvh fix, safe-area-inset for notch devices | P1 | — | OOS — Helix scope (no local artifact) | 📋 Spec |
+| FM-MOB-11 | i18n **[OOS — Helix]** | Min ja + en. Additional languages per tenant supported_languages. Browser locale auto-detected on first visit. Intl.NumberFormat for amounts. Locale persists in localStorage. | P2 | — | OOS — Helix scope (no local artifact) | 📋 Spec |
 
 ### 3.2 BNZA-ADMIN (PTL-02) — Actor: ACT-04
 
@@ -118,6 +119,7 @@ changelog:
 | FM-ADM-09 | Relayer Monitor | Relayer status: balance, nonce, last TX, health | P2 | OPERATOR API `/api/admin/relayers` | `03_modules/admin/bnza-admin/frd.md` § Relayer Monitor | ⚡ Dev-built |
 | FM-ADM-10 | WL Bot Lifecycle Monitor | Monitor `wl_activation_status` backlog: pending_set SLA, failed_set queue, needs_repair alerts, rotation in progress, wl_unattributed_events SLA breach. Admin actions: retry-set, force-normalize (two-phase). Triggers `setBotWlMaster`/`unsetBotWlMaster` via OPERATOR API. | P1 | OPERATOR API `/api/admin/wl-bot-monitor`, `/api/bot-configs/:id/wl-retry-set`, `/api/bot-configs/:id/wl-force-normalize` | `03_modules/admin/bnza-admin/frd.md` § WL Bot Lifecycle Monitor | 📋 Spec |
 | FM-ADM-11 | User Management | View and manage all registered users: wallet address, role (viewer/admin/super_admin), registration date, linked bots count. Read-only list with RBAC-based action controls. | P1 | OPERATOR API `/api/users` (`useUsers`, Step 8-5.6) | `03_modules/admin/bnza-admin/frd.md` § User Management | 📋 Spec |
+| FM-ADM-12 | Audit Log Viewer | Paginated, filterable read-only viewer for audit log entries (NFR-ADM-005). Filters: date range (max 90 days), module, action, actor. Detail view with old/new values. Append-only. | P0 | OPERATOR API `/api/audit-logs` | `03_modules/admin/bnza-admin/frd.md` § Audit Log Viewer | 📋 Spec |
 
 ### 3.3 BNZA-EX (PTL-03)
 
@@ -132,19 +134,19 @@ changelog:
 
 | FM-ID | Name | Scope Description | Priority | Dependencies | Target Artifact | Source |
 |-------|-----|----------------|----------|-----------|---------------|--------|
-| FM-XB-01 | D1 Schema | 9 EXBOT tables in D1, migration, indexes, FK constraints | P0 | zen interface specs (OQ-2) | `03_modules/exbot-infra/frd.md` § D1 Schema | ⚡ Dev-built |
-| FM-XB-02 | Queue Topology | 6 queues, DLQ, retry policy, batch size, concurrency limits | P0 | OPERATOR Queue v2 architecture | `03_modules/exbot-infra/frd.md` § Queue Topology | ⚡ Dev-built |
-| FM-XB-03 | Durable Objects | HLRateLimitDO, UserLockDO, MarketDataDO — lease, TTL, alarm config | P0 | OPERATOR DO patterns | `03_modules/exbot-infra/frd.md` § Durable Objects | ⚡ Dev-built |
-| FM-XB-04 | Cron Jobs | deep-audit `*/360`, intervals TBD, error handling, alerting | P1 | zen interface specs | `03_modules/exbot-infra/frd.md` § Cron Jobs | ⚡ Dev-built |
-| FM-XB-05 | HL Adapter | Rate limit (1200 req/min), cloid generation, error parser, reconcile glue | P1 | Hyperliquid API testnet | `03_modules/exbot-infra/frd.md` § HL Adapter | ⚡ Dev-built |
-| FM-XB-06 | API Endpoints | start, stop, pause, status, agent-key-approval — request/response contracts | P1 | zen interface specs | `03_modules/exbot-infra/frd.md` § API Endpoints | ⚡ Dev-built |
-| FM-XB-07 | Router Extension (Solidity) | LP NFT custody by Router, rebalance/close/collect Operator-only, emergency multi-sig | P1 | zen interface specs, Solidity engineer | `03_modules/exbot-infra/frd.md` § Router Extension | ⚡ Dev-built |
-| FM-XB-08 | OPERATOR API — EXBOT Endpoints | 7 endpoints: start/stop/pause/resume/status/agent-key-approval/margin-deposit-confirmed | P1 | FM-XB-01, FM-XB-02 | `03_modules/exbot-infra/frd.md` § OPERATOR API Additions | ⚡ Dev-built |
-| FM-XB-09 | Phase A1 — Dry Run | Single-user dry-run, no live HL mutation, SOTATEK infra + zen strategy | P0 | FM-XB-01→FM-XB-06 | `03_modules/exbot-infra/frd.md` § Phase Progression | ⚡ Dev-built |
-| FM-XB-10 | Phase A2 — Live $1k Test | Live test with zen's own funds, SOTATEK monitors infra | P1 | FM-XB-09 | `03_modules/exbot-infra/frd.md` § Phase Progression | ⚡ Dev-built |
-| FM-XB-11 | Phase A3 — Closed Beta | 5-10 WL users via MOBILE, 4 weeks | P1 | FM-XB-10 | `03_modules/exbot-infra/frd.md` § Phase Progression | ⚡ Dev-built |
-| FM-XB-12 | Envelope Encryption | HL agent keys: master key in CF Secrets Store, per-bot key encrypted in D1 | P0 | zen interface specs | `03_modules/exbot-infra/frd.md` § HL Adapter | ⚡ Dev-built |
-| FM-XB-13 | Pre-launch Hotfixes | WETH calc bug, executeRebalanceAction missing recordFeeCollection, leaseExpireCron, RelayerLockDO persistence, system_config seed | P0 | — | `03_modules/exbot-infra/frd.md` § Pre-launch Hotfixes | ⚡ Dev-built |
+| FM-XB-01 | D1 Schema | 9 EXBOT tables in D1, migration, indexes, FK constraints | P0 | zen interface specs (OQ-2) | `03_modules/exbot/frd.md` § D1 Schema | ⚡ Dev-built |
+| FM-XB-02 | Queue Topology | 6 queues, DLQ, retry policy, batch size, concurrency limits | P0 | OPERATOR Queue v2 architecture | `03_modules/exbot/frd.md` § Queue Topology | ⚡ Dev-built |
+| FM-XB-03 | Durable Objects | HLRateLimitDO, UserLockDO, MarketDataDO — lease, TTL, alarm config | P0 | OPERATOR DO patterns | `03_modules/exbot/frd.md` § Durable Objects | ⚡ Dev-built |
+| FM-XB-04 | Cron Jobs | deep-audit `*/360`, intervals TBD, error handling, alerting | P1 | zen interface specs | `03_modules/exbot/frd.md` § Cron Jobs | ⚡ Dev-built |
+| FM-XB-05 | HL Adapter | Rate limit (1200 req/min), cloid generation, error parser, reconcile glue | P1 | Hyperliquid API testnet | `03_modules/exbot/frd.md` § HL Adapter | ⚡ Dev-built |
+| FM-XB-06 | API Endpoints | start, stop, pause, status, agent-key-approval — request/response contracts | P1 | zen interface specs | `03_modules/exbot/frd.md` § API Endpoints | ⚡ Dev-built |
+| FM-XB-07 | Router Extension (Solidity) | LP NFT custody by Router, rebalance/close/collect Operator-only, emergency multi-sig | P1 | zen interface specs, Solidity engineer | `03_modules/exbot/frd.md` § Router Extension | ⚡ Dev-built |
+| FM-XB-08 | OPERATOR API — EXBOT Endpoints | 7 endpoints: start/stop/pause/resume/status/agent-key-approval/margin-deposit-confirmed | P1 | FM-XB-01, FM-XB-02 | `03_modules/exbot/frd.md` § OPERATOR API Additions | ⚡ Dev-built |
+| FM-XB-09 | Phase A1 — Dry Run | Single-user dry-run, no live HL mutation, SOTATEK infra + zen strategy | P0 | FM-XB-01→FM-XB-06 | `03_modules/exbot/frd.md` § Phase Progression | ⚡ Dev-built |
+| FM-XB-10 | Phase A2 — Live $1k Test | Live test with zen's own funds, SOTATEK monitors infra | P1 | FM-XB-09 | `03_modules/exbot/frd.md` § Phase Progression | ⚡ Dev-built |
+| FM-XB-11 | Phase A3 — Closed Beta | 5-10 WL users via MOBILE, 4 weeks | P1 | FM-XB-10 | `03_modules/exbot/frd.md` § Phase Progression | ⚡ Dev-built |
+| FM-XB-12 | Envelope Encryption | HL agent keys: master key in CF Secrets Store, per-bot key encrypted in D1 | P0 | zen interface specs | `03_modules/exbot/frd.md` § HL Adapter | ⚡ Dev-built |
+| FM-XB-13 | Pre-launch Hotfixes | WETH calc bug, executeRebalanceAction missing recordFeeCollection, leaseExpireCron, RelayerLockDO persistence, system_config seed | P0 | — | `03_modules/exbot/frd.md` § Pre-launch Hotfixes | ⚡ Dev-built |
 
 ### 3.5 BNZA-POOL Steps 7-8 (PTL-05)
 
@@ -152,8 +154,8 @@ changelog:
 
 | FM-ID | Name | Scope Description | Priority | Dependencies | Target Artifact | Source |
 |-------|-----|----------------|----------|-----------|---------------|--------|
-| FM-PL-01 | Step 7 Multi-Bot | BotCard grid, Active Bots section, chain-switching, max 10/chain, label format | P1 | OPERATOR API `/api/bot-positions` | `03_modules/pool-steps/frd.md` § Step 7 Multi-Bot | 📋 Spec |
-| FM-PL-02 | Step 8 plan_specs | Version management across POOL+OPERATOR+OPS, immutability, snapshot, outdated warning | P1 | OPERATOR migration 0008, simultaneous deploy | `03_modules/pool-steps/frd.md` § Step 8 plan_specs | 📋 Spec |
+| FM-PL-01 | Step 7 Multi-Bot | BotCard grid, Active Bots section, chain-switching, max 10/chain, label format | P1 | OPERATOR API `/api/bot-positions` | `03_modules/bnza-pool/frd.md` § Step 7 Multi-Bot | 📋 Spec |
+| FM-PL-02 | Step 8 plan_specs | Version management across POOL+OPERATOR+OPS, immutability, snapshot, outdated warning | P1 | OPERATOR migration 0008, simultaneous deploy | `03_modules/bnza-pool/frd.md` § Step 8 plan_specs | 📋 Spec |
 | FM-PL-03 | Fiat On-Ramp (Banxa) | `/buy` route embeds Banxa widget with wallet address pre-filled; mock data (MOCK_RATES, MOCK_HISTORY) — no live Banxa API | P3 | — | `03_modules/bnza-pool/usecases/uc-buy.md` | ⚡ Dev-built |
 
 ### 3.6 WL Smart Contracts — Sotatek Scope
@@ -188,7 +190,7 @@ changelog:
 | FM-ID | Blocked by | Blocks |
 |-------|----------|----------|
 | FM-ADM-01 | OPERATOR WL admin endpoints | FM-ADM-02 (WL must exist before PF distribution) |
-| FM-ADM-02 | daily-collector cron, OQ-6 (WL remittance flow) | — |
+| FM-ADM-02 | daily-collector cron | — |
 | FM-XB-01 | OQ-2 (zen interface specs) | FM-XB-02, FM-XB-03, FM-XB-04, FM-XB-05, FM-XB-06, FM-XB-07, FM-XB-08 |
 | FM-XB-02 | FM-XB-01 (schema must exist before queue writes) | FM-XB-04, FM-XB-05, FM-XB-09 |
 | FM-XB-07 | FM-XB-01, zen Solidity specs | FM-XB-08 (Router extension needed for EXBOT API) |
@@ -217,7 +219,7 @@ changelog:
 
 | Tier | FM-IDs |
 |------|--------|
-| T0 — WL Launch | FM-OPW-01, FM-OPW-02, FM-OPW-03, FM-OPW-04, FM-OPW-07, FM-WLC-01, FM-ADM-01, FM-ADM-02, FM-XB-01, FM-XB-02, FM-XB-03, FM-XB-09, FM-XB-12, FM-XB-13 |
+| T0 — WL Launch | FM-OPW-01, FM-OPW-02, FM-OPW-03, FM-OPW-04, FM-OPW-07, FM-WLC-01, FM-ADM-01, FM-ADM-02, FM-ADM-12, FM-XB-01, FM-XB-02, FM-XB-03, FM-XB-09, FM-XB-12, FM-XB-13 |
 | T1 — Core Dev | FM-OPW-05, FM-OPW-06, FM-ADM-03, FM-ADM-04, FM-ADM-10, FM-ADM-11, FM-PL-01, FM-XB-04, FM-XB-05, FM-XB-06, FM-XB-07, FM-XB-08, FM-XB-10 |
 | T2 — Enhancement | FM-PL-02, FM-ADM-05, FM-ADM-06, FM-ADM-08, FM-ADM-09, FM-EX-01, FM-EX-02, FM-EX-03, FM-EX-04, FM-XB-11 |
 | T3 — Low Priority | FM-ADM-07, FM-PL-03 |

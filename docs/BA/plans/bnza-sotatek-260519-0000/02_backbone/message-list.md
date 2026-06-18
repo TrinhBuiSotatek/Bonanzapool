@@ -108,9 +108,94 @@ changelog:
 
 ---
 
+## MSG-POOL — BNZA Pool UI Messages (bnza-pool)
+
+> Screen-local display codes defined in each screen file §6. Same code number may carry different text depending on the originating screen. `Screen` column identifies the canonical source.
+
+| Code | Type | Screen | Text |
+|------|------|--------|------|
+| MSG-ERR-01 | ERR | bot (SCR-POOL-03) | "Unsupported network. Please switch to OP Mainnet or Base." |
+| MSG-ERR-01 | ERR | bot-monitor (SCR-POOL-02) | "Unable to load bots. Please try again." |
+| MSG-ERR-01 | ERR | bot-create (SCR-POOL-01) | "Unsupported network. Please switch to OP Mainnet or Base." |
+| MSG-ERR-01 | ERR | pairs (SCR-POOL-05) | "Unsupported network. Please switch to OP Mainnet or Base." |
+| MSG-ERR-01 | ERR | positions (SCR-POOL-07) | "Unsupported network. Please switch to OP Mainnet or Base." |
+| MSG-ERR-01 | ERR | rules (SCR-POOL-08) | "Unsupported network. Please switch to OP Mainnet or Base." |
+| MSG-ERR-01 | ERR | pool-list (SCR-POOL-06, superseded) | "Unable to load pools. Please try again." |
+| MSG-ERR-02 | ERR | bot (SCR-POOL-03) | "Unable to resolve pool on-chain. Please try again." |
+| MSG-ERR-02 | ERR | bot-monitor (SCR-POOL-02) | "Stop transaction failed. Please try again." |
+| MSG-ERR-02 | ERR | bot-create (SCR-POOL-01) | "Unable to resolve pool on-chain. Please try again." |
+| MSG-ERR-02 | ERR | positions (SCR-POOL-07) | "Unable to resolve pool on-chain. Please try again." |
+| MSG-ERR-03 | ERR | bot (SCR-POOL-03) | "Amount must be greater than 0." |
+| MSG-ERR-03 | ERR | bot-monitor (SCR-POOL-02) | "Fatal error stopping bot. Please contact support." |
+| MSG-ERR-03 | ERR | bot-create (SCR-POOL-01) | "Amount must be greater than 0." |
+| MSG-ERR-04 | ERR | bot (SCR-POOL-03) | "Amount exceeds your wallet balance." |
+| MSG-ERR-04 | ERR | bot-create (SCR-POOL-01) | "Amount exceeds your wallet balance." |
+| MSG-ERR-05 | ERR | bot (SCR-POOL-03) | "Insufficient ETH for gas. Add at least 0.001 ETH." |
+| MSG-ERR-05 | ERR | bot-create (SCR-POOL-01) | "Insufficient ETH for gas. Add at least 0.001 ETH." |
+| MSG-ERR-05 | ERR | positions (SCR-POOL-07) | "Insufficient ETH for gas. Add at least 0.001 ETH." |
+| MSG-ERR-06 | ERR | bot (SCR-POOL-03) | "Bot registration failed. Please retry." |
+| MSG-ERR-06 | ERR | bot-create (SCR-POOL-01) | "Bot registration failed. Please retry." |
+| MSG-ERR-06 | ERR | rules (SCR-POOL-08) | "Rule registration failed. Please retry." |
+| MSG-ERR-07 | ERR | bot (SCR-POOL-03) | "Fatal error. Please contact support." |
+| MSG-ERR-07 | ERR | bot-create (SCR-POOL-01) | "Fatal error. Please contact support." |
+| MSG-ERR-08 | ERR | bot (SCR-POOL-03) | "Transaction failed. Please try again." |
+| MSG-ERR-08 | ERR | dashboard (SCR-POOL-04) | "Failed to load dashboard data. Please try again." |
+| MSG-ERR-09 | ERR | bot (SCR-POOL-03) | "Failed to stop bot. Please try again." |
+| MSG-ERR-09 | ERR | dashboard (SCR-POOL-04) | "Failed to claim fees. Please try again." |
+| MSG-ERR-10 | ERR | bot (SCR-POOL-03) | "Failed to fetch bot configurations. Please refresh." |
+| MSG-ERR-10 | ERR | settings (SCR-POOL-09) | "Failed to send test notification. Check your configuration." |
+| MSG-ERR-11 | ERR | bot (SCR-POOL-03) | "Failed to fetch positions. Please refresh." |
+| MSG-ERR-11 | ERR | settings (SCR-POOL-09) | "Failed to create API key. Please try again." |
+| MSG-ERR-12 | ERR | bot (SCR-POOL-03) | "Amount must be at least $1,000 USD equivalent." |
+| MSG-ERR-12 | ERR | settings (SCR-POOL-09) | "API key name is required and must be 50 characters or fewer." |
+| MSG-ERR-13 | ERR | bot (SCR-POOL-03) | "Position registration failed after multiple retries. Please contact support." |
+| MSG-ERR-13 | ERR | buy (SCR-POOL-10) | "Please enter a valid payment amount." |
+| MSG-ERR-14 | ERR | bot (SCR-POOL-03) | "Pool resolution failed. Please try again or select a different pool." |
+| MSG-ERR-14 | ERR | buy (SCR-POOL-10) | "Purchase failed. Please try again." |
+| MSG-WRN-01 | WRN | bot (SCR-POOL-03) | "You have reached the maximum of 10 bots on this chain." |
+| MSG-WRN-01 | WRN | bot-monitor (SCR-POOL-02) | "Your position is out of range. The bot is not earning fees." |
+| MSG-WRN-01 | WRN | bot-create (SCR-POOL-01) | "You have reached the maximum of 10 bots on this chain." |
+| MSG-WRN-01 | WRN | pairs (SCR-POOL-05) | "You have reached the maximum of 10 bots on this chain." |
+| MSG-WRN-01 | WRN | positions (SCR-POOL-07) | "You have reached the maximum of 10 bots on this chain." |
+| MSG-WRN-01 | WRN | rules (SCR-POOL-08) | "You have reached the maximum of 5 rules for this position." |
+| MSG-WRN-01 | WRN | pool-list (SCR-POOL-06, superseded) | "You have reached the maximum of 10 bots on this chain." |
+| MSG-WRN-02 | WRN | bot (SCR-POOL-03) | "Insufficient ETH balance. Please bridge more ETH to this network." |
+| MSG-WRN-02 | WRN | dashboard (SCR-POOL-04) | "Dashboard data may be stale. Last updated: {timestamp}." |
+| MSG-WRN-02 | WRN | positions (SCR-POOL-07) | "Position is out of range. Consider rebalancing." |
+| MSG-WRN-02 | WRN | rules (SCR-POOL-08) | "Rule execution failed. Check logs for details." |
+| MSG-INF-01 | INF | bot (SCR-POOL-03) | "ETH will be wrapped to WETH before deposit." |
+| MSG-INF-01 | INF | bot-monitor (SCR-POOL-02) | "This action is irreversible. The bot will be stopped and your position will be withdrawn." |
+| MSG-INF-01 | INF | bot-create (SCR-POOL-01) | "ETH will be wrapped to WETH before deposit." |
+| MSG-INF-01 | INF | pairs (SCR-POOL-05) | "ETH will be wrapped to WETH before deposit." |
+| MSG-INF-01 | INF | positions (SCR-POOL-07) | "ETH will be wrapped to WETH before deposit." |
+| MSG-INF-01 | INF | rules (SCR-POOL-08) | "ETH will be wrapped to WETH before deposit." |
+| MSG-INF-01 | INF | pool-list (SCR-POOL-06, superseded) | "No pools match your filter." |
+| MSG-INF-02 | INF | bot (SCR-POOL-03) | "This setting cannot be changed after bot creation." |
+| MSG-INF-02 | INF | bot-create (SCR-POOL-01) | "This setting cannot be changed after bot creation." |
+| MSG-INF-02 | INF | pairs (SCR-POOL-05) | "No pools found. Try changing the chain or filter." |
+| MSG-INF-02 | INF | positions (SCR-POOL-07) | "Position data refreshed successfully." |
+| MSG-INF-02 | INF | rules (SCR-POOL-08) | "Rule deleted successfully." |
+| MSG-INF-02 | INF | pool-list (SCR-POOL-06, superseded) | "No favorite pools yet. Click ☆ to add." |
+| MSG-INF-03 | INF | dashboard (SCR-POOL-04) | "Connect your wallet to view your positions." |
+| MSG-INF-04 | INF | dashboard (SCR-POOL-04) | "Loading dashboard data…" |
+| MSG-INF-05 | INF | dashboard (SCR-POOL-04) | "No positions found on this chain." |
+| MSG-INF-06 | INF | settings (SCR-POOL-09) | "Test notification sent successfully." |
+| MSG-INF-07 | INF | settings (SCR-POOL-09) | "API key created." |
+| MSG-INF-08 | INF | settings (SCR-POOL-09) | "API key deleted." |
+| MSG-INF-09 | INF | buy (SCR-POOL-10) | "Redirecting to Banxa…" |
+| MSG-INF-10 | INF | buy (SCR-POOL-10) | "Transaction ID copied to clipboard." |
+| MSG-SUC-01 | SUC | bot (SCR-POOL-03) | "Bot started successfully!" |
+| MSG-SUC-01 | SUC | bot-monitor (SCR-POOL-02) | "Bot stopped. Funds returned to wallet." |
+| MSG-SUC-01 | SUC | settings (SCR-POOL-09) | "Language updated successfully." |
+| MSG-SUC-02 | SUC | buy (SCR-POOL-10) | "Purchase request submitted." |
+
+---
+
 ## EX — BNZA Exchange (bnza-ex)
 
 > bnza-ex does not use registered E-codes. Error scenarios are documented as an inline Error Handling Matrix in `03_modules/bnza-ex/srs/spec.md §12`.
+>
+> **E-EX policy (intentional):** bnza-ex uses inline error handling. No `E-EX-NNN` codes are registered in this backbone registry by design. The module-level error matrix is the canonical source — see `03_modules/bnza-ex/srs/spec.md §12`.
 
 | Scenario | Trigger | Message shown to user | Retryable |
 |----------|---------|----------------------|-----------|
