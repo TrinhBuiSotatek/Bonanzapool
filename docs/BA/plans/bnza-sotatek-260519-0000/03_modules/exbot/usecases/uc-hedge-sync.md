@@ -3,10 +3,11 @@ type: use-case
 module: exbot
 status: draft
 created: 2026-06-12
-updated: 2026-06-18
+updated: 2026-06-20
 owner: "@hienduong"
 linked_stories: [US-EXBOT-006, US-EXBOT-008]
 changelog:
+  - 2026-06-20 | /ba-do | QC audit fixes: trigger updated, step 5 delta=0 note, A5 primary/secondary fix, A6 added, BR consecutive failures def, stale template removed
   - 2026-06-18 | /ba-do | add US-008 to linked_stories; fix phantom ref in A5 to point at uc-deep-audit.md
   - 2026-06-12 | /ba-start srs | initial draft
 ---
@@ -15,7 +16,7 @@ changelog:
 
 ## Trigger
 
-User navigates to the relevant screen or initiates the described action.
+hedge-sync Worker dequeues a message from the hedge-sync queue. Message is enqueued by light-check (primary, FR-EXBOT-033, ≤5 min cadence) or deep-audit (secondary backstop). Message payload: `{botId, reasons: RebalanceReason[], stateVersion}`.
 
 ---
 
@@ -34,6 +35,7 @@ User navigates to the relevant screen or initiates the described action.
 3. Worker calls `UserLockDO.acquire(holderToken, ttl=90s, idempotencyKey=hedge-sync:{botId}:{stateVersion})`
 4. Fetch actual HL position via `clearinghouseState` (weight=2)
 5. Compute `delta = BigDecimal(targetShortEth).sub(actualShortEth)` (BigDecimal only, no float)
+   - Note: if delta=0, no HL order submitted; flow continues to stop replacement. Behavior pending OQ-EXBOT-013.
 6. Submit delta-only adjustment via `adjustShortDelta(delta, cloid)` (increase or reduce-only)
 7. Enqueue `reconcile` message: `{botId, attemptId, expectedAbsSize, hedgeLegId}`
 8. Execute stop replacement via INV-STOP protocol (§19.5): `stop_replacing_started_at` set, protected cancel→place
@@ -51,7 +53,8 @@ User navigates to the relevant screen or initiates the described action.
 - **A2 (stateVersion mismatch):** Step 2 — discard; status='skipped'; no HL order
 - **A3 (HL order rejection):** Step 6 — record rebalance_attempts (status='failed'); call `incrementCircuitBreaker`; enqueue notification
 - **A4 (partial fill):** Step 11 — reconcile detects partial mismatch; enqueue `partial_repair` message
-- **A5 (stop_replacing_started_at stuck > 60s detected by audit):** Enter SAFE_MODE (see uc-deep-audit.md — FR-EXBOT-016 secondary detection path)
+- **A5 (stop_replacing_started_at stuck > 60s):** Primary detection by light-check (FR-EXBOT-033, ≤5 min). deep-audit is secondary backstop only. Enter SAFE_MODE.
+- **A6 (delta=0, no HL order):** Step 5 — skip HL order entirely; proceed directly to stop replacement (step 8). Log reason in rebalance_attempts.
 
 ## 5. Postconditions
 - `hedge_legs` updated: `stop_price`, `entry_price`, `effective_leverage`, `stop_replacing_started_at=NULL`
@@ -59,16 +62,9 @@ User navigates to the relevant screen or initiates the described action.
 - `rebalance_attempts` row inserted with final status
 - `circuit_breakers.failure_count` incremented on failure (or reset on half_open success)
 
----
-
-## Postconditions
-
-- System state reflects the completed operation
-- Relevant audit log entries recorded (NFR-ADM-005)
-- Affected bot state transitions persisted in D1
-
 ## 6. Business Rules
 - BR-EXBOT-004 (delta-only invariant)
+- "Consecutive failures" definition: rolling 24h window, no intervening success. Source: FR-EXBOT-040 AC.
 
 ---
 

@@ -3,10 +3,11 @@ type: use-case
 module: exbot
 status: draft
 created: 2026-06-12
-updated: 2026-06-12
+updated: 2026-06-20
 owner: "@hienduong"
 linked_stories: [US-EXBOT-011]
 changelog:
+  - 2026-06-20 | /ba-do | QC audit fixes: A2 superseded/revoked split, A5 added, FR trace note, stale template removed
   - 2026-06-12 | /ba-start srs | initial draft
 ---
 
@@ -42,8 +43,10 @@ User navigates to the relevant screen or initiates the described action.
 
 ## 4. Alternate Flows
 - **A1 (key expired):** At preflight time — `expires_at < now` → block start: "Agent key expired. Please submit a new one."
-- **A2 (key rotation):** New row inserted (new DEK + new wrap); old row set to `status='revoked'`, `rotated_from` chain preserved
+- **A2 (key rotation):** New row inserted (new DEK + new wrap); old row set to `status='superseded'`, `rotated_from` chain preserved. `revoked` reserved for explicit admin revocation action only.
 - **A3 (decryption during hedge-sync):** Unwrap `wrapped_dek` with Master Key → decrypt `encrypted_secret` → use plain key in function scope → destroy immediately; nothing logged
+
+- **A5 (expiry notification):** Out of scope for this UC — handled by UC-EXBOT-deep-audit. Cross-ref FR-083.
 
 ## 5. Postconditions
 - `hl_agent_keys.approval_status='approved'`
@@ -51,12 +54,6 @@ User navigates to the relevant screen or initiates the described action.
 - `users.hl_agent_key_id` references the approved key row
 
 ---
-
-## Postconditions
-
-- System state reflects the completed operation
-- Relevant audit log entries recorded (NFR-ADM-005)
-- Affected bot state transitions persisted in D1
 
 ## 6. Business Rules
 - BR-EXBOT (FR-EXBOT-080, 081, 082, 083)
@@ -77,3 +74,5 @@ sequenceDiagram
 
 ## 7. FR Trace
 FR-EXBOT-080, FR-EXBOT-081, FR-EXBOT-082, FR-EXBOT-083
+
+Note: frd.md uses implementation grouping numbers; srs/spec.md is canonical. Trace here always refers srs/spec.md.

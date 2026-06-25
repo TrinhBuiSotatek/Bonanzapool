@@ -11,6 +11,7 @@ sources:
   - Google Doc: EXBOT System & Smart Contract Overview (Daniel, June 2026)
   - Google Sheet: BNZA ExBot Feature Tracker
 changelog:
+  - 2026-06-24 | /ba-do | remove §7 Open Questions — 8 OQs migrated to SRS §9 (OQ-EXBOT-01..08); SRS is source of truth
   - 2026-06-18 | /ba-do hld-decisions | ACT-M removed; bot_safe_close flow updated (drop park/re-entry); lifecycle states cooldown/parked removed; emergencyTransfer authority updated
   - 2026-06-12 | /ba-impact | gap fill v5.2.6 X-5: §4.2 FR-011 add deltaErrorUsd formula + 3-way price split (uniPoolPrice/hlMarkPrice/hlOraclePrice); add stop_replacing_started_at primary detection bullet
   - 2026-06-12 | /ba-start frd | initial draft from SPEC v5.2.6 + Google Doc + Sheet
@@ -526,15 +527,3 @@ All 4 conditions must be met before Phase A work begins:
 
 Before gate clears: SOTATEK prepares D1 schema + Queue skeleton only (no HL integration).
 
----
-
-## 7. Open Questions
-
-- [ ] OQ-1: NV-1 — HL `marginSummary` exact API field names for `marginBalanceUsd` (zen/SOTATEK to verify at Phase 0 start)
-- [ ] OQ-2: NV-3 — HL supports place-before-cancel stop replacement? (Determines §19.5 path a vs b; blocks stop-replace implementation)
-- [ ] OQ-3: NV-12 — Pool addresses + wethIndex for USDC/WETH 0.3% on Base + Optimism (zen/BNZA to provide)
-- [ ] OQ-4: NV-13 — HL ETH-USD perp min order size / dust handling rules
-- [ ] OQ-5: NV-14 — HL builder fee 5bps approval flow (on-chain or API?)
-- [ ] OQ-6: Margin thresholds (0.55/0.75) — finalized via Phase 0 backtest (zen task)
-- [ ] OQ-7: stopSafetyFactor Phase B+ value — finalized via Phase 0 backtest (zen task)
-- [ ] OQ-8: BnzaExVault final ABI — confirmed when zen deploys contract at Phase 0

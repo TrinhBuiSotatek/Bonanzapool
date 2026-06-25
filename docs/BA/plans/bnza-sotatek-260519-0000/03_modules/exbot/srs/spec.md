@@ -2,7 +2,7 @@
 type: srs
 status: draft
 created: 2026-06-12
-updated: 2026-06-18
+updated: 2026-06-20
 owner: "@hienduong"
 module: exbot
 lang: en
@@ -12,6 +12,7 @@ links:
   - ../usecases/index.md
   - ../userstories/index.md
 changelog:
+  - 2026-06-20 | /ba-do | QC audit fixes: OQ-EXBOT-13/14/15/16/17 added to §9
   - 2026-06-18 | /ba-do hld-decisions | FR-070/071/073 update: drop park/re-entry; IC-EXBOT-002 remove uninvestedBalanceOf stub; scope FM-XB-08 update; us-012 emergency authority
   - 2026-06-12 | /ba-impact | §9 add OQ-EXBOT-10/11/12: range_boundary_near formula, lpValueUsd computation, 7d APR aggregation — all pending zen confirm
   - 2026-06-12 | /ba-impact | gap fill v5.2.6: FR-012 add stop_replacing_started_at primary detection + uniPoolPrice 3-way split note; FR-033 add primary light-check detection (≤5min) vs deep-audit secondary backstop
@@ -632,6 +633,11 @@ Full story files in `../userstories/`. 12 stories across 4 epics.
 | OQ-EXBOT-10 | `range_boundary_near` exact computation: is "90% to upper/lower" measured in tick distance or price distance? Formula needed before implementation. E.g. tick-based: `currentTick >= tickUpper - 0.10 × (tickUpper - tickLower)` vs price-based: `sqrtPrice >= sqrtUpper × 0.90`. Owner: zen/SOTATEK to confirm. | Blocks FR-EXBOT-012 `range_boundary_near` implementation | Open |
 | OQ-EXBOT-11 | `lpValueUsd` formula: how is `bot_runtime_state.lp_value_usd` computed and updated? Candidate: `(lpEthAmount × uniPoolPrice) + lpUsdcAmount` — but SPEC v5.2.6 does not define it explicitly. Owner: zen to confirm or SOTATEK to propose. | Blocks FR-EXBOT-012 `drift_threshold` (lpValueUsd × 3% term) | Open |
 | OQ-EXBOT-12 | 7d funding APR aggregation formula: how is `funding_alert` condition (`7d APR < −15%`) computed from `funding_daily_metrics`? Candidate (from SPEC v5.2.6 §7.5): sum of latest 7 rows `funding_net_usd`, annualize relative to LP capital — but exact annualization formula not specified. Owner: zen to confirm. | Blocks FR-EXBOT-012 `funding_alert` implementation | Open |
+| OQ-EXBOT-13 | delta=0 behavior in hedge-sync: if computed delta=0, should the Worker skip HL order entirely and proceed directly to stop replacement, or abort the sync? Owner: Tech Lead. | Blocks UC-EXBOT-hedge-sync step 5 / A6 | Open |
+| OQ-EXBOT-14 | `marginSummary` fetch ordering in hedge-sync preflight: does the Worker fetch marginSummary before or after acquiring UserLockDO? Ordering affects lock TTL design. Owner: Tech Lead. | Blocks FR-EXBOT-060 preflight step ordering | Open |
+| OQ-EXBOT-15 | HLRateLimitDO + UserLockDO interaction in hedge-sync: should rate-limit weight be consumed before or after lock acquisition? Determines retry behavior on rate-limit hit while lock is held. Owner: Tech Lead. | Blocks FR-EXBOT-091 + hedge-sync flow | Open |
+| OQ-EXBOT-16 | Admin reject path for agent key: when admin rejects a pending key, what is the resulting row status — remain `pending`, set to `rejected`, or delete? Options: A) `approval_status='rejected'` keep row for audit trail; B) delete row, investor must resubmit; C) `approval_status='rejected'`, allow resubmit without new row. Owner: BA + zen (scope decision). | Blocks UC-EXBOT-agent-key A4 admin reject enum | Open |
+| OQ-EXBOT-17 | `hlMarkPrice` data source in light-check step 11: given the zero-HL-calls invariant (BR-EXBOT-003), what is the authoritative source for mark price used to evaluate stop trigger? Candidate: `bot_runtime_state.eth_price_usd`. Staleness policy needed. Owner: Tech Lead. | Blocks UC-EXBOT-light-check step 11 | Open |
 
 ---
 

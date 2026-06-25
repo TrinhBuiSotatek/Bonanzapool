@@ -3,9 +3,10 @@ type: srs-flows
 module: exbot
 status: draft
 created: 2026-06-12
-updated: 2026-06-12
+updated: 2026-06-20
 owner: "@hienduong"
 changelog:
+  - 2026-06-20 | /ba-do | QC audit fixes: F-05 rewritten — remove park/re-entry/cooldown, reflect direct close flow
   - 2026-06-12 | /ba-start srs | initial draft
 ---
 
@@ -149,42 +150,24 @@ sequenceDiagram
     end
 ```
 
-## F-05: bot_safe_close + Automatic Re-Entry
+## F-05: bot_safe_close (Direct Close via RedemptionQueue)
 
 ```mermaid
 sequenceDiagram
-    participant TRIGGER as "Trigger (circuit/margin/admin)"
-    participant CLOSEW as Close Worker
-    participant HL as Hyperliquid
-    participant VAULT as BnzaExVault
-    participant D1 as D1
-    participant REENTRY as "Re-Entry Worker (60min interval)"
+    actor Investor
+    participant OperatorFacade
+    participant ExBotWorker
+    participant RedemptionQueue
+    participant Operator
 
-    TRIGGER->>CLOSEW: initiate bot_safe_close
-    CLOSEW->>D1: close_operations (kind=bot_safe_close, state=requested)
-    CLOSEW->>HL: closeShort (full close)
-    CLOSEW->>HL: cancelStop
-    CLOSEW->>D1: close_operations state=hedge_closed
-    CLOSEW->>VAULT: vaultClose(tokenId, dest=UNINVESTED)
-    VAULT-->>CLOSEW: emit FundsParked(user, botId, amount)
-    CLOSEW->>D1: close_operations state=funds_parked → done
-    CLOSEW->>D1: lifecycle_state=cooldown (60 min)
-    CLOSEW->>D1: enqueue notification (cooldown entry)
-
-    loop Every 60 min during cooldown
-        REENTRY->>D1: read funding_daily_metrics (7d APR)
-        REENTRY->>VAULT: uninvestedBalanceOf(user, botId) [on-chain read, canonical]
-        alt funding APR > -15% AND preflight passes AND balance > 0
-            REENTRY->>VAULT: redeploy(botId) → FundsRedeployed event
-            REENTRY->>D1: update uninvested_balances = 0
-            REENTRY->>D1: run open flow (lifecycle_state=preflight → ... → active)
-        else conditions not met
-            REENTRY->>D1: keep lifecycle_state=cooldown
-        end
-    end
-
-    alt 3rd bot_safe_close within 7 days
-        CLOSEW->>D1: lifecycle_state=parked (24h interval)
-        CLOSEW->>D1: admin escalation notification
-    end
+    Investor->>OperatorFacade: POST /api/exbot/close
+    OperatorFacade->>ExBotWorker: forward via service binding
+    ExBotWorker->>ExBotWorker: executeStrategy(RedeemStrategyV1)
+    ExBotWorker->>RedemptionQueue: createRequest(botId, userId, amount)
+    RedemptionQueue-->>ExBotWorker: requestId
+    ExBotWorker->>ExBotWorker: lifecycle_state = 'closing'
+    ExBotWorker-->>Investor: "Close request queued. Funds will be returned after FIFO processing."
+    Operator->>RedemptionQueue: fulfillRequest(requestId) [FIFO]
+    RedemptionQueue-->>Investor: funds transferred
+    ExBotWorker->>ExBotWorker: lifecycle_state = 'closed'
 ```
