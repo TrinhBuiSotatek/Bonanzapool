@@ -152,12 +152,12 @@ This folder follows BA-Kit conventions:
 ### Branch Hierarchy
 
 ```
-dev  ←── ba/main  ←── ba/{member}/{topic}
+main  ←── BA-MAIN  ←── ba/{member}/{topic}
 ```
 
-- `ba/main` — long-lived BA base branch owned by BA Lead (`@hien.duong`). All BA member work merges here first.
-- Individual members branch off `ba/main`, never directly off `dev`.
-- When BA work is ready for engineering handoff, BA Lead merges `ba/main` → `dev` via PR.
+- `BA-MAIN` — long-lived BA base branch owned by BA Lead (`@hien.duong`). All BA member work merges here first.
+- Individual members branch off `BA-MAIN`, never directly off `main`.
+- When BA work is ready for engineering handoff, BA Lead merges `BA-MAIN` → `main` via PR.
 
 ### Branch Naming
 
@@ -174,7 +174,7 @@ ba/{your-name}/{topic}
 Rules:
 - All lowercase, hyphens only (no spaces, no underscores)
 - `{topic}` describes the artifact being changed, not the Jira ticket
-- Base off `ba/main`, not `dev`
+- Base off `BA-MAIN`, not `main`
 
 ### Commit Messages
 
@@ -199,13 +199,25 @@ Rules:
 ### Workflow for BA Members
 
 ```
-1. git checkout ba/main && git pull origin ba/main
+1. git checkout BA-MAIN && git pull origin BA-MAIN
 2. git checkout -b ba/{your-name}/{topic}
 3. Make changes, commit with BA({module}): convention
 4. git push -u origin ba/{your-name}/{topic}
-5. Open PR → base: ba/main (NOT dev)
-6. BA Lead reviews + merges to ba/main
+5. Open PR → base: BA-MAIN (NOT main)
+6. BA Lead reviews + merges to BA-MAIN
 ```
+
+### PR Description Template
+
+When opening a PR, fill in the following template in the description field:
+
+**Task:** <!-- What is your task? -->
+
+**Description:** <!-- What is this PR for? Why was it created? -->
+
+**Key Changes:**
+- <!-- What changed -->
+- <!-- What changed -->
 
 ---
 

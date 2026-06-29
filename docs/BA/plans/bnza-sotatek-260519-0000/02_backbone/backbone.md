@@ -2,7 +2,7 @@
 type: backbone
 status: in-review
 created: 2026-05-20
-updated: "2026-06-18"
+updated: "2026-06-26"
 owner: "@hien.duong"
 engagement_mode: formal
 lang: en
@@ -12,6 +12,8 @@ version: "0.7.0"
 links:
   - ../../01_intake/intake.md
 changelog:
+  - "2026-06-26 | manual | update backlog item 1 to reflect that rotation-trigger endpoint is implemented"
+  - "2026-06-18 | /ba-do backbone-fix | §5.2: add FM-ADM-13/14/15 (post-launch backlog screens); update FM-ADM-01 (wl_payout_failures removal note), FM-ADM-05 (UNION revenue logic), FM-ADM-06 (raw USDC display model), FM-ADM-10 (deep reorg alert); §8.10.8: expand backlog items 7-9"
   - "2026-06-18 | /ba-do hld-decisions | §5.4 FM-XB-07/08: drop park/redeploy, update states; §8.7: strategy dispatch pattern + PositionManager NFT custody + emergencyTransfer Operator-only; §8.9.2 Phase 0: remove multiSig; §8.9.6: update bot_safe_close rule"
   - "2026-06-17 | /ba-do propagation | add FM-ADM-11 and FM-ADM-12 entries to §5.2; update FM-ADM-06 description (add WL OpFee/PF Breakdown)"
   - "2026-06-16 | /ba-impact | absorb WL_SPECv1.7.6_EN.md + DELTA v1.7.5→v1.7.6 + WL_HANDOVER_EN + WL_ADMIN_API_GUIDE_EN + WL_API_CONNECTION_GUIDE_EN: §5.2 FM-ADM-01 API surface + state machines; §8.10 WL API Surface (new); §11 Source Traceability updated with 5 new entries"
@@ -32,7 +34,6 @@ changelog:
   - "2026-05-20 | /ba-start | resolved OQ-1: Monorepo, updated §8.4 deployment topology"
   - 2026-05-20 | /ba-start | initial backbone from intake
 ---
-
 # BNZA Ecosystem — SOTATEK Scope: Requirements Backbone
 
 ## Markers
@@ -249,7 +250,7 @@ changelog:
 
 | Sub-module | Description | Priority | Effort |
 |------------|-------------|----------|--------|
-| FM-ADM-01: WL Partner Onboarding + Member + Master Wallet Management | Create/edit/deactivate WL partner records: name, logo (CF R2), referral code (auto 8-char or manual), deposit tier (1k/5k/10k), main wallet, languages, status. View partner earnings summary + payout history. **Thêm mới (WL_SPEC v1)**: (a) wl_members lifecycle — register member (wallet + wl_code), two-phase leave (pending_unset → unset confirmed → left), rejoin (membership_epoch++); (b) wl_master_wallets per chain — địa chỉ nhận net thay WL pool, rotation two-phase (unset old → set new on-chain); (c) wl_codes.status suspend/resume — dừng toàn bộ delivery cho WL. | P0 | 1.5w |
+| FM-ADM-01: WL Partner Onboarding + Member + Master Wallet Management | Create/edit/deactivate WL partner records: name, logo (CF R2), referral code (auto 8-char or manual), deposit tier (1k/5k/10k), main wallet, languages, status. View partner earnings summary + payout history. **Thêm mới (WL_SPEC v1)**: (a) wl_members lifecycle — register member (wallet + wl_code), two-phase leave (pending_unset → unset confirmed → left), rejoin (membership_epoch++); (b) wl_master_wallets per chain — địa chỉ nhận net thay WL pool, rotation two-phase (unset old → set new on-chain); (c) wl_codes.status suspend/resume — dừng toàn bộ delivery cho WL. **Removed (v1.7.6):** `wl_payout_failures` table UI đã bị xóa khỏi scope — failure-queue screen không còn trong BNZA-ADMIN; failure handling chuyển sang GC cron (§8.10.8 backlog item 7). | P0 | 1.5w |
 
 > **[EXPANDED SCOPE — WL_SPEC_SOTATEK_EN_v1.0 §6, §9.2, §9.3]**
 > Client spec cũ (WL_SPEC.md §1): chỉ nói "WL code issuance + WL pool wallet registration" — không có member lifecycle.
@@ -278,7 +279,7 @@ changelog:
 > FM-ADM-02 không cần: gọi BnzaSplitter setters, trigger on-chain distribution, manage groupId.
 > FM-ADM-02 chỉ cần: manage fee_distributions rows (wallet + share + is_remainder) + display history.
 
-| FM-ADM-10: WL Bot Lifecycle Monitor | Monitor screen cho `wl_activation_status` backlog: pending_set SLA, failed_set queue, needs_repair alerts, rotation in progress, wl_unattributed_events SLA breach. Admin actions: retry set, force-normalize (two-phase: unset confirmed + on-chain==0 read → NULL). Trigger setBotWlMaster/unsetBotWlMaster via OPERATOR API. | P1 | 0.5w |
+| FM-ADM-10: WL Bot Lifecycle Monitor | Monitor screen cho `wl_activation_status` backlog: pending_set SLA, failed_set queue, needs_repair alerts, rotation in progress, wl_unattributed_events SLA breach. Admin actions: retry set, force-normalize (two-phase: unset confirmed + on-chain==0 read → NULL). Trigger setBotWlMaster/unsetBotWlMaster via OPERATOR API. **Deep reorg rule:** if chain reorganization depth > 5 blocks, OPERATOR does NOT auto-correct — emits `block_hash` divergence alert; admin must handle manually (no automated recovery path in v1). | P1 | 0.5w |
 
 > **[NEW FEATURE — WL_SPEC_SOTATEK_EN_v1.0 §5.1.1, §5.1.2, §6.3, §11]**
 > Spec mới định nghĩa 6-state WL bot activation machine:
@@ -290,13 +291,16 @@ changelog:
 > Downstream khi /ba-impact: bnza-admin FRD cần FM-ADM-10 section + SRS cần 1 screen mới.
 | FM-ADM-03: IB Management | Replace mockIBs with real D1 data (ib_partners table). CRUD: name, wallet, commission_rate, status. | P1 | 0.5w |
 | FM-ADM-04: Bot Type Config | Complete partial impl: deposit tiers, cooldown range (10–180 min), EXBOT strategy params (hedge_ratio/leverage/stop_safety_factor — zen provides values). | P1 | 0.5w |
-| FM-ADM-05: Dashboard | Real metrics: active bot count, total AUM, daily revenue, total users, EXBOT count. From OPERATOR `/api/admin/stats` (KV-cached, 5 min TTL). | P2 | 0.5w |
-| FM-ADM-06: Reports | Real-data reports: fee collection, bot performance, user activity, WL OpFee/PF Breakdown per-WL aggregated. Date-range queries. | P2 | 0.5w |
+| FM-ADM-05: Dashboard | Real metrics: active bot count, total AUM, daily revenue, total users, EXBOT count. From OPERATOR `/api/admin/stats` (KV-cached, 5 min TTL). **Revenue logic (v1.7.6):** overall daily revenue = UNION of `fee_collections` (LP/EXBOT bots) + `wl_bot_payouts` (WL bots, adds opFee/PF columns from migration 0026); NULL opFee/PF = reconciliation pending; 0 = dust threshold. | P2 | 0.5w |
+| FM-ADM-06: Reports | Real-data reports: fee collection, bot performance, user activity, WL OpFee/PF Breakdown per-WL aggregated. Date-range queries. **Display model (v1.7.6):** payout/ledger views display raw on-chain USDC amounts (not virtual USD estimates) — sourced from `wl_bot_payouts.opfee_usdc` + `pf_usdc` columns (migration 0026). Fee Collection Report columns: bot_id, bot_type, wl_code, gross_fee_usd, opfee_usd (treasury deduction), pf_usd (pfCollector deduction), net_usd. | P2 | 0.5w |
 | FM-ADM-07: TOKEN Mgmt | Burn/supply/vesting/treasury/builder-fee (keep mock, BNZA Token contract NOT in SOTATEK scope). | P3 | — |
 | FM-ADM-08: System Settings | Manage system_config key-value pairs (global_bot_enabled, access_mode, max_bots_per_user, safe_mode, exbot_enabled, etc.). Show current value + last modified. | P2 | 0.5w |
 | FM-ADM-09: Relayer Monitor | Relayer status: wallet address, ETH balance, last tx hash + timestamp, health (balance > threshold). | P2 | 0.5w |
 | FM-ADM-11: User Management | View and manage all registered users: wallet address, role (viewer/admin/super_admin), registration date, linked bots count. Read-only list with RBAC-based action controls (super_admin only for block/unblock). | P1 | — |
 | FM-ADM-12: Audit Log Viewer | Paginated, filterable read-only viewer for all audit log entries (NFR-ADM-005). Filters: date range (max 90 days), module, action, actor. Detail drawer shows old/new values. Append-only — no edit/delete. | P0 | 0.5w |
+| FM-ADM-13: Escalations Dashboard | Provides admin visibility into WL SLA violations by surfacing `wl_escalations` records (migration 0029) that have been unresolved for > 24h. Escalation kinds covered: `failed_set`, `needs_repair`, `hold_sla`, `manual_reconcile_sla`, `unattributed_sla`, `master_not_configured`. Admin and above can acknowledge open escalations to clear the alert queue. Role gate for ACK action: `admin+` *(TBD — OQ-ADM-031)*. | P2 | 0.5w |
+| FM-ADM-14: Holds / Corrections Review | Allows admin to monitor `wl_holds` records (migration 0026) generated by chain reorgs or corrections, ensuring zero-loss WL reconciliation. Displays hold reason, raw USDC amount, affected bot/WL, and Helix ACK status. Helix performs the financial ACK via its own `/api/wl/ledger/ack` endpoint (external). BNZA admin write action (e.g., mark-acknowledged): *(TBD — OQ-ADM-032)*; provisionally read-only. | P2 | 0.5w |
+| FM-ADM-15: Attribution History Viewer | Provides a read-only audit trail of per-bot WL attribution intervals from `wl_token_attribution_history` (migration 0026). Shows which WL partner, membership epoch, and master wallet each bot was attributed to for a given block range. Used for reconciliation and dispute resolution between BNZA and Helix. Role gate: `viewer+` *(TBD — OQ-ADM-031)*. Admin API endpoint: *(TBD — OQ-ADM-030)*. | P2 | 0.5w |
 
 ### 5.3 BNZA-EX (Priority: P2 — Non-blocking)
 
@@ -1039,12 +1043,16 @@ POST /codes ──▶ active ─────────────────
 #### 8.10.8 WL implementation backlog (BNZA-owned, post-launch)
 
 From WL_HANDOVER_EN.md §B — settled decisions, not re-open items:
-1. Rotation-trigger admin endpoint (state machine §6.8 implemented; initiation currently manual DB op)
+1. Rotation-trigger admin endpoint (implemented via PATCH /api/wl-admin/masters/:id with action 'initiate-rotation' and reason validation)
 2. Guard on `PATCH /wl-admin/masters/:id` direct changes (today trips invariant reconciler → needs_repair)
 3. Queue-consumer WL branches (production runs `USE_QUEUE=false` — port June WL/serial-path changes before enabling Queue v2)
 4. GC cron for acked `wl_holds` / old escalations
 5. ZapMintFor start-path fallback (TODO in code)
 6. D1 integration tests for WL SQL
+7. **`wl_payout_failures` UI** — failure-queue admin screen removed from v1 scope; GC cron handles cleanup automatically. If failure-queue review UI needed post-launch, maps to FM-ADM-01 extension or standalone feature.
+8. **Escalations dashboard** (FM-ADM-13) — moved to current scope. Provides admin visibility into WL SLA violations by surfacing unresolved `wl_escalations` events (> 24h). Admin and above can acknowledge open escalations. FR-ADM-029, UC, US, and screen spec are being authored.
+9. **Holds/Corrections review** (FM-ADM-14) — moved to current scope. Allows admin to monitor `wl_holds` records arising from chain reorgs or corrections, track Helix ACK status, and ensure zero-loss reconciliation. FR-ADM-030, UC, US, and screen spec are being authored.
+10. **Attribution history viewer** (FM-ADM-15) — moved to current scope. Provides a read-only audit trail of per-bot WL attribution intervals from `wl_token_attribution_history`, used for reconciliation and dispute resolution. FR-ADM-031, UC, US, and screen spec are being authored.
 
 ---
 

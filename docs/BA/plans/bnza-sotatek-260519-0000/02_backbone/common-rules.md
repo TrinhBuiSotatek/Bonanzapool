@@ -2,9 +2,12 @@
 type: common-rules
 status: draft
 created: 2026-06-02
-updated: "2026-06-17"
+updated: 2026-06-26
 owner: "@hien.duong"
 changelog:
+  - "2026-06-26 | manual | split master wallet column into Current Address and Incoming Address columns, update BR-ADM-038"
+  - "2026-06-26 | manual | update BR-ADM-009–012 to clarify member lifecycle transitions, disabled UI state on Confirm Leave, and joined_at immutability on rejoin"
+  - "2026-06-24 | manual | sync with state-machine & reconciler updates (BR-ADM-056, 057-064)"
   - "2026-06-17 | /ba-do propagation | update frontmatter"
   - "2026-06-16 | manual | restore BR-ADM-036–039 (removed by mistake in commit ad17b0a); update updated date"
   - "2026-06-09 | /ba-do F1 | removed PL-SCREEN section (lines 167–226); CR-BEH/CR-DIS/CR-VAL/BR-0x codes are screen-local — canonical source is each screen file §5"
@@ -96,10 +99,10 @@ changelog:
 | BR-ADM-006 | `referral_code` auto-generation: 8-char alphanumeric, uppercase. | FRD §1.4 |
 | BR-ADM-007 | `wl_code` must be unique; once set, immutable without WL-ADMIN team coordination. | FRD §1.4 |
 | BR-ADM-008 | Boundary: FM-ADM-01 manages WL partner records only; daily MLM ops are PTL-06 scope. | FRD §1.4 |
-| BR-ADM-009 | One wallet can only be `active` or `leaving` in one WL at a time. | FRD §1.8 |
-| BR-ADM-010 | While a member is `leaving`, new bot starts for that wallet are rejected. | FRD §1.8 |
-| BR-ADM-011 | Member leave is two-phase: `initiate-leave` → `leaving`; `confirm-leave` after on-chain unset confirmed. | FRD §1.8 |
-| BR-ADM-012 | `membership_epoch` increments on every rejoin; included in Ledger API response for Helix. | FRD §1.8 |
+| BR-ADM-009 | One wallet can only be `active` or `leaving` in one WL at a time; violations return `409 active_in_another_wl`. | FRD §1.8 |
+| BR-ADM-010 | While a member is `leaving`, new bot starts for that wallet are rejected with `409 leaving_in_progress`. | FRD §1.8 |
+| BR-ADM-011 | Member leave is two-phase (initiate → leaving → left). `Confirm Leave` is only permitted after all member bots have been unset on-chain (button is disabled in UI if any bot is in `pending_unset`). Cancel Leave is allowed during `leaving` to revert status to `active`. | FRD §1.8 |
+| BR-ADM-012 | On rejoin, `joined_at` remains the immutable initial join time; system records the rejoin time in `rejoined_at` and increments `membership_epoch` by 1. | FRD §1.8 |
 | BR-ADM-013 | One master wallet per WL per chain. Rotation is two-phase; bot delivery suspended during rotation. | FRD §1.8 |
 | BR-ADM-014 | Suspend (`wl_codes.status='suspended'`) pauses all net delivery; OPERATOR cron moves bots to `pending_unset`. | FRD §1.8 |
 | BR-ADM-015 | Exactly one `fee_distributions` row must have `is_remainder=true`. | FRD §2.4 |
@@ -125,7 +128,7 @@ changelog:
 | BR-ADM-035 | The [View] detail drawer shows the entity's old value and new value at the time of the operation. | FRD §12.3 |
 | BR-ADM-036 | Form actions [Cancel] and [Save Partner] are mandatory implementation details for the WL Partner creation/edit UI, and `wl_code` is a required input field, regardless of WBS omission. | FRD §1.4 |
 | BR-ADM-037 | WL Member list and forms must include standard UI elements (e.g., list filters, `wl_code`, `wallet address`, [Register Member], [Save/Cancel]) as required implementation details, even if omitted from WBS. | FRD §1.5 |
-| BR-ADM-038 | WL Master Wallet list and forms must explicitly include 'Created Date', list filters, 'wl_code', 'master wallet address', 'reason note', and standard action buttons (e.g., [Register master wallet], [Suspend/Resume WL], [Save/Cancel]) as required implementation details, regardless of WBS omission. | FRD §1.6 |
+| BR-ADM-038 | WL Master Wallet list and forms must explicitly include 'Created Date', list filters, 'wl_code', 'current address', 'incoming address', 'reason note', and standard action buttons (e.g., [Register master wallet], [Suspend/Resume WL], [Save/Cancel]) as required implementation details, regardless of WBS omission. | FRD §1.6 |
 | BR-ADM-039 | User Compensation (Bot lifecycle): If a bot generates net profit while in `pending_set` or `failed_set`, the on-chain `wlMaster` is 0x0. If the user manually stops the bot during this period, 100% of the net profit routes to the user instead of the partner. Smart contract handles race conditions: if System Unset runs before User Stop → `wlMaster=0` (profit to user); if User Stop runs before System Unset → `wlMaster!=0` (profit to partner). | FRD §10.4 |
 | BR-ADM-040 | Admin can force-stop any bot regardless of owner wallet — no ownership check on Stop action. | FRD §3.5.3 |
 | BR-ADM-041 | Force-stop requires non-empty reason string; submitted via POST body `{ reason: string }`. | FRD §3.5.3 |
@@ -143,6 +146,15 @@ changelog:
 | BR-ADM-053 | New member registration (`POST /api/wl-admin/members`) must be rejected if the WL partner status is 'suspended', returning HTTP 409 `wl_code_suspended`. | FRD §1.10 |
 | BR-ADM-054 | Optimistic locking on member transitions: updates must verify the expected state and return HTTP 409 `not_found_or_wrong_state` on stale data, requiring a frontend re-fetch and retry. | FRD §1.10 |
 | BR-ADM-055 | Master wallet registration is bookkeeping-only. It is restricted to chain IDs Base (8453) and OP (10). Only one master wallet is allowed per `(wl_code, chain_id)` — duplicate registration returns HTTP 409 `already_exists_for_chain`. | FRD §1.10 |
+| BR-ADM-056 | Deep reorg rule: if chain reorganization depth > 5 blocks, OPERATOR does NOT auto-correct. OPERATOR emits a `block_hash` divergence alert. Admin must review and handle manually — there is no automated recovery path in v1. | FRD §10.4 |
+| BR-ADM-057 | Unset Reason Escalation Invariant: When multiple unset triggers overlap, `pending_unset_reason` is escalated but never downgraded based on priority: `suspended`(1) < `master_rotation`(2) < `force_normalize`(3) < `leaving`(4). | FRD §10.4 |
+| BR-ADM-058 | Role of B2 Reconciler: Only the B2 reconciler cron (`wl-reconciler.ts`) is authorized to submit on-chain transactions (such as `setBotWlMaster` or `unsetBotWlMaster`). Other crons or API endpoints only update the database state to trigger/queue reconciler actions. | FRD §10.4 |
+| BR-ADM-059 | Compare-and-Swap State Protection: All database updates to `bot_configs.wl_activation_status` must execute via Compare-and-Swap (CAS) query patterns (using `WHERE wl_activation_status='<previous_state>'` in the SQL `UPDATE` statement) to prevent race conditions between concurrently running cron ticks. | FRD §10.4 |
+| BR-ADM-060 | Bot Stopped State Invariant: All WL lifecycle crons (reconciler, leaving, suspend, resume, force-normalize) must filter for `bot_configs.status='running'`. When a bot enters the `stopped` state, all Whitelabel lifecycle processing for that bot is completely frozen, and it is excluded from reconciler updates. | FRD §10.4 |
+| BR-ADM-061 | Double-Check Active Invariant (G-3): During bot activation (`pending_set` → `active`), the OPERATOR reconciler must re-verify that both the Whitelabel member (`wl_members.status='active'`) and the Whitelabel code (`wl_codes.status='active'`) are still active both at transaction dispatch time and when verifying the confirmed transaction (on-chain check). | FRD §10.4 |
+| BR-ADM-062 | Atomic Activation and History Open (H-2): Setting a bot's activation status to `active` and opening its Whitelabel attribution history (recording the `valid_from_block` as the transaction submission block) must be performed atomically in a single database transaction. | FRD §10.4 |
+| BR-ADM-063 | Single Open Attribution Interval Constraint (K-4): To prevent database unique constraint violations on `idx_wl_attribution_one_open_per_bot` (which enforces a maximum of one open attribution interval per bot), any existing open interval for a bot must be closed by setting its `valid_to_block` before opening a new half-open interval `[valid_from_block, valid_to_block)`. | FRD §10.4 |
+| BR-ADM-064 | Unset Retry Behavior: Unlike bot activation (`pending_set`), the bot deactivation / unset process (`pending_unset`) does not have a "failed" state. On-chain transaction failures or timeouts during the unset phase are logged as escalations and retried indefinitely until they succeed. | FRD §10.4 |
 ---
 
 ## WLA — WL Admin (wl-admin)

@@ -6,6 +6,8 @@ created: 2026-06-12
 updated: 2026-06-12
 owner: "@hienduong"
 changelog:
+  - 2026-06-26 | manual | QC I-13 fix: add approved_by field to hl_agent_keys for admin audit trail
+  - 2026-06-26 | manual | QC I-07 fix: add note to expires_at field — system-set at submitted_at + 90 days
   - 2026-06-12 | /ba-start srs | initial draft
 ---
 
@@ -58,7 +60,8 @@ erDiagram
         INTEGER encryption_key_version
         TEXT approval_status
         TEXT approved_at
-        TEXT expires_at
+        TEXT approved_by
+        TEXT expires_at "system-set: submitted_at + 90 days; not supplied by user"
         TEXT rotated_from FK
         TEXT created_at
         TEXT updated_at

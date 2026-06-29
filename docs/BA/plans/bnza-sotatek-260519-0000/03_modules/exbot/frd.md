@@ -476,7 +476,8 @@ OPERATOR exposes `/api/exbot/*` which proxies to ExBot Worker via CF service bin
 | `/api/exbot/start` | POST | Start a new ExBot for user | Admin |
 | `/api/exbot/status` | GET | Get ExBot status for user | Admin |
 | `/api/exbot/close` | POST | Initiate close (bot_safe_close path) | Admin |
-| `/api/exbot/agent-key` | POST/GET | Manage HL agent key approval | Admin |
+| `/api/exbot/agent-key` | POST | Submit HL agent key for approval | Investor |
+| `/api/exbot/agent-key` | GET | View pending agent keys for approval | Admin |
 | `/api/exbot/margin` | POST | Adjust margin parameters | Admin |
 
 ---

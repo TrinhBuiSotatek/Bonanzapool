@@ -443,7 +443,11 @@ The system shall never store the user's master private key. Only the approved HL
 
 During decryption (at hedge-sync time), the plain DEK and plain agent key are function-scoped and destroyed immediately after the signing operation. No log entry shall contain the raw key or raw DEK.
 
-**Acceptance criteria:** A D1 dump of `hl_agent_keys` contains only encrypted blobs — no plaintext key is recoverable without the Master Key. Log audit shows no raw key values. Key rotation inserts a new row (new DEK + wrap); the old row transitions to `status='revoked'`.
+**Cloudflare Secrets Store failure handling:**
+- *At key submission (wrap DEK):* If Cloudflare Secrets Store is unavailable when wrapping the DEK, the system shall abort the submission and return HTTP 503: "Service temporarily unavailable. Please try again later." No row is inserted into `hl_agent_keys`. The investor may retry after the service recovers.
+- *At hedge-sync (unwrap DEK):* If Cloudflare Secrets Store is unavailable when unwrapping the DEK, the hedge-sync worker shall log the error (without exposing key material), abort the signing operation, and transition the bot to SAFE_MODE. Admin is alerted. Recovery follows the standard SAFE_MODE path.
+
+**Acceptance criteria:** A D1 dump of `hl_agent_keys` contains only encrypted blobs — no plaintext key is recoverable without the Master Key. Log audit shows no raw key values. Key rotation inserts a new row (new DEK + wrap); the old row transitions to `status='revoked'`. A submit attempt when Secrets Store is unavailable returns HTTP 503 with no row inserted. A hedge-sync that fails to unwrap DEK due to Secrets Store unavailability enters SAFE_MODE without exposing key material in logs.
 
 ---
 
@@ -453,7 +457,15 @@ During decryption (at hedge-sync time), the plain DEK and plain agent key are fu
 
 Newly submitted agent keys have `approval_status='pending'`. The admin approves via the admin dashboard, which calls the Operator Facade `/api/exbot/agent-key` endpoint. Keys with `approval_status='pending'` or `approval_status='revoked'` shall be rejected at preflight. Keys where `expires_at < now` shall be rejected at preflight with a message directing the user to submit a new key.
 
-**Acceptance criteria:** A bot start with a pending or expired agent key is blocked with a specific message. A bot start with an approved, non-expired key passes the agent key check.
+**Submit constraint:** An investor may only submit a new agent key when their current key has `approval_status='expired'` or `approval_status='revoked'`. Submission while a key is `pending` returns E-EXBOT-014. Submission while a key is `approved` returns E-EXBOT-015.
+
+**Approval audit:** When admin approves a key, ExBot Worker sets `approved_at=now` and `approved_by=<admin_user_id>` on the row. This provides a full audit trail of which admin performed the approval.
+
+**Approval expiry check:** Before committing an approval, ExBot Worker shall validate that `expires_at >= now`. If the key has already expired at the time of admin approval, the approval is rejected with E-EXBOT-016: "This agent key has already expired and cannot be approved. Please ask the investor to submit a new key." The row remains `approval_status='pending'` unchanged.
+
+**Approval SLA:** No SLA is defined for the `pending → approved` transition. Key approval is a manual admin action with no time constraint. There is no system-enforced timeout or escalation for pending keys awaiting approval.
+
+**Acceptance criteria:** A bot start with a pending or expired agent key is blocked with a specific message. A bot start with an approved, non-expired key passes the agent key check. A submit attempt while a `pending` key exists is rejected with E-EXBOT-014. A submit attempt while an `approved` key exists is rejected with E-EXBOT-015. An approved key row always has both `approved_at` and `approved_by` populated. An approve attempt on a key where `expires_at < now` is rejected with E-EXBOT-016 and the row remains `pending`.
 
 ---
 
@@ -471,9 +483,15 @@ Key revocation shall be non-destructive. When a key is revoked (by user request 
 **Trace:** FM-XB-01, FM-XB-06
 **Priority:** P0
 
+**Background:** Hyperliquid does not assign an expiry date when an agent key is created — HL agent keys are valid indefinitely on the HL protocol level until explicitly deregistered. The `expires_at` field is therefore set by the ExBot system at application level to enforce periodic key rotation as a security best practice.
+
+**Expiry assignment rule:** When an investor submits an agent key, ExBot Worker shall automatically set `expires_at = submitted_at + 90 days`. The investor does not supply `expires_at` in the POST payload — it is always system-computed. No configuration override is exposed to the user.
+
 The system shall proactively check `hl_agent_keys.expires_at` during deep-audit. If `expires_at - now <= 7 days`, a notification is sent to the user via the `notification` queue with message "Your HL agent key expires in {N} days. Submit a new key to avoid bot interruption." At bot start preflight, `expires_at < now` blocks start with E-EXBOT-004. The re-submission flow: user submits a new key → new `hl_agent_keys` row with `approval_status='pending'` → admin approves → old approved row transitions to `status='superseded'` → new row becomes `approved`. During the window between submission and admin approval, the existing approved key remains active (unless it has expired).
 
-**Acceptance criteria:** A user with a key expiring in 5 days receives a notification within the next deep-audit cycle. Bot start with an expired key is blocked with E-EXBOT-004. New key submission does not revoke the existing key until admin approves the replacement. `status='superseded'` is set on the old row atomically with `status='approved'` on the new row.
+**Note:** `expires_at` is only evaluated at bot start preflight and during deep-audit. A key expiring while a bot is already running does not interrupt ongoing hedge-sync operations — the bot continues until it stops or enters SAFE_MODE, at which point the preflight check applies on the next start attempt.
+
+**Acceptance criteria:** A submitted agent key always has `expires_at = submitted_at + 90 days` set by the system — no user-supplied value is accepted. A user with a key expiring in 5 days receives a notification within the next deep-audit cycle. Bot start with an expired key is blocked with E-EXBOT-004. New key submission does not revoke the existing key until admin approves the replacement. `status='superseded'` is set on the old row atomically with `status='approved'` on the new row.
 
 ---
 
@@ -550,6 +568,10 @@ The OPERATOR shall expose five endpoints under `/api/exbot/*`, each proxied to E
 | BR-EXBOT-008 | "BnzaExVault/Vault" (LP NFT custody Solidity contract) is unrelated to "vaultAddress/subaccount" (HL subaccount identifier) despite naming similarity. These must never be conflated in code or documents. | P0 |
 | BR-EXBOT-009 | D1 schema changes after Phase A deploy: ADD COLUMN only. DROP and RENAME of existing columns are forbidden. | P0 |
 | BR-EXBOT-010 | ExBot Worker (`apps/bnza-exbot/`) must not be co-deployed with OPERATOR (`apps/bnza-operator/`). They communicate via CF service binding only. | P0 |
+| BR-EXBOT-011 | Agent key storage is envelope-encrypted only. The plain agent key and plain DEK must never be persisted to D1, logs, or any external store. Plain values are function-scoped during decryption and destroyed immediately after use. Source: FR-EXBOT-080. | P0 |
+| BR-EXBOT-012 | Only one `hl_agent_keys` row per user may have `approval_status='approved'` at any time. This constraint is enforced at the database level. Source: FR-EXBOT-082. | P0 |
+| BR-EXBOT-013 | Agent key rows are immutable after write — revocation and rotation are non-destructive. `revoked` and `superseded` rows must never be overwritten or deleted; they are retained for audit purposes. Source: FR-EXBOT-082. | P0 |
+| BR-EXBOT-014 | During key rotation, the old row's `status='superseded'` and the new row's `status='approved'` must be committed atomically in the same transaction. There is no window where both rows are `approved` or neither is `approved`. Source: FR-EXBOT-083. | P0 |
 
 ---
 
@@ -570,6 +592,9 @@ The OPERATOR shall expose five endpoints under `/api/exbot/*`, each proxied to E
 | E-EXBOT-011 | Reconcile mismatch | "Hedge position mismatch detected. Bot entered Safe Mode pending reconciliation." | — (internal) |
 | E-EXBOT-012 | Close attempted on already-closed bot | "Bot is already closed. No action needed." | 409 |
 | E-EXBOT-013 | Pause attempted in SAFE_MODE | "Bot is in Safe Mode. You can close the bot instead." | 409 |
+| E-EXBOT-014 | Submit agent key while existing key is pending | "Your agent key is awaiting admin approval. You cannot submit a new key until the current one is reviewed." | 409 |
+| E-EXBOT-015 | Submit agent key while existing key is approved | "You already have an active agent key. You can only submit a new key after your current key has expired." | 409 |
+| E-EXBOT-016 | Approve agent key that has already expired | "This agent key has already expired and cannot be approved. Please ask the investor to submit a new key." | 409 |
 
 ---
 

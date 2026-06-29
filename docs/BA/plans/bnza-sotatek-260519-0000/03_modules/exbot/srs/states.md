@@ -6,6 +6,7 @@ created: 2026-06-12
 updated: 2026-06-18
 owner: "@hienduong"
 changelog:
+  - 2026-06-26 | manual | QC I-23 fix: add hl_agent_keys.approval_status state diagram (4 states, 4 transitions; reject path deferred OQ-EXBOT-016)
   - 2026-06-18 | /ba-do hld-decisions | remove cooldown/parked states from state machine; remove funds_parked from close_operations; update bot_safe_close terminal transition
   - 2026-06-12 | /ba-start srs | initial draft
 ---
@@ -108,3 +109,23 @@ stateDiagram-v2
 | `redemption_queued` | — | ✓ (RedemptionQueue.createRequest enqueued) |
 | `residual_hl_liability` | if hedge close fails | if hedge close fails |
 | `done` | ✓ | ✓ |
+
+## Agent Key Approval Status (`hl_agent_keys.approval_status`)
+
+```mermaid
+stateDiagram-v2
+    [*] --> pending : investor submits key (POST /api/exbot/agent-key)
+    pending --> approved : admin approves AND expires_at >= now
+    pending --> [*] : admin rejects — transition TBD (deferred OQ-EXBOT-016)
+    approved --> superseded : admin approves new key (rotation — atomic with new row approved)
+    approved --> revoked : admin explicit revocation
+```
+
+| State | Meaning | Bot Start Preflight |
+|-------|---------|-------------------|
+| `pending` | Submitted, awaiting admin review | Blocked — E-EXBOT-003 |
+| `approved` | Active, usable by hedge-sync | Passes (if not expired) |
+| `superseded` | Replaced by a newer approved key (rotation) | N/A — row inactive |
+| `revoked` | Explicitly revoked by admin | N/A — row inactive |
+
+**Note:** `pending → ???` (admin reject path) is deferred pending OQ-EXBOT-016 resolution. Three transitions above are fully documented and testable; only the reject path is blocked.

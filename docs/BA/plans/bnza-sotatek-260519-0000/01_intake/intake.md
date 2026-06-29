@@ -2,7 +2,7 @@
 type: intake
 status: in-review
 created: 2026-05-19
-updated: 2026-06-18
+updated: 2026-06-26
 owner: "@hien.duong"
 priority: P0
 tags: []
@@ -12,6 +12,8 @@ links:
 engagement_mode: formal
 lang: en
 changelog:
+  - "2026-06-26 | manual | renumber OQ-ADM-* to match 3-digit zero-padded format"
+  - "2026-06-18 | /ba-do audit-v1.7.6 | §3 Module 2: HMAC show-once, UNION revenue, raw USDC display, task F P3 backlog (3 screens); §4.6: BNZA-ADMIN role matrix Viewer/Admin|Operator/Super_Admin"
   - "2026-06-18 | /ba-do hld-decisions | §3 Module 4: update smart contracts list (9 contracts, strategy dispatch, PositionManager); add emergencyTransfer constraint; Phase 0 condition 2 remove multiSig"
   - "2026-06-16 | /ba-impact | §13 Document History: absorb WL_SPECv1.7.6_EN + DELTA v1.7.5→v1.7.6 + WL_HANDOVER_EN + WL_ADMIN_API_GUIDE_EN + WL_API_CONNECTION_GUIDE_EN; backbone §8.10 + §5.2 FM-ADM-01 API detail updated"
   - "2026-06-12 | /ba-do drift-2 | §3.2 Current State sync: WL Master Wallet + PF Distribution → ✅ Real API; WL Mgmt → 🟡 Partial; WL Member + WL Bot Monitor → 🔸 Mock UI"
@@ -368,7 +370,7 @@ Mobile communicates with 3 distinct systems. Do not confuse them.
 - 🔸 Mock/incomplete 📋 Spec: TOKEN mgmt, IB mgmt, Dashboard metrics, System Settings, Relayer monitoring, Reports
 
 **SOTATEK Tasks** (convert mock → real API):
-- **E: WL Management** — Partner onboarding, earnings tracking, payout history, logo dynamic switching; **thêm mới**: WL member lifecycle UI (register/leave/rejoin/epoch), master wallet management per chain, wl_code suspend/resume
+- **E: WL Management** — Partner onboarding, earnings tracking, payout history, logo dynamic switching; **thêm mới**: WL member lifecycle UI (register/leave/rejoin/epoch), master wallet management per chain, wl_code suspend/resume; **API Key management**: tạo/revoke API key cho WL partner — FE hiển thị HMAC secret key **một lần duy nhất** (show-once), không lưu hoặc xử lý secret key sau đó
 - **E2: WL Bot Lifecycle Monitor** *(new)* — Monitor screen cho `wl_activation_status` backlog (pending_set SLA, failed_set, needs_repair, rotation in progress, wl_unattributed_events SLA breach); admin actions: retry set, force-normalize; trigger setBotWlMaster/unsetBotWlMaster via OPERATOR API
 
   > **[NEW — WL_SPEC_SOTATEK_EN_v1.0 §5.1.1, §5.1.2, §6.3, §11]**
@@ -388,8 +390,9 @@ Mobile communicates with 3 distinct systems. Do not confuse them.
 - **I: Bot Type Configuration** — Deposit tiers, strategy parameters, limits (complete partial implementation)
 - **D: IB Management** — Replace mockIBs with real data
 - **C: TOKEN Management** — burn/supply/vesting/treasury/builder-fee (depends on OPERATOR endpoints)
-- Dashboard, System Settings, Relayer, Reports — real data integration
+- Dashboard, System Settings, Relayer, Reports — real data integration. **Revenue UNION model**: Dashboard/Reports hiển thị daily revenue = UNION của `fee_collections` (LP bot + EXBOT) và `wl_bot_payouts` (WL bots). **Raw USDC display**: payout/ledger views hiển thị raw on-chain amounts từ `wl_bot_payouts.opfee_usdc` + `pf_usdc` (không phải USD estimate; column suffix `_usdc` per audit v1.7.6; xem OQ-ADM-019 trong FRD)
 - E2E tests (Step 8-7, not started)
+- **F: Post-Launch Backlog (P3)** — 3 màn hình mới, xây sau go-live: (1) **Escalations Dashboard** — monitor `wl_escalations` table (deep reorg alert, block_hash divergence event; maps FM-ADM-13); (2) **Holds & Corrections** — review `wl_holds`, ACK/mark-resolved flow (maps FM-ADM-14); (3) **Attribution History** — read-only viewer cho `wl_token_attribution_history` (maps FM-ADM-15). Không nằm trong sprint hiện tại.
 
 **Tech Stack** (verified): React 19.2.4 + Vite 8.0.4 + TypeScript 5.9.3 + Tailwind 4.2.2 + shadcn/ui + React Router 7.14.0 + TanStack React Query 5.100.5 + Recharts 3.8.1
 
@@ -619,7 +622,7 @@ Dev progress as of tracker (Google Sheet):
 | Layer | Mechanism | Modules |
 |---|---|---|
 | Primary | X-Wallet-Address header (no signature) | All frontends → OPERATOR |
-| BNZA-ADMIN | Cloudflare Access (zen@bnza.io) + wallet connect + RBAC role check (`/api/me`) | PTL-02 only |
+| BNZA-ADMIN | Cloudflare Access (zen@bnza.io) + wallet connect + RBAC role check (`/api/me`). Roles: **Viewer** (read-only all) / **Admin\|Operator** (member writes, `wl_members` PATCH, lifecycle ops) / **Super_Admin** (`wl_codes` create/edit + `wl_master_wallets` writes) | PTL-02 only |
 | WL-ADMIN | SSO (Cloudflare Access) + 2FA (TOTP mandatory); roles: Super / Operator / Read-only | PTL-06 only |
 | WL Mobile | SIWE (Sign-In with Ethereum) → 24h JWT; tenant resolved by subdomain + signature domain | PTL-01 only |
 
