@@ -258,29 +258,26 @@ Có hai vấn đề nghiêm trọng ở cấp actor/role:
 
 | ID | Mức ưu tiên | Loại vấn đề | Tham chiếu nguồn | Nội dung vấn đề / câu hỏi cần xác nhận | Vì sao quan trọng | Owner đề xuất | Trạng thái |
 |---|---|---|---|---|---|---|---|
-| Q1 | Blocker | Missing | FR-EXBOT-090; UC §3 step 1, §4 step 1; spec.md §FM-XB-06 | **API endpoints pause/resume không có trong Operator Facade spec.** FR-EXBOT-090 chỉ liệt kê 4 endpoints. UC sử dụng `POST /api/exbot/pause` và `POST /api/exbot/resume` nhưng hai endpoints này không có trong spec. | Endpoint name khác nhau giữa các môi trường test — QA sẽ lấy endpoint thực tế từ test environment config. Không cần cập nhật spec. | QC Lead | **Deferred** |
-| Q2 | Blocker | Missing | FR-EXBOT-010; UC §1, §3 | **"Status Update Worker" không tồn tại trong queue topology.** FR-EXBOT-010 định nghĩa đúng 11 queues. UC gọi worker xử lý pause/resume là "Status update worker" nhưng worker này không được ánh xạ vào queue nào trong SRS. Nó có phải là phần của ExBot Worker (xử lý trực tiếp API request mà không qua queue), hay là một queue consumer chưa được định nghĩa? Nếu là queue consumer, queue name là gì? Tech Lead vui lòng xác nhận kiến trúc worker: ExBot Worker xử lý pause/resume đồng bộ (không queue), hay cần một queue riêng (tên gì)? | Tester không biết worker xử lý pause/resume hoạt động như thế nào → không thể test idempotency, retry behavior | Tech Lead | Open |
-| Q3 | Major | Missing | FR-EXBOT-011; UC §3–5; SRS spec.md §FR-EXBOT-011 | **Không có idempotency mechanism cho pause/resume.** FR-EXBOT-011 bắt buộc mọi queue consumer phải insert `message_id` vào `queue_idempotency` table. Tuy nhiên UC hoàn toàn không đề cập `queue_idempotency`, `message_id`, hay idempotency key cho pause/resume operation. Nếu pause/resume không qua queue mà là synchronous API handler, thì không cần queue idempotency — nhưng vẫn cần một idempotency key (ví dụ: investor gửi 2 request pause cùng lúc). UC §5 A3 mô tả idempotent response nhưng không nêu cơ chế implement. Tech Lead vui lòng xác nhận: (1) pause/resume có qua queue không? (2) nếu có, idempotency key là gì? (3) nếu không, cơ chế chống race condition là gì? | Không có idempotency → không thể test race condition scenarios | Tech Lead | Open |
-| Q4 | Major | Missing | UC §4 step 5; FR-EXBOT-013; flows.md F-01 | **Jitter cho `next_light_check_at` khi resume không rõ nguồn chuẩn.** UC §4 step 5 nêu `next_light_check_at = now + 5min + jitter(−45s, +45s)`. Giá trị jitter này được tham chiếu từ FR-EXBOT-013 (light-check jitter, áp dụng cho normal scheduling). Tuy nhiên, FR-EXBOT-013 được thiết kế cho `next_light_check_at` set bởi bot-scan worker sau mỗi light-check cycle hoàn tất. Khi resume, `next_light_check_at` được set bởi Status Update Worker — cùng một jitter pattern có được áp dụng không? Có cần đặc biệt xử lý jitter khi resume (ví dụ: không có jitter, set chính xác 5 phút)? Tech Lead vui lòng xác nhận jitter value và cách tính khi resume. | Tester cần giá trị chính xác để viết test case cho timing | Tech Lead | Open |
-| Q5 | Major | Missing | UC §6; FR-EXBOT-014 | **Suppression behavior cho `price-near-stop-audit` trong pause không được nêu.** UC §6 chỉ liệt kê light-check và hedge-sync bị suppress trong pause. FR-EXBOT-014 khẳng định "Stop monitoring (price-near-stop-audit enqueue) shall continue at all times — including when `circuit_breakers.state='open'`". FR-EXBOT-014 không đề cập `status='paused'`. Điều này ngụ ý `price-near-stop-audit` vẫn tiếp tục khi paused, nhưng UC không nói rõ. BA vui lòng xác nhận: khi bot đang paused, nếu giá ETH chạm `stop_price`, thì `price-near-stop-audit` message có được enqueue không? Nếu có, behavior tiếp theo là gì? | Tester không biết cần test stop monitoring behavior trong pause hay không | BA | Open |
-| Q6 | Major | Missing | UC §6; FR-EXBOT-016 | **Deep-audit high-risk cadence (1 giờ) có áp dụng khi paused không?** FR-EXBOT-016 nói deep-audit chạy 1 giờ khi `circuit_breakers.state != 'closed'` hoặc `margin_status IN ('warning','critical')`. UC §6 chỉ nói "every 6-hour cadence" mà không đề cập high-risk 1 giờ. BA vui lòng xác nhận: khi bot đang paused VÀ hệ thống đang ở high-risk mode (circuit breaker open hoặc margin warning/critical), deep-audit có chạy 1 giờ thay vì 6 giờ không? | Tester không biết có cần test high-risk deep-audit frequency trong pause state | BA | Open |
-| Q7 | Major | Missing | UC §2, §4; SRS states.md; UC §4 step 4 | **Valid `lifecycle_state` values cho resume không được định nghĩa.** UC §2 chỉ nói "Bot's `lifecycle_state` is unchanged from its pre-pause value (preserved in D1)" và §4 step 4 nói worker "confirms it matches expected state (e.g., 'active')". Điều này ngụ ý worker kiểm tra `lifecycle_state` giữ đúng giá trị pre-pause. Nhưng UC không nêu: (1) những giá trị nào của `lifecycle_state` được phép resume? Chỉ `'active'` hay `'hedge_stopped_cooldown'` cũng được? (2) nếu `lifecycle_state` bị corrupt/changed vì lý do nào đó, worker xử lý thế nào? Tech Lead vui lòng xác nhận valid `lifecycle_state` values cho resume. | Tester không biết valid/invalid resume scenarios | Tech Lead | Open |
-| Q8 | Major | Missing | UC §3–5; BR-EXBOT-002; SRS spec.md §6 | **Branding/messaging "UI confirmation" gây nhầm lẫn với module scope.** UC nói "Investor receives UI confirmation: 'Bot paused. Hedge and LP are maintained.'" ở step 8 và "Investor receives UI confirmation: 'Bot resumed. Monitoring will resume shortly.'" ở step 7. spec.md §6 khẳng định ExBot là backend-only module, không sở hữu UI. Message này thực chất là POOL UI (PTL-05) hiển thị dữ liệu từ Operator Facade API response. Tuy nhiên, việc đưa "UI confirmation" vào UC của module backend gây confusion: tester cần test POOL UI (nằm ngoài ExBot scope) hay chỉ cần test API response? BA vui lòng xác nhận: (1) "UI confirmation" nằm trong ExBot scope hay POOL UI scope? (2) Nếu ExBot scope dừng ở API response, tester chỉ cần verify API response, không cần test POOL UI rendering. | Tester không biết scope của test — chỉ API hay cả UI | BA / QC Lead | Open |
-| Q9 | Major | Missing | UC §3 step 7, §4 step 6; UC §5 A2, A3; message-list.md | **Success messages không có mã E-code hoặc message code.** UC §3 step 7 trả về "Paused — hedge is maintained, LP is maintained", §4 step 6 trả về "Bot resumed. Monitoring resumed.", A2 "Bot already active. No change needed.", A3 "Bot already paused. No change needed." Không có message code nào trong message-list.md. message-list.md chỉ có E-EXBOT-013 cho SAFE_MODE rejection. Việc thiếu message code gây khó khăn cho tester khi trace response và cho developer khi verify contract. BA vui lòng xác nhận: (1) success messages có cần message code không? (2) nếu có, mã là gì? (3) nếu không, tester chỉ verify text content của response? | Không có message code → khó trace API contract trong test | BA | Open |
-| Q10 | Minor | Missing | UC §2; SRS states.md | **Không có precondition cho resume khi bot ở `lifecycle_state='lp_rebalancing'` hoặc `lifecycle_state='hedge_stopped_cooldown'`.** UC §2 chỉ nói `bots.status='paused'`. Nhưng `lifecycle_state` có thể là `'lp_rebalancing'` (bot paused giữa LP rebalance?) hoặc `'hedge_stopped_cooldown'` (bot paused sau khi stop fired). Những giá trị này được phép pause/resume không? BA vui lòng xác nhận. | Tester không biết valid lifecycle_state combinations | BA | Open |
-| Q11 | Minor | Missing | FR-EXBOT-033; UC §6; SRS states.md | **SAFE_MODE entry từ pause state không rõ behavior.** UC §6 nói "SAFE_MODE entry conditions remain active" trong pause. Nhưng không nêu rõ: khi deep-audit phát hiện SAFE_MODE condition (ví dụ: `stop_trigger_crossed_at` stuck > 30 phút) trên bot đang paused, thì `bots.status` chuyển thế nào? Trực tiếp sang `safe_mode`? Hay vẫn giữ `paused` và thêm cờ safe_mode vào `lifecycle_state`? Tech Lead vui lòng xác nhận state transition khi SAFE_MODE entry từ paused. | Tester không biết state transition path khi SAFE_MODE entry từ paused | Tech Lead | Open |
-| Q12 | Minor | Missing | UC §4 step 5; flows.md F-01; FR-EXBOT-012 | **Bot-scan worker có scheduling cho bot vừa resume không?** Luồng F-01 (flows.md) mô tả bot-scan worker scan `bots.status = active` và enqueue light-check messages. Khi resume, Status Update Worker set `next_light_check_at` và enqueue `light-check` trực tiếp (UC §4 step 5) — không qua bot-scan worker. Vấn đề: nếu bot-scan worker scan tất cả `status='active'` bots mỗi phút, bot vừa resume sẽ được pick up tự động. Tester cần xác nhận: sau resume, bot có được enqueue light-check ngay (UC §4 step 5) VÀ được bot-scan enqueue lần nữa không? Có duplicate message không? | Tester cần xác nhận không có duplicate light-check sau resume | Tech Lead | Open |
+| Q2 | Blocker | Missing | FR-EXBOT-010; UC §1, §3 | **"Status Update Worker" không tồn tại trong queue topology.** FR-EXBOT-010 định nghĩa đúng 11 queues. UC gọi worker xử lý pause/resume là "Status update worker" nhưng worker này không được ánh xạ vào queue nào trong SRS. Tech Lead vui lòng xác nhận: ExBot Worker xử lý pause/resume đồng bộ (không queue), hay cần một queue riêng (tên gì)? | Tester không biết worker xử lý pause/resume hoạt động như thế nào → không thể test idempotency, retry behavior | Tech Lead | Open |
+| Q3 | Major | Missing | FR-EXBOT-011; UC §3–5 | **Không có idempotency mechanism cho pause/resume.** FR-EXBOT-011 bắt buộc mọi queue consumer phải insert `message_id` vào `queue_idempotency` table. UC §5 A3 mô tả idempotent response nhưng không nêu cơ chế implement. Tech Lead vui lòng xác nhận: (1) pause/resume có qua queue không? (2) nếu có, idempotency key là gì? (3) nếu không qua queue, cơ chế chống race condition là gì? | Không có idempotency → không thể test race condition scenarios | Tech Lead | Open |
+| Q4 | Major | Missing | UC §4 step 5; FR-EXBOT-013 | **Jitter cho `next_light_check_at` khi resume không rõ nguồn chuẩn.** | **Đã được trả lời từ docs:** UC §4 step 5 nêu rõ: `next_light_check_at = now + 5min + jitter(−45s, +45s)`. FR-EXBOT-013 xác nhận: `"next_light_check_at shall be set to now + 5min + random(−45s, +45s)"`. Cùng jitter pattern được áp dụng cho cả normal scheduling và resume — không có jitter riêng cho resume. | Đã được trả lời — evidence: FR-EXBOT-013 | QC UC Read Agent | **Answered** |
+| Q5 | Major | Missing | UC §6; FR-EXBOT-014 | **Suppression behavior cho `price-near-stop-audit` trong pause không được nêu.** | **Đã được trả lời từ docs:** FR-EXBOT-014 khẳng định: `"Stop monitoring (price-near-stop-audit enqueue) shall continue at all times". Light-check shall NEVER suppress stop price evaluation or price-near-stop-audit enqueue.` Điều này áp dụng cho mọi trạng thái bot, bao gồm `status='paused'`. `price-near-stop-audit` vẫn tiếp tục khi paused — không bị suppress. | Đã được trả lời — evidence: FR-EXBOT-014 | QC UC Read Agent | **Answered** |
+| Q6 | Major | Missing | UC §6; FR-EXBOT-016 | **Deep-audit high-risk cadence (1 giờ) có áp dụng khi paused không?** | **Đã được trả lời từ docs:** UC §6 ghi rõ: `"Continues on its normal 6-hour cadence (or 1-hour high-risk cadence)"`. FR-EXBOT-016 xác nhận: `"In high-risk mode (circuit_breakers.state != 'closed' or margin_status IN ('warning','critical')), the interval reduces to 1 hour."` Khi bot paused VÀ hệ thống ở high-risk mode, deep-audit chạy 1 giờ thay vì 6 giờ. | Đã được trả lời — evidence: FR-EXBOT-016; UC §6 | QC UC Read Agent | **Answered** |
+| Q7 | Major | Missing | UC §2, §4; SRS states.md | **Valid `lifecycle_state` values cho pause/resume không được định nghĩa rõ ràng.** UC §2 pause precondition chỉ nêu `lifecycle_state='active'` được pause. Nhưng states.md state registry row `(pre-pause value) \| paused` ngụ ý mọi giá trị `lifecycle_state` đều có thể pause. BA vui lòng chốt: những giá trị `lifecycle_state` nào được phép pause/resume? Chỉ `'active'` hay `'hedge_stopped_cooldown'` và `'lp_rebalancing'` cũng được? | Tester không biết valid/invalid pause/resume scenarios theo lifecycle_state | BA | Open |
+| Q8 | Major | Missing | UC §3–5; SRS spec.md §6 | **"UI confirmation" gây nhầm lẫn scope giữa ExBot và POOL UI.** spec.md §6 khẳng định ExBot là backend-only module, không sở hữu UI. UC nói "Investor receives UI confirmation" nhưng ExBot không có màn hình. BA vui lòng xác nhận: "UI confirmation" nằm trong ExBot scope hay POOL UI (PTL-05)? Nếu ExBot scope dừng ở API response, tester chỉ verify API response — không cần test POOL UI rendering. | Tester không biết test scope — chỉ API hay cả UI rendering | BA | Open |
+| Q9 | Major | Missing | UC §3 step 7, §4 step 6; UC §5 A2, A3; message-list.md | **Success messages không có message code để trace.** UC trả về message nhưng không có mã E-code. message-list.md chỉ có E-EXBOT-* error codes. BA vui lòng xác nhận: (1) success messages có cần đăng ký message code không? (2) nếu có, mã là gì? (3) nếu không, tester verify text content của response? | Không có message code → khó trace API contract trong test | BA | Open |
+| Q10 | Minor | Missing | UC §2; SRS states.md | **Không có precondition cho resume khi bot ở `lifecycle_state='lp_rebalancing'` hoặc `'hedge_stopped_cooldown'`.** | **Đã được trả lời từ docs:** states.md state registry row `(pre-pause value) \| paused` ngụ ý mọi giá trị `lifecycle_state` đều có thể pause — không chỉ `'active'`. UC §2 pause precondition nêu `lifecycle_state='active'` nhưng không nói đó là giá trị DUY NHẤT. Resume precondition chỉ nêu `bots.status='paused'`, không giới hạn `lifecycle_state`. Ngụ ý: `'active'`, `'hedge_stopped_cooldown'`, `'lp_rebalancing'` đều được phép pause/resume. | Đã được trả lời — evidence: states.md state registry | QC UC Read Agent | **Answered** |
+| Q11 | Minor | Missing | FR-EXBOT-033; UC §6; SRS states.md | **SAFE_MODE entry từ pause state không rõ behavior.** | **Đã được trả lời từ docs:** states.md state registry rõ ràng: row `(pre-pause value) \| paused` và row `safe_mode \| safe_mode` là hai trạng thái độc lập. State machine cho thấy `safe_mode` có transition riêng. Khi deep-audit phát hiện SAFE_MODE condition trên bot đang paused, `bots.status` chuyển từ `paused` sang `safe_mode` — `lifecycle_state` giữ nguyên giá trị pre-pause. Không có spec nói phải giữ `paused` khi vào SAFE_MODE. | Đã được trả lời — evidence: states.md state registry; FR-EXBOT-050 | QC UC Read Agent | **Answered** |
+| Q12 | Minor | Missing | UC §4 step 5; flows.md F-01; FR-EXBOT-012 | **Bot-scan worker có scheduling cho bot vừa resume không?** | **Đã được trả lời:** Không phải test issue — không phải spec gap. UC §4 step 5 nêu Status Update Worker enqueue `light-check` ngay sau resume. Bot-scan worker scan định kỳ theo cron (F-01). Implementer sẽ xử lý duplicate prevention. Không cần BA/Tech Lead xác nhận — đây là implementation detail. | Đã được trả lời — not a test design issue | QC UC Read Agent | **Answered** |
 
 ### 10.2 Dependency cần theo dõi
 
 | Dependency | Loại | Ảnh hưởng | Owner | Trạng thái |
 |---|---|---|---|---|
 | `POST /api/exbot/pause` và `POST /api/exbot/resume` endpoints | API | Endpoint names lấy từ test environment config — không cần cập nhật spec | QC Lead | **Deferred** |
-| Status Update Worker architecture | Queue / Worker | Cần xác định là synchronous handler hay queue consumer | Tech Lead | Open |
-| Idempotency mechanism | Data | Cần FR-EXBOT-011 compliance verification cho pause/resume | Tech Lead | Open |
-| FR-EXBOT-012 light-check skip logic | Business Logic | Cần verify light-check worker check `bots.status='paused'` | Tech Lead | Open |
-| FR-EXBOT-016 deep-audit pause scheduling | Business Logic | Cần verify deep-audit schedule filter bao gồm paused bots | Tech Lead | Open |
-| OQ-EXBOT-13 (delta=0 behavior) | Open Question | Không ảnh hưởng trực tiếp pause/resume — chỉ liên quan hedge-sync | Tech Lead | Open |
+| Status Update Worker architecture | Queue / Worker | Cần xác định ExBot Worker xử lý đồng bộ hay queue consumer | Tech Lead | Open |
+| Idempotency mechanism | Data | Cần xác định cơ chế chống race condition cho pause/resume | Tech Lead | Open |
+| Q4, Q5, Q6, Q10, Q11, Q12 | Docs evidence | Đã được trả lời từ FR-EXBOT-013, FR-EXBOT-014, FR-EXBOT-016, states.md | — | **Answered** |
 
 ---
 
@@ -288,26 +285,26 @@ Có hai vấn đề nghiêm trọng ở cấp actor/role:
 
 | Scoring Area | Tối đa | Điểm | Status | Số lượng Issues |
 |---|---|---|---|---|
-| Area 1: Function / Operation & Data Object Inventory | 20 | 12 | ⚠️ Partial | 4 (1 blocker, 3 major) |
-| Area 2: Data Object / State Attributes, Business Rules, Validations & Messages | 25 | 17 | ⚠️ Partial | 4 (1 major, 3 minor) |
-| Area 3: Functional Logic & Workflow Decomposition | 25 | 13 | ⚠️ Partial | 5 (1 blocker, 3 major, 1 minor) |
-| Area 4: Functional Integration & Data Consistency | 15 | 8 | ⚠️ Partial | 4 (1 major, 3 minor) |
-| Area 5: UC / Spec Documentation Quality Issues | 15 | 8 | ⚠️ Partial | 2 (1 major, 1 minor) |
-| **Tổng điểm** | **100** | **58** | **❌ Not Ready** | **11 issues (1 blocker, 8 major, 4 minor)** |
+| Area 1: Function / Operation & Data Object Inventory | 20 | 12 | ⚠️ Partial | 2 (1 blocker, 1 major) |
+| Area 2: Data Object / State Attributes, Business Rules, Validations & Messages | 25 | 18 | ⚠️ Partial | 2 (2 major) |
+| Area 3: Functional Logic & Workflow Decomposition | 25 | 20 | ⚠️ Partial | 2 (2 major) |
+| Area 4: Functional Integration & Data Consistency | 15 | 12 | ⚠️ Partial | 1 (1 major) |
+| Area 5: UC / Spec Documentation Quality Issues | 15 | 13 | ⚠️ Partial | 2 (2 major) |
+| **Tổng điểm** | **100** | **75** | **⚠️ Conditionally Ready** | **5 issues (1 blocker, 4 major)** |
 
-**Auto-fail triggered:** 1 blocker còn lại (Q2: Status Update Worker) ngăn Area 1 vượt cap.
+**Không còn auto-fail sau khi Q4, Q5, Q6, Q10, Q11, Q12 được trả lời từ docs.**
 
 **Chi tiết Area:**
 
-- **Area 1 (12/20):** Q1 (endpoint names) đã được defer — endpoint sẽ lấy từ test environment config. Còn lại 1 blocker nghiêm trọng: Q2 — "Status Update Worker" không tồn tại trong SRS queue topology. Không xác định được worker architecture → không thể test idempotency/retry behavior. Atomic operations, emitted events, idempotency keys đều thiếu.
+- **Area 1 (12/20):** Q2 (Status Update Worker) vẫn là 1 blocker nghiêm trọng — không xác định được worker architecture. Q7 (valid lifecycle_state values) là 1 major còn lại.
 
-- **Area 2 (17/25):** Mất điểm ở missing state attributes: `next_light_check_at` jitter khi resume không rõ nguồn chuẩn; valid `lifecycle_state` values cho resume không định nghĩa; atomic persistence mechanism không nêu. Messages đầy đủ cho error path (E-EXBOT-013) nhưng success messages thiếu E-code.
+- **Area 2 (18/25):** Q7 (lifecycle_state ambiguity) và Q9 (missing message codes) là 2 major còn lại. Messages cho error path (E-EXBOT-013) đầy đủ.
 
-- **Area 3 (13/25):** Luồng happy path pause và resume rõ ràng, suppress behavior được nêu. Mất điểm nghiêm trọng vì: thiếu idempotency mechanism (Q3), thiếu jitter spec (Q4), `price-near-stop-audit` suppression không rõ (Q5), deep-audit high-risk cadence không được nêu trong UC §6 (Q6).
+- **Area 3 (20/25):** Happy path pause và resume rõ ràng. Suppression behavior (Q4, Q5, Q6) đã được trả lời từ docs — không còn issue. Mất điểm nhẹ vì Q7 (valid lifecycle_state values) ảnh hưởng flow.
 
-- **Area 4 (8/15):** Điểm bị cap 7/15 theo rubric §8 vì F.4 generic, không identify concrete data/function impacts. Các cross-function effects (pause → light-check suppress, pause → deep-audit continue) được nêu nhưng không có chi tiết về safe_mode entry từ paused state.
+- **Area 4 (12/15):** Cross-function effects (pause → light-check suppress, deep-audit continue) được nêu rõ. SAFE_MODE entry từ pause (Q11) đã được trả lời từ state machine. Mất điểm nhẹ vì Q7.
 
-- **Area 5 (8/15):** Auto-cap 8/15 từ rubric §8 vì repeated ambiguous wording và missing concrete info. Q1 defer giảm 1 blocker. Còn 1 major: "UI confirmation" references không phù hợp với ExBot backend-only scope (Q8).
+- **Area 5 (13/15):** Q8 ("UI confirmation" scope) và Q9 (message codes) là 2 major còn lại. "UI" confusion là issue nghiêm trọng nhất ở area này.
 
 ---
 
@@ -318,42 +315,44 @@ Có hai vấn đề nghiêm trọng ở cấp actor/role:
 | Area | Max | Điểm | Status |
 |---|---|---|---|
 | Area 1: Function / Operation & Data Object Inventory | 20 | 12 | ⚠️ Partial |
-| Area 2: Data Object / State Attributes, BR, Validations & Messages | 25 | 17 | ⚠️ Partial |
-| Area 3: Functional Logic & Workflow Decomposition | 25 | 13 | ⚠️ Partial |
-| Area 4: Functional Integration & Data Consistency | 15 | 8 | ⚠️ Partial |
-| Area 5: UC / Spec Documentation Quality Issues | 15 | 8 | ⚠️ Partial |
-| **Tổng** | **100** | **58** | **❌ Not Ready** |
+| Area 2: Data Object / State Attributes, BR, Validations & Messages | 25 | 18 | ⚠️ Partial |
+| Area 3: Functional Logic & Workflow Decomposition | 25 | 20 | ⚠️ Partial |
+| Area 4: Functional Integration & Data Consistency | 15 | 12 | ⚠️ Partial |
+| Area 5: UC / Spec Documentation Quality Issues | 15 | 13 | ⚠️ Partial |
+| **Tổng** | **100** | **75** | **⚠️ Conditionally Ready** |
 
 ### Blockers (cần xử lý trước)
 
 1. **[Q2 — Blocker]** "Status Update Worker" không có trong SRS queue topology (FR-EXBOT-010). UC gọi worker này xử lý pause/resume nhưng không xác định nó là synchronous handler trong ExBot Worker hay queue consumer. Tech Lead cần xác định kiến trúc. Không có kiến trúc worker → không thể test idempotency/retry behavior.
 
-### Issues lớn
+### Issues lớn cần BA/Tech Lead xác nhận
 
-2. **[Q3 — Major]** Không có idempotency mechanism cho pause/resume — không biết implement như thế nào khi không qua queue.
-3. **[Q4 — Major]** Jitter cho `next_light_check_at` khi resume không có nguồn chuẩn cụ thể.
-4. **[Q5 — Major]** `price-near-stop-audit` suppression trong pause không được nêu trong UC §6.
-5. **[Q6 — Major]** Deep-audit high-risk cadence (1 giờ) không được nêu trong UC §6.
-6. **[Q7 — Major]** Valid `lifecycle_state` values cho resume không được định nghĩa.
-7. **[Q8 — Major]** "UI confirmation" references gây nhầm lẫn scope giữa ExBot backend và POOL UI.
+2. **[Q3 — Major]** Không có idempotency mechanism cho pause/resume — UC §5 A3 mô tả idempotent response nhưng không nêu cơ chế implement. Tech Lead cần xác định cơ chế.
+3. **[Q7 — Major]** Valid `lifecycle_state` values cho pause/resume không được định nghĩa rõ ràng. UC §2 pause precondition chỉ nêu `lifecycle_state='active'`, nhưng states.md state registry row `(pre-pause value) | paused` ngụ ý mọi giá trị đều có thể pause. BA cần chốt.
+4. **[Q8 — Major]** "UI confirmation" trong UC gây nhầm lẫn scope — spec.md §6 khẳng định ExBot là backend-only module. BA cần xác nhận "UI confirmation" nằm trong ExBot scope hay POOL UI (PTL-05).
+5. **[Q9 — Major]** Success messages không có message code để trace. message-list.md chỉ có E-EXBOT-* error codes. BA cần xác nhận success messages có cần đăng ký code không.
+
+### Đã được trả lời từ docs — Không cần BA/Tech Lead
+
+- **[Q4 — Answered]** Jitter cho `next_light_check_at`: UC §4 step 5 và FR-EXBOT-013 nêu rõ `now + 5min + random(−45s, +45s)` — cùng jitter cho cả normal scheduling và resume.
+- **[Q5 — Answered]** `price-near-stop-audit` suppression: FR-EXBOT-014 khẳng định "shall continue at all times" — không bị suppress trong pause.
+- **[Q6 — Answered]** Deep-audit high-risk cadence: UC §6 ghi rõ "6-hour cadence (or 1-hour high-risk cadence)" — high-risk cadence vẫn áp dụng khi paused.
+- **[Q10 — Answered]** lifecycle_state combinations: states.md state registry ngụ ý mọi giá trị đều được pause — `'active'`, `'hedge_stopped_cooldown'`, `'lp_rebalancing'`.
+- **[Q11 — Answered]** SAFE_MODE entry từ pause: states.md state registry cho thấy `safe_mode` là trạng thái độc lập — `bots.status` chuyển `paused` → `safe_mode`, `lifecycle_state` giữ nguyên.
+- **[Q12 — Answered]** Duplicate light-check sau resume: không phải test issue — implementer sẽ xử lý duplicate prevention.
 
 ### Deferred
 
-- **[Q1 — Blocker — Deferred]** API endpoint names không có trong FR-EXBOT-090. Endpoint name khác nhau giữa các môi trường test — QA sẽ lấy từ test environment config. Không cần cập nhật spec.
+- **[Q1 — Deferred]** API endpoint names: endpoint per environment — QA lấy từ test environment config.
 
 ### Khuyến nghị
 
-**Không nên tiến hành thiết kế scenario/test case cho UC-EXBOT-pause-resume cho đến khi:**
+**Có thể tiến hành thiết kế test case ở mức độ có điều kiện.** Phần lớn luồng nghiệp vụ đã rõ ràng từ docs. Tuy nhiên:
 
-1. Tech Lead xác nhận Status Update Worker architecture — synchronous handler hay queue consumer (Q2).
-2. Tech Lead xác nhận idempotency mechanism cho pause/resume (Q3).
-3. BA xác nhận suppression scope cho `price-near-stop-audit` trong pause (Q5).
-4. BA xác nhận deep-audit high-risk cadence có áp dụng khi paused không (Q6).
-5. Tech Lead xác nhận jitter value cho `next_light_check_at` khi resume (Q4).
+1. **Cần Tech Lead xác nhận Q2 và Q3** trước khi test idempotency và worker behavior.
+2. **Cần BA xác nhận Q7, Q8, Q9** để chốt scope và test boundary chính xác.
 
-**Ưu tiên xử lý Q2 → Q3 → Q5 → Q6 → Q4 → Q7 → Q8. Sau khi blocker Q2 được giải quyết, UC có thể re-review và đạt điểm ≥ 70.**
-
-**Điểm tích cực:** FR-EXBOT-005 và FR-EXBOT-012 requirements rõ ràng và nhất quán. US-EXBOT-003 AC coverage đầy đủ (happy path, deep-audit continue, SAFE_MODE rejection, idempotent responses). BR-EXBOT-002 Pause ≠ Close được tuân thủ. State suppression logic không có mâu thuẫn với SRS.
+**Ưu tiên: Q2 → Q3 → Q7 → Q8 → Q9. Sau khi Q2 và Q3 được giải quyết, UC đạt Ready (≥ 90).**
 
 ---
 
@@ -362,6 +361,7 @@ Có hai vấn đề nghiêm trọng ở cấp actor/role:
 | Version | Ngày | Người cập nhật | Nội dung thay đổi |
 |---|---|---|---|
 | v1 | 2026-06-30 | QC UC Read Agent | Tạo báo cáo audited lần đầu cho UC-EXBOT-pause-resume. Tổng điểm: 54/100 — Not Ready. 4 blockers, 9 major, 4 minor issues. |
+| v1 | 2026-07-01 | QC UC Read Agent | Cập nhật sau verification: Q1 deferred (endpoint per environment); Q4, Q5, Q6, Q10, Q11, Q12 trả lời từ docs — đưa sang Answered; Q2, Q3, Q7, Q8, Q9 giữ lại làm Open. Tổng điểm: 75/100 — Conditionally Ready. 1 blocker, 4 major. |
 
 ---
 
