@@ -53,9 +53,9 @@ System-initiated: on-chain deposit detected by chain indexer (Fargate) → key-p
 - **A5 (builder fee not confirmed):** Step 3 — block with "Builder fee (5bps) must be confirmed on HL before starting."
 - **A6 (LP mint simulation fail):** Step 3 — block with simulation error details; no vault call made.
 - **A7 (HL unreachable):** Step 5 or 7 — enter `error` state; return "HL service unavailable, please retry."
-- **A8 (stop placement fail):** Step 10 — enter `error` state; HL short open but stop not confirmed; alert operator.
+- **A8 (stop placement fail):** Step 10 — enter `safe_mode`; HL short open but stop not confirmed; alert operator; auto-recovery per FR-EXBOT-050 (retry when HL responsive + 3 reconciles succeed; if irrecoverable → bot_safe_close).
 - **A10 (HL order rejection):** Step 7 — HL rejects IOC order; enter `error` state; return HL rejection reason.
-- **A11 (reconcile mismatch):** Step 8 — actual size deviates > threshold; enqueue `partial_repair`; alert operator.
+- **A11 (reconcile mismatch):** Step 8 — actual size deviates > threshold; enqueue `partial_repair`; alert operator. *(threshold = `drift_threshold` = `lp_value_usd × 3%`; pending OQ-EXBOT-11)*
 
 ## 5. Postconditions
 - `bots.lifecycle_state='active'`, `bots.status='active'`

@@ -40,9 +40,9 @@ Cron scheduler (system-initiated, background worker).
 
 ## 4. Alternate Flows
 - **A1 (HL unreachable):** Step 2 — HLRateLimitDO returns `{allowed: false}` or HL API returns 5xx; skip HL-dependent steps (2, 3, 4, 6, 7); update cadence to high-risk interval (1 hour); enqueue notification "Hyperliquid API unreachable"; record retry-pending state
-- **A2 (bot status='paused'):** Full audit still runs at 6-hour cadence — pause does NOT skip deep-audit scheduling. All detection paths (steps 3–7) execute normally
+- **A2 (bot status='paused'):** Full audit still runs at 6-hour cadence — pause does NOT skip deep-audit scheduling. All detection paths (steps 3–7) execute normally, including stuck marker detection (steps 4–5); if triggered, bot transitions from `paused` to `safe_mode`.
 - **A3 (reconcile mismatch detected):** Step 3 — actual short size ≠ `last_known_hl_short_size`; record mismatch in D1; trigger SAFE_MODE entry; enqueue admin notification with size delta
-- **A4 (stuck stop marker detected):** Step 4 or 5 — trigger SAFE_MODE entry; enqueue admin escalation notification with timestamp and reason ("stop_trigger_crossed_at stuck > 30min" or "stop_replacing_started_at stuck > 60s")
+- **A4 (stuck stop marker detected):** Step 4 or 5 — trigger SAFE_MODE entry; enqueue admin escalation notification with timestamp and reason (E-EXBOT-019: "stop_trigger_crossed_at stuck > 30min"; E-EXBOT-020: "stop_replacing_started_at stuck > 60s")
 
 ## 5. Postconditions
 - `hedge_legs.margin_status` updated from fresh HL `marginSummary`

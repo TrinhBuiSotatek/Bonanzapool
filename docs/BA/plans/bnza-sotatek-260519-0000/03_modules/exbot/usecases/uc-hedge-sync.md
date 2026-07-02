@@ -31,7 +31,7 @@ hedge-sync Worker dequeues a message from the hedge-sync queue. Message is enque
 
 ## 3. Main Success Scenario
 1. Worker inserts `message_id` into `queue_idempotency` (started); UNIQUE conflict → skip
-2. Worker reads D1 `bots.state_version`; if mismatch with message `stateVersion` → discard (status='skipped')
+2. Worker reads D1 `bots.state_version`; if mismatch with message `stateVersion` → discard (status='skipped'); Worker rechecks `circuit_breakers.state` at execution time; if `open` → discard (status='skipped'); no HL order submitted
 3. Worker calls `UserLockDO.acquire(holderToken, ttl=90s, idempotencyKey=hedge-sync:{botId}:{stateVersion})`
 4. Fetch actual HL position via `clearinghouseState` (weight=2)
 5. Compute `delta = BigDecimal(targetShortEth).sub(actualShortEth)` (BigDecimal only, no float)
@@ -50,11 +50,11 @@ hedge-sync Worker dequeues a message from the hedge-sync queue. Message is enque
 
 ## 4. Alternate Flows
 - **A1 (lock held):** Step 3 — `acquired=false`; re-queue with delay; no HL order
-- **A2 (stateVersion mismatch):** Step 2 — discard; status='skipped'; no HL order
+- **A2 (stateVersion mismatch):** Step 2 — discard; status='skipped'; reason = original RebalanceReason[] from message payload; no HL order
 - **A3 (HL order rejection):** Step 6 — record rebalance_attempts (status='failed'); call `incrementCircuitBreaker`; enqueue notification
-- **A4 (partial fill):** Step 11 — reconcile detects partial mismatch; enqueue `partial_repair` message
+- **A4 (partial fill):** Step 11 — reconcile detects partial mismatch; enqueue `partial_repair` message; `incrementCircuitBreaker` is NOT called (partial fill is not a failure — repair path handles remaining delta)
 - **A5 (stop_replacing_started_at stuck > 60s):** Primary detection by light-check (FR-EXBOT-033, ≤5 min). deep-audit is secondary backstop only. Enter SAFE_MODE.
-- **A6 (delta=0, no HL order):** Step 5 — skip HL order entirely; proceed directly to stop replacement (step 8). Log reason in rebalance_attempts.
+- **A6 (delta=0, no HL order):** Step 5 — skip HL order entirely; proceed directly to stop replacement (step 8); reason = original RebalanceReason[] from message payload
 
 ## 5. Postconditions
 - `hedge_legs` updated: `stop_price`, `entry_price`, `effective_leverage`, `stop_replacing_started_at=NULL`
@@ -81,4 +81,4 @@ sequenceDiagram
 ```
 
 ## 7. FR Trace
-FR-EXBOT-022, FR-EXBOT-024, FR-EXBOT-025, FR-EXBOT-026, FR-EXBOT-027, FR-EXBOT-036
+FR-EXBOT-020, FR-EXBOT-021, FR-EXBOT-022, FR-EXBOT-024, FR-EXBOT-025, FR-EXBOT-026, FR-EXBOT-027, FR-EXBOT-035, FR-EXBOT-036

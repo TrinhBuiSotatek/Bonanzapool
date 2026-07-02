@@ -26,9 +26,10 @@ User navigates to the relevant screen or initiates the described action.
 
 ## 2. Preconditions
 - Trigger condition met: circuit breaker retries exhausted, OR margin critical + SAFE_MODE irrecoverable, OR 3 stops within 7 days, OR admin force-close
+- `bots.status NOT IN ('closed', 'closing')` — a trigger on a bot already closed or currently closing is rejected; the UNIQUE constraint on `close_operations.idempotency_key` enforces this at DB level (see FR-EXBOT-072)
 
 ## 3. Main Success Scenario
-1. Trigger creates `close_operations` row (kind='bot_safe_close', state='requested')
+1. Trigger creates `close_operations` row (kind='bot_safe_close', state='requested'); `lifecycle_state` set to `lp_closing`; `bots.status` set to `'closing'` — held until step 11
 2. Close Worker: acquire `UserLockDO` lease; full close HL short (`closeShortReduceOnlyIoc`)
 3. Cancel stop via `§19.5 replaceStopProtected` with size=0
 4. Reconcile: verify HL size = 0; update `close_operations.state='hedge_closed'`
@@ -42,7 +43,7 @@ User navigates to the relevant screen or initiates the described action.
 12. Investor notification: "Bot safely closed. Funds have been returned to your wallet."
 
 ## 4. Alternate Flows
-- **A1 (hedge close impossible):** Step 3 — `close_operations.state='residual_hl_liability'` + SAFE_MODE; do NOT touch LP until hedge confirmed closed
+- **A1 (hedge close impossible):** Step 3 — retry hedge close up to 3 times; on final failure set `close_operations.state='residual_hl_liability'` + enter SAFE_MODE; send admin escalation notification (E-EXBOT-018: "Bot safe close failed: HL hedge could not be closed after 3 attempts. Manual intervention required. Bot held at residual_hl_liability."); do NOT touch LP until hedge confirmed closed
 - **A2 (LP close reverts):** Step 5 — retry up to 3 times; on failure escalate to admin, hold at `lp_closed` pending
 - **A3 (RedemptionQueue fulfillRequest fails):** Step 10 — request stays in queue; Operator retries; user funds not lost (request remains enqueued)
 - **A4 (3rd bot_safe_close trigger within 7 days):** Step 1 — create `close_operations` row; proceed with same flow; admin escalation notification sent concurrently

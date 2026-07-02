@@ -2,10 +2,17 @@
 type: message-list
 status: draft
 created: 2026-06-02
-updated: 2026-06-26
+updated: 2026-07-01
 module: bnza-backbone
 owner: "@hien.duong"
 changelog:
+  - "2026-07-01 | manual | add E-EXBOT-019/020: stuck marker notifications for deep-audit (stop_trigger_crossed_at > 30min, stop_replacing_started_at > 60s)"
+  - "2026-07-01 | manual | add E-EXBOT-018: bot_safe_close hedge close failed after 3 retries (residual_hl_liability)"
+  - "2026-07-01 | manual | add E-EXBOT-017: bot start preflight no active key_status row (key-provision arc update)"
+  - "2026-07-01 | manual | deprecate E-EXBOT-003/004/014/015/016: manual approval + expiry flow removed in key-provision arc update"
+  - "2026-06-30 | manual | register MSG-ERR-98 and MSG-ERR-99 for whitelabel (SCR-ADM-02) filters"
+  - "2026-06-30 | manual | register MSG-INF-97, MSG-INF-98, MSG-INF-99, MSG-ERR-97 for reports debug info bar (SCR-ADM-07)"
+  - "2026-06-29 | /ba-do | register MSG-INF-71: escalation already acknowledged toast (dashboard SCR-ADM-01)"
   - "2026-06-26 | /ba-do | register MSG-SUC-79/80 for master wallet deactivate/activate (whitelabel SCR-ADM-02)"
   - "2026-06-26 | manual | consolidate duplicate MSG-ERR-92 system error to MSG-ERR-79 and renumber subsequent codes"
   - "2026-06-26 | manual | format MSG-ERR-R01 to MSG-ERR-96, MSG-WRN-R01 to MSG-WRN-02, and restore deprecated MSG-SUC-57/58/64 as stubs"
@@ -219,7 +226,7 @@ changelog:
 |------|------|--------|------|
 | MSG-ERR-15 | ERR | reports (SCR-ADM-11) | "Export failed. Try a shorter date range or retry." |
 | MSG-ERR-51 | ERR | access-control (SCR-ADM-14) | "Unrecognized access mode. Refresh and try again." |
-| MSG-ERR-52 | ERR | access-control (SCR-ADM-14) | "Invalid wallet address. Must be a 0x… EVM address." |
+| MSG-ERR-52 | ERR | access-control (SCR-ADM-14) | "Please enter a valid EVM address." |
 | MSG-ERR-53 | ERR | access-control (SCR-ADM-14) | "This address is already in the list." |
 | MSG-ERR-54 | ERR | access-control (SCR-ADM-14) | "Cannot add address to both Whitelist and Blacklist." |
 | MSG-ERR-55 | ERR | access-control (SCR-ADM-14) | "Failed to save access mode. Please retry." |
@@ -263,7 +270,14 @@ changelog:
 | MSG-ERR-93 | ERR | whitelabel (SCR-ADM-02) | "The operation failed due to a state mismatch. The page will reload. Please retry." |
 | MSG-ERR-94 | ERR | plans (SCR-ADM-03) | "Failed to save bot type configuration. Please retry." |
 | MSG-ERR-95 | ERR | relayer (SCR-ADM-12) | "Status unavailable — API error" |
+| MSG-ERR-97 | ERR | reports debug bar (SCR-ADM-07) | `"failed: {error.message}"` |
+| MSG-ERR-98 | ERR | whitelabel (SCR-ADM-02) | "Bot Config ID must be a positive integer." |
+| MSG-ERR-99 | ERR | whitelabel (SCR-ADM-02) | "Position ID must be a valid numeric token ID." |
 | MSG-INF-70 | INF | dashboard (SCR-ADM-01) | "Dashboard data updates every 30s." |
+| MSG-INF-71 | INF | dashboard (SCR-ADM-01) | "This escalation has already been acknowledged." |
+| MSG-INF-97 | INF | reports debug bar (SCR-ADM-07) | `"Last request: {endpoint path with params}"` |
+| MSG-INF-98 | INF | reports debug bar (SCR-ADM-07) | `"success ({n} rows)"` |
+| MSG-INF-99 | INF | reports debug bar (SCR-ADM-07) | `"mock data ({n} rows)"` |
 | MSG-SUC-50 | SUC | access-control (SCR-ADM-14) | "Access mode updated." |
 | MSG-SUC-51 | SUC | access-control (SCR-ADM-14) | "Address added to list." |
 | MSG-SUC-52 | SUC | access-control (SCR-ADM-14) | "Address removed." |
@@ -331,8 +345,8 @@ changelog:
 |--------|----------|---------|------|
 | E-EXBOT-001 | One-bot policy violation | "You already have an active ExBot. Close or wait for the existing bot to finish." | 409 |
 | E-EXBOT-002 | Insufficient HL margin at preflight | "Required HL margin: $X (with 100% buffer). Current: $Y. Please deposit $Z to HL." | 400 |
-| E-EXBOT-003 | Agent key status is pending | "Agent key is awaiting approval. Please complete the approval process before starting." | 400 |
-| E-EXBOT-004 | Agent key expired | "Your HL agent key has expired. Please submit a new one." | 400 |
+| ~~E-EXBOT-003~~ | ~~Agent key status is pending~~ *(deprecated — manual approval flow removed in key-provision arc update)* | ~~"Agent key is awaiting approval. Please complete the approval process before starting."~~ | ~~400~~ |
+| ~~E-EXBOT-004~~ | ~~Agent key expired~~ *(deprecated — key expiry removed; system-generated keys do not expire)* | ~~"Your HL agent key has expired. Please submit a new one."~~ | ~~400~~ |
 | E-EXBOT-005 | Builder fee not approved | "HL builder fee (5bps) approval required before starting ExBot." | 400 |
 | E-EXBOT-006 | LP mint simulation failed | "LP mint simulation failed. Check pool liquidity or adjust deposit amount." | 400 |
 | E-EXBOT-007 | HL order rejected (insufficient margin during sync) | "Hedge adjustment rejected: insufficient margin on Hyperliquid. Deposit additional margin." | 502 |
@@ -342,7 +356,11 @@ changelog:
 | E-EXBOT-011 | Reconcile mismatch | "Hedge position mismatch detected. Bot entered Safe Mode pending reconciliation." | — (internal) |
 | E-EXBOT-012 | Close attempted on already-closed bot | "Bot is already closed. No action needed." | 409 |
 | E-EXBOT-013 | Pause attempted in SAFE_MODE | "Bot is in Safe Mode. You can close the bot instead." | 409 |
-| E-EXBOT-014 | Submit agent key while existing key is pending | "Your agent key is awaiting admin approval. You cannot submit a new key until the current one is reviewed." | 409 |
-| E-EXBOT-015 | Submit agent key while existing key is approved | "You already have an active agent key. You can only submit a new key after your current key has expired." | 409 |
-| E-EXBOT-016 | Approve agent key that has already expired | "This agent key has already expired and cannot be approved. Please ask the investor to submit a new key." | 409 |
+| ~~E-EXBOT-014~~ | ~~Submit agent key while existing key is pending~~ *(deprecated — manual key submission flow removed)* | ~~"Your agent key is awaiting admin approval. You cannot submit a new key until the current one is reviewed."~~ | ~~409~~ |
+| ~~E-EXBOT-015~~ | ~~Submit agent key while existing key is approved~~ *(deprecated — manual key submission flow removed)* | ~~"You already have an active agent key. You can only submit a new key after your current key has expired."~~ | ~~409~~ |
+| ~~E-EXBOT-016~~ | ~~Approve agent key that has already expired~~ *(deprecated — admin approval flow removed)* | ~~"This agent key has already expired and cannot be approved. Please ask the investor to submit a new key."~~ | ~~409~~ |
+| E-EXBOT-017 | Bot start preflight — no `hl_agent_keys` row with `key_status='active'` for this user | "Bot cannot start: agent key not yet provisioned. Please complete an on-chain deposit to trigger automatic setup." | 400 |
+| E-EXBOT-018 | bot_safe_close hedge close failed after 3 retries — `close_operations.state='residual_hl_liability'` | "Bot safe close failed: HL hedge could not be closed after 3 attempts. Manual intervention required. Bot held at residual_hl_liability." | — (internal alert) |
+| E-EXBOT-019 | `stop_trigger_crossed_at` stuck > 30 minutes — deep-audit backstop detection; bot enters SAFE_MODE | "Stop trigger marker stuck for over 30 minutes. Bot entered Safe Mode. Manual review required." | — (internal alert) |
+| E-EXBOT-020 | `stop_replacing_started_at` stuck > 60 seconds — deep-audit backstop detection; bot enters SAFE_MODE | "Stop replacement marker stuck for over 60 seconds. Bot entered Safe Mode. Manual review required." | — (internal alert) |
 | Symbol not found | Symbol removed from Hyperliquid | "Symbol not found" (chart) | User can search another symbol |

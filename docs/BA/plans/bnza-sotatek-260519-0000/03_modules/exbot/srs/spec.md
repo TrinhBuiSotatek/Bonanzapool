@@ -430,7 +430,7 @@ The system shall initiate `bot_safe_close` when any of the following conditions 
 **Trace:** FM-XB-08
 **Priority:** P0
 
-The `bot_safe_close` execution follows a fixed hedge-first sequence tracked atomically in `close_operations`: (1) `requested` — trigger received, `close_operations` row created; (2) `hedge_close_pending` — close HL short position fully (target = 0); (3) `hedge_closed` — HL position confirmed closed, stop cancelled; (4) `lp_closed` — call `BnzaExVault.redeem(tokenId)` on-chain, LP NFT burned; (5) `redemption_queued` — RedemptionQueue.createRequest(user, botId, tokenId, hlPortionId) enqueued; RequestCreated event emitted; (6) `done` — Operator calls fulfillRequest(tokens, amounts); FIFO pop; safeTransferFrom(operator, user, amount) on-chain; RequestFulfilled event emitted; bots.status='closed'. On hedge close failure, the system retries up to 3 times before escalating to admin and holding at `hedge_close_pending`. LP close is not attempted until hedge is confirmed closed.
+The `bot_safe_close` execution follows a fixed hedge-first sequence tracked atomically in `close_operations`: (1) `requested` — trigger received, `close_operations` row created; (2) `hedge_close_pending` — close HL short position fully via `closeShortReduceOnlyIoc` (target = 0); cancel stop via `replaceStopProtected(size=0)` — both are actions within this step, not separate states; (3) `hedge_closed` — `close_operations.state` advances to `hedge_closed` only after reconcile confirms HL position size = 0 and stop is cancelled; (4) `lp_closed` — call `vault.executeStrategy(RedeemStrategyV1, user, botId, params)` via ExBot Worker; BnzaExPositionManager closes LP position, fees routed via LpFeeOps, principal returned; `PositionClosed` event emitted; (5) `redemption_queued` — RedemptionQueue.createRequest(user, botId, tokenId, hlPortionId) enqueued; RequestCreated event emitted; (6) `done` — Operator calls fulfillRequest(tokens, amounts); FIFO pop; safeTransferFrom(operator, user, amount) on-chain; RequestFulfilled event emitted; bots.status='closed'. On hedge close failure, the system retries up to 3 times before escalating to admin and holding at `hedge_close_pending`. LP close is not attempted until hedge is confirmed closed.
 
 **Acceptance criteria:** `close_operations` state transitions are sequential — no step is skipped. LP close is never attempted before `hedge_closed`. RedemptionQueue request is enqueued at step 5; user funds are returned on-chain when Operator calls fulfillRequest. A failure at any step holds `close_operations.status` at the failed step — does not silently advance.
 
@@ -557,6 +557,7 @@ The OPERATOR shall expose four endpoints under `/api/exbot/*`, each proxied to E
 | E-EXBOT-012 | Close attempted on already-closed bot | "Bot is already closed. No action needed." | 409 |
 | E-EXBOT-013 | Pause attempted in SAFE_MODE | "Bot is in Safe Mode. You can close the bot instead." | 409 |
 | E-EXBOT-017 | Bot start preflight — no `hl_agent_keys` row with `key_status='active'` for this user | "Bot cannot start: agent key not yet provisioned. Please complete an on-chain deposit to trigger automatic setup." | 400 |
+| E-EXBOT-018 | bot_safe_close hedge close failed after 3 retries — `close_operations.state='residual_hl_liability'` | "Bot safe close failed: HL hedge could not be closed after 3 attempts. Manual intervention required. Bot held at residual_hl_liability." | — (internal alert) |
 
 ---
 
@@ -576,7 +577,7 @@ Full UC specs in `../usecases/`. Each file contains: actors, preconditions, main
 |---|---|---|
 | `uc-bot-start` | Start ExBot: deposit → key-provision → preflight → LP mint → hedge open → stop place → active | FR-EXBOT-001–004, 020, 030–031 |
 | `uc-light-check` | Periodic scan (zero HL calls) → fan-out to hedge-sync or price-near-stop-audit | FR-EXBOT-012, 013, 014, 015, 016, 032 |
-| `uc-hedge-sync` | Delta-only hedge adjustment + INV-STOP protocol + post-order reconcile | FR-EXBOT-020, 021, 022, 024, 025, 026, 027, 035 |
+| `uc-hedge-sync` | Delta-only hedge adjustment + INV-STOP protocol + post-order reconcile | FR-EXBOT-020, 021, 022, 024, 025, 026, 027, 035, 036 |
 | `uc-user-redeem` | LP-first instant redemption + HL hedge close SLA 5 min | FR-EXBOT-070, 071 |
 | `uc-bot-safe-close` | Hedge-first system close → executeStrategy(RedeemStrategyV1) → RedemptionQueue FIFO payout to user | FR-EXBOT-070, 072, 073 |
 

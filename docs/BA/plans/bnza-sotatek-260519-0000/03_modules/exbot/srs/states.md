@@ -68,7 +68,7 @@ stateDiagram-v2
 | `closed` | closed | Fully closed | skip | skip | skip |
 | `safe_mode` | safe_mode | No mutations; monitor only | limited (no HL) | blocked | when HL recovers |
 | `error` | error | Admin required | skip | skip | skip |
-| (pre-pause value) | paused | Hedge maintained; no new mutations | skip | skip | every 6h |
+| (pre-pause value) | paused | Hedge maintained; no new mutations; deep-audit may trigger SAFE_MODE via stuck marker detection | skip | skip | every 6h |
 
 **Note (HLD 2026-06-18):** `cooldown` and `parked` lifecycle states removed — park/redeploy feature dropped. After bot_safe_close, lifecycle transitions directly to `closed`.
 
