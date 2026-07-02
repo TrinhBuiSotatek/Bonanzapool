@@ -1,4 +1,23 @@
+## UC-EXBOT-light-check
+
+| # | Câu hỏi | Trả lời | Note |
+|---|---------|---------|------|
+| I-01 | Nguồn hlMarkPrice dùng để đánh giá stop trigger trong step 11 chưa được xác nhận. Với ràng buộc HL weight = 0 (BR-EXBOT-003), light-check không thể gọi HL để lấy mark price thực. UC đề xuất candidate là `bot_runtime_state.eth_price_usd` nhưng staleness policy hoàn toàn thiếu. | hlMarkPrice source = `HlMarkDO.markPriceUsd` (primary); fallback = `bot_runtime_state.eth_price_usd` (last-known từ light-check trước). Stale threshold = 120s → widen near-stop band 2%→4% + freeze hedge-sync. Detection latency tối đa ~7 phút. | ✅ Confirmed (Tech Lead) |
+| I-02 | Công thức tính điều kiện `range_boundary_near` chưa được xác nhận: tick-based hay price-based? | Price-based USD. Công thức: `nearestFraction = min(distToLower, distToUpper) / halfRange`. Fires khi `nearestFraction <= 0.9` (default). Ví dụ range $3,000–$3,400: trigger khi giá ≤ $3,020 hoặc ≥ $3,380. | ✅ Confirmed (code) |
+| I-03 | Công thức tính `lpValueUsd` (dùng trong `drift_threshold`) chưa được xác nhận. | `lpValueUsd = max(0, lpEthAmount × currentPriceUsd)`. Threshold: `drift_threshold = max($25, lpValueUsd × 3%)`. Follow code hiện tại. | ✅ Confirmed (code) |
+| I-04 | Công thức aggregation 7d funding APR cho `funding_alert` chưa được xác nhận. | Fires khi 7d funding APR < -15%. Primary source: `fundingApr7dPct` từ `funding_rolling_metrics` — đọc trực tiếp. Fallback: `fundingRate × 8760` (annualize per-hour rate). | ✅ Confirmed (code) |
+| I-05 | Khi `RebalanceReason[]` chứa cả `range_out` VÀ các reason khác (vd `drift_threshold`) trong cùng một pass, liệu hedge-sync có được enqueue không hay chỉ `lp_rebalancing` path chạy? | Engine gom tất cả reasons vào `decision.reason[]` và enqueue 1 hedge-sync duy nhất. Light-check không tự set `lifecycle_state='lp_rebalancing'` — đó là việc của hedge-sync handler downstream. | ✅ Confirmed (code) |
+| I-07 | Khi step 12 chạy (stop replace overrun), cả `bots.lifecycle_state` VÀ `bots.status` đều được update hay chỉ `lifecycle_state`? Worker nào thực hiện? | Light-Check Worker set cả `bots.status='safe_mode'` VÀ `bots.lifecycle_state='safe_mode'` atomically trong 1 UPDATE — xảy ra trước khi `partial_repair` được enqueue. Tester cần assert cả 2 fields trong cùng 1 check. | ✅ Confirmed (code) |
+| I-08 | `next_light_check_at` của các bot bị skip (lp_rebalancing, lp_closing) có được update hay không? | Scan Worker update `next_light_check_at` cho mọi eligible bot (kể cả `lp_rebalancing`, `lp_closing`) trước khi enqueue. Bot bị Light-Check Worker skip vẫn được reschedule đúng 5 phút sau — không bị flood khi recovery. | ✅ Confirmed (code) |
+| I-09 | Scan Worker query `LIMIT 500`: khi shard có > 500 bots eligible cùng lúc, các bot vượt LIMIT có được xử lý không? Có pagination không? | By design — jitter ±45s deterministic theo `hash(botId)` phân tán bots đều trong 5 phút, steady state không bao giờ overflow. Sau downtime, bots vượt LIMIT 500 được xử lý ở cron tick tiếp theo (1 phút sau), oldest first. Không cần pagination, không mất bot. | ✅ Confirmed (code) |
+| I-10 | `expires_at` field trong `queue_idempotency` — Light-Check Worker có set khi insert hay để NULL? Nếu NULL, table tích lũy vô hạn. | `expires_at` luôn được set (TTL = 1 phút, không NULL). Tuy nhiên không có cleanup job purge expired rows — table sẽ tích lũy. Gap: Dev team cần thêm scheduled purge. | ⏳ Pending Tech Lead (cleanup solution) |
+| I-11 | UC có placeholder Mermaid diagram generic (User → System) thay vì sequence diagram thực. | Trỏ sang **F-01: Queue Fan-Out** trong `srs/flows.md` — full sequence Cron Worker → Scan Worker → Light-Check Worker fan-out → hedge-sync enqueue. | ✅ Confirmed |
+| I-12 | UC không mô tả hành vi khi `MarketDataDO` cache stale (> 2× refresh interval): Light-Check Worker dùng stale data hay chờ DO refresh? | Fail-fast: nếu snapshot stale (> 5 phút) hoặc DO unreachable → throw ngay tại step 7, skip tick hoàn toàn. Không dùng stale data, không chờ refresh. Test design: stale MarketDataDO = light-check skip, không evaluate trigger nào. | ✅ Confirmed (code) |
+
+---
+
 ## UC-EXBOT-bot-safe-close
+
 
 | # | Câu hỏi | Trả lời | Note |
 |---|---------|---------|------|
