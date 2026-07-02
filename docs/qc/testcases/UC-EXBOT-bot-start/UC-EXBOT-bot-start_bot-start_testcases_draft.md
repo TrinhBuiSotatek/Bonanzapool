@@ -3,8 +3,9 @@
 **Total test cases:** 46 (FUNC: 33, INTG: 8, NFR: 5)
 **Scope:** Logic-only (backend / API / bot — no UI)
 **Source UC:** UC-EXBOT-bot-start_bot-start_audited_20260630_v1.md
-**Source scenarios (if any):** UC-EXBOT-bot-start_bot-start_scenarios_20260701_v1.md
+**Source scenarios (if any):** UC-EXBOT-bot-start_bot-start_scenarios_20260702_v2.md
 **Output language:** English
+**Version:** v4 | **Delta (v3 → v4):** +0 new, ~2 updated (TC_028, TC_029), -0 deleted | **Update trigger:** REQUIREMENT_DELTA (scenarios v2 — I-11 flagged on TS_028/TS_029)
 
 #### Requirement Traceability Matrix
 
@@ -16,9 +17,9 @@
 | AC-04 | Agent key not active blocks start with E-EXBOT-017 | TC_015 | Covered |
 | AC-05 | Builder fee not confirmed blocks start with E-EXBOT-005 | TC_016 | Covered |
 | AC-06 | LP mint simulation fail blocks start with E-EXBOT-006 | TC_018 | Covered |
-| AC-07 | HL unreachable during hedge open — lifecycle=error | TC_028 | Covered |
-| AC-08 | Stop placement fails — error state + operator alert (destination state ambiguous per I-06) | TC_038 | Covered |
-| AC-09 | HL IOC order rejected — lifecycle=error, HL reason captured | TC_029 | Covered |
+| AC-07 | HL unreachable during hedge open — lifecycle=error | TC_028 | Covered (I-11 OPEN: destination state ambiguous — `error` per UC §4 A7 vs `safe_mode` per states.md; pending BA confirmation) |
+| AC-08 | Stop placement fails — safe_mode + auto-recovery per FR-EXBOT-050 (I-06 resolved) | TC_038 | Covered |
+| AC-09 | HL IOC order rejected — lifecycle=error, HL reason captured | TC_029 | Covered (I-11 OPEN: destination state ambiguous — `error` per UC §4 A10 vs `safe_mode` per states.md; pending BA confirmation) |
 | AC-10 | Reconcile mismatch — partial_repair enqueued + operator alert | TC_031 | Covered |
 | AC-11 | Private key never in hl_agent_keys or logs after provisioning | TC_007, TC_045 | Covered |
 | AC-12 | weth_index per chain stored from config (pending OQ-EXBOT-03) | TC_025 | Covered (blocked on OQ-EXBOT-03) |
@@ -381,7 +382,7 @@
   1. Let ExBot Worker attempt to send the short IOC order while HL is unreachable.
 - **Expected Result:**
   1. On-chain: LP NFT remains held by BnzaExVault (LP was already minted; `custodian='vault'` unchanged).
-  2. Off-chain: `bots.lifecycle_state` transitions to `error`; `E-EXBOT-008` is surfaced; no stop order is placed. (Reference: UC §4 A7, E-EXBOT-008.)
+  2. Off-chain: `E-EXBOT-008` is surfaced; no stop order is placed; the LP NFT remains held by BnzaExVault (`custodian='vault'` unchanged). `bots.lifecycle_state` transitions away from `hedge_pre_open` — the destination state is `error` per UC §4 A7 but `safe_mode` per `srs/states.md` (`hedge_pre_open → safe_mode`); this conflict is tracked as **I-11 (open blocker, pending BA confirmation)**. Until I-11 is resolved, this TC verifies the failure gate and the LP-open-without-hedge condition; the specific destination state (`error` vs `safe_mode`) must be re-confirmed once I-11 is answered. (Reference: UC §4 A7, E-EXBOT-008.)
 - **Priority:** P0
 
 #### TC_029
@@ -394,7 +395,7 @@
   1. Let HL process the signed IOC order while rejecting it.
 - **Expected Result:**
   1. On-chain: no short position is opened on HL.
-  2. Off-chain: `bots.lifecycle_state` transitions to `error`; the HL rejection reason is captured in D1 (or in the error response payload). (Reference: UC §4 A10.)
+  2. Off-chain: the HL rejection reason is captured; no short position exists on HL after the failure. `bots.lifecycle_state` transitions away from `hedge_pre_open` — the destination state is `error` per UC §4 A10 but `safe_mode` per `srs/states.md` (`hedge_pre_open → safe_mode`); this conflict is tracked as **I-11 (open blocker, pending BA confirmation)**. Until I-11 is resolved, this TC verifies that the order is rejected and no hedge position is left; the specific destination state must be re-confirmed once I-11 is answered. (Reference: UC §4 A10.)
 - **Priority:** P0
 
 #### TC_030
@@ -513,7 +514,7 @@
   1. Let ExBot Worker attempt `placeReduceOnlyStopMarket` while HL is set to fail.
 - **Expected Result:**
   1. On-chain: the HL short position remains open but no stop order is placed.
-  2. Off-chain: `E-EXBOT-009` ("Failed to place native stop on Hyperliquid. Bot cannot activate without a stop.") is surfaced; an operator alert is sent; the bot does NOT reach `lifecycle_state='active'`. (Note: the destination state — `error` per UC §4 A8 vs `safe_mode` per states.md — is ambiguous per I-06 open; this TC verifies the failure gate and alert regardless of destination state.) (Reference: UC §4 A8, FR-EXBOT-031, E-EXBOT-009.)
+  2. Off-chain: `E-EXBOT-009` ("Failed to place native stop on Hyperliquid. Bot cannot activate without a stop.") is surfaced; an operator alert is sent; the bot does NOT reach `lifecycle_state='active'`; `bots.lifecycle_state` transitions to `safe_mode` (per states.md `stop_placing → safe_mode`; I-06 resolved 2026-07-02). Auto-recovery per FR-EXBOT-050 begins: system retries when HL is responsive + 3 consecutive reconciles succeed; if irrecoverable → `bot_safe_close` is triggered. (Reference: UC §4 A8, FR-EXBOT-031, FR-EXBOT-050, E-EXBOT-009.)
 - **Priority:** P0
 
 #### TC_039
@@ -592,12 +593,12 @@
 
 - **Title:** Verify the agent key is never written to logs while it is decrypted for signing during bot start
 - **Pre-condition:**
-  1. The user's agent key is active and not expired.
+  1. The user's agent key is active (`key_status='active'` in `hl_agent_keys`).
   2. Log capture is enabled for the worker execution.
 - **Step:**
   1. Run the bot-start so the agent key is decrypted for signing (for `openShortIoc` and `placeReduceOnlyStopMarket`); then read the worker logs and any error output.
 - **Expected Result:**
-  1. The plain agent key and the plain data-encryption key (DEK) do not appear anywhere in the logs or error output. They are used only inside the Signing Lambda function scope and dropped right after. A dump of `hl_agent_keys` shows no plaintext key material. (Reference: FR-EXBOT-080, NFR-EXBOT-006, AC-11.)
+  1. No private key material appears anywhere in the logs or error output. The agent private key is generated and retained exclusively in AWS KMS — it never leaves the HSM, is never passed to ExBot Worker or Signing Lambda's memory as plaintext, and is never written to D1. A dump of `hl_agent_keys` shows only public addresses and metadata. (Reference: FR-EXBOT-080, NFR-EXBOT-006, AC-11.)
 - **Priority:** P0
 
 #### TC_046
