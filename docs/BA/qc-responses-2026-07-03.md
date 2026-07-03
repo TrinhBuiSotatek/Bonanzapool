@@ -9,6 +9,102 @@ owner: "@hienduong"
 
 # QC Responses — ExBot Module (2026-07-03)
 
+---
+
+## EXBOT on AWS — Architecture Reference
+
+> Context lưu từ 3 diagrams do Lead cung cấp (2026-07-03). Dùng để check "câu hỏi này có bị outdated so với arc mới không" trước khi trả lời QnA.
+
+### Diagram 1 — Target Architecture (tổng quan)
+
+**Entry point:**
+- OPERATOR vẫn là Cloudflare Worker, chỉ làm nhiệm vụ create/close bot → API Gateway
+
+**AWS infrastructure (ap-southeast-1 · CloudTrail + Config):**
+- API Gateway (HTTP API) → Lambda Authorizer (HMAC token)
+- EventBridge (cron 1m / 5m) → Queue (SQS / Redis BullMQ)
+
+**Compute — 2 layer:**
+- **AWS Lambda** (event/API): Ingress (start/close) · Queue Consumers (scan · light · hedge · reconcile) · Signing (KMS · nonce)
+- **ECS Fargate ×1** (long-running): HL WS Poller + Chain Indexer
+
+**Storage/State:**
+- **Aurora PostgreSQL Serverless v2** — advisory lock · state · idempotency
+- **ElastiCache Redis** — rate-limit · price cache
+- **AWS KMS** — operator + master/agent keys
+- **Secrets Manager** — config
+
+**External:**
+- Hyperliquid (perp hedge + funding)
+- EVM Chains — OP/Arb · vault + logs
+- Uniswap V3 — WETH/USDC LP
+
+---
+
+### Diagram 2 — Bot Lifecycle & Event Pipeline
+
+**Queue pipeline (triggered bởi EventBridge):**
+EventBridge → bot-scan (enqueue active) → light-check (8 triggers · cached) → [if trigger] → hedge-sync (serial · lock · order) → reconcile (read HL · write)
+
+**Exception routing:**
+- stop / margin critical → stop-audit (pre-liquidation)
+- → SAFE_MODE (warn/restrict/freeze)
+
+**Data flows:**
+- bot-scan + light-check → Aurora PostgreSQL (acquire lock · write state)
+- light-check → ElastiCache Redis (read cache — price)
+- hedge-sync → Signing Lambda → KMS (sign) → Hyperliquid (place/reduce)
+- reconcile → Aurora PostgreSQL (write state)
+
+**Per-bot state machine (high-level):**
+IDLE → LP_OPENING → ACTIVE → CLOSING → CLOSED
+
+**Key points:**
+- Không còn ExBot Worker monolith — tất cả là Lambda functions
+- hedge-sync đảm bảo serial exactly-one-per-bot qua SQS FIFO + Postgres advisory lock
+- Signing tách riêng thành Signing Lambda → KMS
+
+---
+
+### Diagram 3 — KMS Custody Signing
+
+**AWS KMS — HSM (secp256k1), 3 loại key:**
+
+| Key | Scope | Signs what |
+|-----|-------|-----------|
+| Operator key (1 key · role-based) | System-wide | vault executeStrategy (open / rebalance / redeem / collect) → EVM Chains |
+| Per-user MASTER key (withdraw authority) | Per user | withdraw3 + HL approveAgent |
+| Per-user AGENT key (trade-only) | Per user | HL trades (place / reduce) |
+
+**Signing Lambda** là trung gian duy nhất:
+- re-validate · per-wallet nonce lock · kms:Sign only
+- Private key **never leaves KMS** — chỉ signing-Lambda IAM role được gọi kms:Sign
+- Output: broadcast → EVM Chains (vault executeStrategy) + Hyperliquid (approveAgent · place/reduce)
+
+---
+
+### Cloudflare → AWS Mapping (what replaced what)
+
+| Cloudflare (cũ — trong doc hiện tại) | AWS (mới — arc thực tế) |
+|---------------------------------------|------------------------|
+| ExBot Worker (monolith) | Lambda: Ingress + Queue Consumers + Signing |
+| Redeem Event Watcher | Chain Indexer (ECS Fargate) |
+| UserLockDO | Postgres advisory lock + SQS FIFO MsgGroup=botId |
+| MarketDataDO / HlMarkDO | ElastiCache Redis (rate-limit · price cache) |
+| D1 database | Aurora PostgreSQL Serverless v2 |
+| Cloudflare Queues | SQS / Redis BullMQ |
+| Cloudflare Cron | EventBridge Scheduler (cron 1m / 5m) |
+| Cloudflare Secrets Store | AWS Secrets Manager + KMS |
+
+### Rule check: câu hỏi có bị outdated không?
+
+- Câu hỏi về **business logic** (state machine, SLA, business rules, idempotency behavior): **không bị outdated** — arc thay đổi infra, không thay đổi behavior
+- Câu hỏi đề cập **tên component cụ thể** (Worker, UserLockDO, D1, MarketDataDO, Redeem Event Watcher): **bị outdated** — cần map sang tên AWS tương đương
+- Câu hỏi về **cơ chế locking / serialization**: UserLockDO → Postgres advisory lock + SQS FIFO
+- Câu hỏi về **price/market data cache**: MarketDataDO → ElastiCache Redis
+
+---
+
 > Câu trả lời cho các câu hỏi QC audit ngày 2026-07-03.
 > Source: `UC-EXBOT-monitor-status` và `UC-EXBOT-pause-resume`
 
@@ -40,3 +136,20 @@ owner: "@hienduong"
 | Q7 | Major | UC §2, §4; SRS states.md | **Valid `lifecycle_state` values cho pause/resume không được định nghĩa rõ ràng.** UC §2 pause precondition chỉ nêu `lifecycle_state='active'` được pause. Tuy nhiên states.md state registry row `(pre-pause value) \| paused` ngụ ý mọi giá trị `lifecycle_state` đều có thể pause (không chỉ `'active'`). BA vui lòng chốt: những giá trị `lifecycle_state` nào được phép pause/resume? Chỉ `'active'` hay `'hedge_stopped_cooldown'` và `'lp_rebalancing'` cũng được? | Tester không biết valid/invalid pause/resume scenarios theo lifecycle_state | Open | BA chốt: chỉ `lifecycle_state='active'` được phép pause. `hedge_stopped_cooldown` và `lp_rebalancing` không được pause — 2 state này đang trong quá trình xử lý tự động, pause vào giữa tạo edge case không xác định (cooldown timer, rebalance dở). states.md đã cập nhật. |
 | Q8 | Major | UC §3–5; SRS spec.md §6 | **"UI confirmation" gây nhầm lẫn scope giữa ExBot và POOL UI.** spec.md §6 khẳng định ExBot là backend-only module, không sở hữu UI. UC nói "Investor receives UI confirmation" nhưng ExBot không có màn hình. BA vui lòng xác nhận: "UI confirmation" nằm trong ExBot scope hay POOL UI (PTL-05)? Nếu ExBot scope dừng ở API response, tester chỉ verify API response — không cần test POOL UI rendering. | Tester không biết test scope — chỉ API hay cả UI rendering | Open | ExBot scope dừng ở API response: `{status: "paused/active", message: "..."}`. Phần "Investor receives UI confirmation" thuộc POOL UI (PTL-05) — nằm ngoài ExBot scope. Tester chỉ cần verify API response, không cần test POOL UI rendering. UC sẽ được sửa để tách rõ boundary. |
 | Q9 | Major | UC §3 step 7, §4 step 6; UC §5 A2, A3; message-list.md | **Success messages không có message code để trace.** UC §3 step 7 trả về message nhưng không có mã E-code. message-list.md chỉ có E-EXBOT-* error codes. BA vui lòng xác nhận: (1) success messages có cần đăng ký message code không? (2) nếu có, mã là gì? (3) nếu không, tester verify text content của response? | Không có message code → khó trace API contract trong test | Open | Success messages đã được đăng ký: **MSG-SUC-81** (pause): "Bot paused. Hedge and LP are maintained." — **MSG-SUC-82** (resume): "Bot resumed. Monitoring will resume shortly." Đăng ký trong `message-list.md` §MSG-EXBOT. Tester verify theo message code. |
+
+---
+
+## UC-EXBOT-user-redeem
+
+| ID | Priority | Ref | Question | Why It Matters | Status | Ans |
+| --- | --- | --- | --- | --- | --- | --- |
+| I-01 | High | UC §7 FR Trace vs frd.md; US-EXBOT-009 Trace | UC §7 FR Trace liệt kê "FR-EXBOT-070, FR-EXBOT-071". FR-EXBOT-070 tồn tại trong frd.md (§4.8) và mô tả cả hai close systems. **FR-EXBOT-071 không tồn tại trong frd.md** — sau FR-EXBOT-070 nhảy thẳng đến FR-EXBOT-080; không có định nghĩa nào cho FR-EXBOT-071 trong toàn bộ tài liệu. Phân tích bổ sung: US-EXBOT-009 (`bot_safe_close`) cũng cite "FR-EXBOT-070, FR-EXBOT-071" trong phần Trace, gợi ý FR-EXBOT-071 có thể là FR dự kiến tách riêng chi tiết `bot_safe_close` (RedemptionQueue mechanics, fulfillRequest flow) ra khỏi FR-EXBOT-070, nhưng **chưa được viết**. Câu hỏi cần BA xác nhận: (a) FR-EXBOT-071 có phải là FR bị thiếu cần tạo mới (nếu vậy nội dung sẽ là gì)? hay (b) đây là lỗi copy-paste từ US-009 sang UC user-redeem (FR Trace của UC user-redeem chỉ nên cite FR-EXBOT-070 mục A)? | FR-EXBOT-071 được cite trong UC như một yêu cầu của user_redeem. Nếu FR này chưa được viết, coverage UC bị thiếu. Nếu là lỗi copy-paste, FR Trace của UC cần sửa để tránh tester trace nhầm test case vào FR của bot_safe_close. | Open | FR-EXBOT-071 does not exist in frd.md. Citation error — FR-071 belongs to `uc-bot-safe-close`, not in scope of user-redeem. UC §7 FR Trace updated — only `FR-EXBOT-070` retained. |
+| I-02 | High | uc-user-redeem.md §3 step 12-14; flows.md F-04 | UC mô tả Worker "gửi HL-portion USDC về nhà đầu tư qua RedemptionQueue ledger" nhưng không định nghĩa: (a) HL-portion được tính như thế nào (tổng số tiền từ HL closing position minus fees? minus funding?); (b) ai thực sự là người thực hiện on-chain transfer USDC (Worker gọi trực tiếp hay qua Operator Facade?); (c) transaction hash của HL-portion transfer có được lưu vào `close_operations.hedge_close_tx` không? | Không có công thức hoặc mô tả source of truth cho HL-portion amount → tester không thể verify số tiền nhà đầu tư nhận đúng không. | Open | Outdated vs AWS arc — HL-portion transfer mechanism changed. Pending Tech Lead for updated flow details. |
+| I-03 | Medium | uc-user-redeem.md §3 step 8; spec.md FR-EXBOT-026; flows.md F-04 | UC step 8 xác nhận Redeem Worker có acquire `UserLockDO` lease — vấn đề không phải là "có lock hay không". Sau khi cross-check tài liệu, câu hỏi được thu hẹp còn 2 điểm chưa rõ: **(a) Behavior khi acquired=false:** UC step 8 chỉ ghi "acquires UserLockDO lease" nhưng không mô tả behavior khi lock đang bị giữ bởi hedge-sync worker. spec.md FR-EXBOT-026 định nghĩa pattern cho hedge-sync: `acquired=false → re-queue với delay`. User_redeem có dùng cùng pattern không, hay chờ spin-wait, hay fail ngay? Với user_redeem có SLA 5 phút, re-queue với delay có thể vi phạm SLA. **(b) flows.md F-04 không hiển thị UserLockDO:** Sequence diagram F-04 không có participant UserLockDO (trong khi F-02 hedge-sync hiển thị rõ). Đây là lỗi thiếu trong diagram hay user_redeem dùng cơ chế khác? | Behavior khi lock contention xảy ra ảnh hưởng trực tiếp đến test case SLA. | Open | Outdated vs AWS arc — UserLockDO replaced by Postgres advisory lock + SQS FIFO. Lock behavior details pending Tech Lead confirmation under new arc. |
+| I-04 | High | uc-user-redeem.md §3 step 7; flows.md F-04 line 162; states.md close_operations table; spec.md FR-EXBOT-073 | Có conflict về initial state khi Worker tạo `close_operations` row. **UC step 7 và flows.md F-04** cùng ghi: `create close_operations (kind=user_redeem, state=lp_closed→funds_returned)` — dùng mũi tên (`→`) trong một field TEXT, không hợp lệ về mặt data model (ERD định nghĩa `close_operations.state` là `TEXT`, không thể lưu hai giá trị). **states.md** liệt kê sequence đầy đủ cho user_redeem: `requested → lp_closed → funds_returned → hedge_close_pending → hedge_closed → done` — trong đó `requested` là state đầu tiên (✓). **spec.md FR-EXBOT-073** mô tả bot_safe_close bắt đầu ở `requested` rõ ràng, nhưng không có spec tương đương cho user_redeem. Câu hỏi: (a) Khi Worker tạo `close_operations` row ở step 7, initial state là `'requested'` (như bot_safe_close) hay `'funds_returned'` (vì LP-portion đã về user rồi)? (b) UC/flows notation `lp_closed→funds_returned` là lỗi notation hay worker thực sự bỏ qua state `requested` và `lp_closed` trong user_redeem path? (c) Nếu skip `requested`, tester không thể viết test case verify state transition `requested → lp_closed`. | Initial state xác định expected result của test case verify `close_operations` record được tạo đúng. | Open | (a) Initial state = `requested`. (b) `lp_closed→funds_returned` is a notation error — Worker inserts row at `requested`, then immediately updates to `lp_closed` then `funds_returned` (on-chain guarantee from step 2-3). No states skipped. (c) Full transition `requested → lp_closed → funds_returned → hedge_close_pending → hedge_closed → done` is testable. UC doc updated. |
+| I-05 | Medium | uc-user-redeem.md §4 A2; flows.md F-04; message-list.md | Khi hedge close thất bại hoàn toàn và `close_operations.state='residual_hl_liability'`, UC A2 và flows.md F-04 đều nói "admin notified with amount" nhưng không cite message code. `message-list.md` chỉ có `E-EXBOT-010` cho SLA breach, không có message nào cho hedge close failure hoàn toàn. BA vui lòng cung cấp message code và nội dung verbatim của admin notification cho trường hợp này. | Tester không thể verify expected result của admin notification trong test case A2 nếu không có message code và nội dung chính xác. | Open | Registered **E-EXBOT-024**: "User redemption hedge close failed. Manual intervention required." — internal admin alert. UC A2 updated to cite E-EXBOT-024. |
+| I-06 | Medium | uc-user-redeem.md §4 A2; states.md | Khi `close_operations.state = 'residual_hl_liability'` (A2 flow), `bots.lifecycle_state` và `bots.status` chuyển sang giá trị gì? UC §5 Postconditions (phần đầu) mô tả happy path. §5 không mô tả postconditions cho A2. states.md không có state `residual_hl_liability` trong `bots.lifecycle_state` enum. | Tester không biết bot ở trạng thái nào sau A2 — không thể verify state transition của `bots` table. | Open | A2 → `bots.lifecycle_state='error'`, `bots.status='error'`. LP already returned (on-chain, not reversed). Admin must manually close residual HL position. UC §5 updated with A2 postconditions. |
+| I-08 | Medium | uc-user-redeem.md §3 step 11; flows.md F-04 | Sau bước reconcile (verify HL position = 0), nếu reconcile thất bại (HL position ≠ 0 sau closeShortReduceOnlyIoc), UC không mô tả behavior. Trong hedge-sync, reconcile mismatch → SAFE_MODE. Trong user_redeem context (LP đã thanh lý), SAFE_MODE có được áp dụng không? | Không có expected behavior cho reconcile failure trong user_redeem → tester không thiết kế được test case cho trường hợp này. | Open | Reconcile failure in user_redeem = same outcome as A2: `residual_hl_liability` → `bots.lifecycle_state='error'` → admin notified (E-EXBOT-024). SAFE_MODE does NOT apply — LP already liquidated, nothing to protect. UC A2 updated to cover both hedge close failure and reconcile mismatch. |
+| I-09 | Medium | uc-user-redeem.md §5 (Postconditions) | UC có hai phần Postconditions: phần đầu (§5 chính thức) và một phần không có header §5 lặp lại ở phía dưới. Hai phần này có nội dung khác nhau về `lifecycle_state` sau khi hoàn tất. Đây là lỗi cấu trúc tài liệu. | Gây nhầm lẫn cho tester về expected postcondition. BA cần merge hoặc xóa một phần. | Open | Duplicate Postconditions section removed. The boilerplate section (referencing D1, NFR-ADM-005) was stale and conflicted with §5. §5 is now the single source of truth with happy path and A2 postconditions. |
+| I-10 | Medium | flows.md F-05 vs uc-user-redeem.md | flows.md F-05 (bot_safe_close) vẫn hiển thị luồng cũ với `OperatorFacade → ExBotWorker → RedemptionQueue → Operator fulfillRequest` (hedge-first qua API, không phải qua on-chain event watcher). Tuy nhiên HLD 2026-06-18 ghi nhận "drop park/re-entry" và frd.md FR-EXBOT-070(B) mô tả bot_safe_close khác. F-05 có thể đã outdated sau HLD decision. | Nếu tester đọc F-05 để so sánh hai close systems, họ sẽ hiểu sai bot_safe_close. | Open | Outdated vs AWS arc — F-05 will be rewritten during arc migration. Logic issue (missing hedge-first step) will also be corrected in the same pass. |
+| I-11 | Low | uc-user-redeem.md §3 step 9; flows.md F-04; frd.md FR-EXBOT-022 | UC step 9 gọi `closeShortReduceOnlyIoc` với `cloid` nhưng không mô tả behavior khi HL từ chối lệnh (ví dụ: lệnh bị reject vì lý do không xác định, partial fill, hay HL API timeout). BA vui lòng xác nhận: khi `closeShortReduceOnlyIoc` bị HL reject, Worker retry bao nhiêu lần trước khi chuyển sang `residual_hl_liability`? | Ảnh hưởng test case cho edge case HL reject close order — tester cần biết retry count để thiết kế đúng expected behavior. | Open | `closeShortReduceOnlyIoc` retries up to 3 times on HL reject/timeout. After 3 failed attempts, `close_operations.state='residual_hl_liability'`, `bots.lifecycle_state='error'`, admin notified (E-EXBOT-024). Retry count aligned with bot_safe_close. UC step 9 and A2 updated. |

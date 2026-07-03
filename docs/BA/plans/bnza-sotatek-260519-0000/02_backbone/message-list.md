@@ -367,6 +367,7 @@ changelog:
 | E-EXBOT-021 | `lifecycle_state='lp_closing'` — bot_safe_close in progress, close not yet complete | "Bot close is in progress. Please wait." | 200 |
 | E-EXBOT-022 | `lifecycle_state='closed'` after bot_safe_close — close complete, funds returned | "Bot safely closed. Funds have been returned to your wallet." | 200 |
 | E-EXBOT-023 | No bot record found for user — `GET /api/exbot/status` returns 404 | "No active bot found for this account." | 404 |
+| E-EXBOT-024 | user_redeem hedge close failed — `close_operations.state='residual_hl_liability'` | "User redemption hedge close failed. Manual intervention required." | — (internal alert) |
 | Symbol not found | Symbol removed from Hyperliquid | "Symbol not found" (chart) | User can search another symbol |
 
 ---
