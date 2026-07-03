@@ -3,10 +3,11 @@ type: use-case
 module: exbot
 status: draft
 created: 2026-06-18
-updated: 2026-06-18
+updated: 2026-07-03
 owner: "@hienduong"
 linked_stories: [US-EXBOT-002]
 changelog:
+  - 2026-07-03 | /ba-do | I-001: A3 rewrite — cooldown removed, A3a lp_closing + A3b closed (E-EXBOT-021/022). I-002: Actors add Admin + auth mechanism. I-004: step 3 last_light_check_at. I-005: A6 lp_rebalancing + A7 error + A4 clarify closed≠404. I-006: JSON response schema defined. I-009: E-EXBOT-023 registered + A4 updated. I-010: A5 infra-level note. I-011: Preconditions auth mechanism documented. I-013: step 4 + A8 MarketDataDO null fallback
   - 2026-06-18 | /ba-do | initial draft to cover US-002 monitor status flow via Operator Facade
 ---
 
@@ -19,11 +20,15 @@ Investor navigates to the ExBot status screen in the POOL UI.
 ---
 
 ## 1. Actors
-- **Primary:** USDC Investor (read-only)
+- **Primary:** USDC Investor (read-only, must match `bot.user_wallet_address`)
+- **Secondary:** Admin (read-only, bypasses wallet ownership check)
 - **System:** Operator Facade Worker, ExBot Worker, D1
 
 ## 2. Preconditions
-- Investor is authenticated and has an active ExBot
+- Caller is authenticated via `X-Wallet-Address` header (Investor or Admin)
+- Investor: `wallet_address` must match `bot.user_wallet_address`; Admin: bypasses ownership check
+- Operator Facade validates `X-Wallet-Address`: missing → 401; blocked → 403; not in whitelist (when `access_mode=whitelist`) → 403
+- Operator Facade forwards request to ExBot Worker via `X-Exbot-Internal-Auth` header (shared secret from env var `EXBOT_INTERNAL_AUTH_TOKEN`); missing/wrong → 401
 - Operator Facade service is available with valid CF service binding to ExBot Worker
 
 ## 3. Main Success Scenario
@@ -32,16 +37,49 @@ Investor navigates to the ExBot status screen in the POOL UI.
 3. ExBot Worker reads from D1:
    - `bots.status`, `lifecycle_state`
    - `bot_runtime_state.last_known_hl_short_size` (actual hedge size)
+   - `bot_runtime_state.last_light_check_at` (last completed light-check timestamp)
    - `positions.tickLower`, `positions.tickUpper` (LP range)
    - `hedge_legs.margin_status`
-   - `next_light_check_at` (last light-check timestamp)
-4. ExBot Worker queries current tick from MarketDataDO
-5. ExBot Worker computes `rangeState` by comparing current tick against `tickLower`/`tickUpper` (in-range or out-of-range)
+4. ExBot Worker queries current tick from MarketDataDO. If MarketDataDO unavailable or snapshot stale → `current_tick: null`, `range_state: null`; remaining fields returned normally (no block, no retry)
+5. ExBot Worker computes `rangeState` by comparing current tick against `tickLower`/`tickUpper` (in-range or out-of-range). If `current_tick = null` → `range_state: null`, skip computation
 6. ExBot Worker computes drift %: `(|actualShortEth - targetShortEth| / targetShortEth) × 100`
-7. ExBot Worker composes JSON status response with all fields
+7. ExBot Worker composes JSON status response:
+
+   **Implemented fields:**
+   ```json
+   {
+     "bot_id": "string",
+     "status": "string",
+     "lifecycle_state": "string",
+     "safe_mode_tier": "string | null",
+     "runtime_health_status": "string",
+     "last_reconcile_at": "string | null",
+     "last_error_code": "string | null",
+     "dry_run": "boolean"
+   }
+   ```
+
+   **Pending implementation (BA-defined):**
+   ```json
+   {
+     "tick_lower": "number | null",
+     "tick_upper": "number | null",
+     "current_tick": "number | null",
+     "range_state": "\"in\" | \"out\" | null",
+     "actual_short_eth": "string | null",
+     "target_short_eth": "string | null",
+     "drift_pct": "number | null",
+     "margin_status": "\"ok\" | \"warning\" | \"critical\" | null",
+     "last_light_check_at": "string | null",
+     "safe_mode_reason": "string | null",
+     "cooldown_end_at": "string | null"
+   }
+   ```
+
+   Null-handling: all pending fields return `null` when not yet available. ETH amounts use `string` to avoid floating-point precision loss. Timestamps use ISO 8601 string.
 8. Response returned to Operator Facade → POOL UI
 9. POOL UI renders ExBot status panel:
-   - Status label (Active/Safe Mode/Cooldown)
+   - Status label (Active / Safe Mode / Stop Fired — Cooldown / Rebalancing / Closing / Closed / Error)
    - LP range (tickLower/tickUpper), current tick
    - Range state indicator (in/out)
    - Current hedge size (ETH), target hedge size, drift %
@@ -51,10 +89,14 @@ Investor navigates to the ExBot status screen in the POOL UI.
 
 ## 4. Alternate Flows
 - **A1 (status='safe_mode'):** Response includes `safe_mode_reason`; UI displays "Safe Mode — No new actions" banner; all mutation buttons disabled except "Close Bot (emergency)"
-- **A2 (lifecycle_state='hedge_stopped_cooldown'):** Response includes cooldown end timestamp; UI displays "Stop Fired — Cooldown (Xh remaining)" with explanation
-- **A3 (lifecycle_state='cooldown' after bot_safe_close):** UI displays "Bot safely closed. USDC parked. Re-entry will be attempted automatically."
-- **A4 (no active bot for user):** 404 response; UI shows empty state "No active bot"
-- **A5 (Operator Facade unavailable):** 503 Service Unavailable; UI shows error banner "Status service temporarily unavailable"
+- **A2 (lifecycle_state='hedge_stopped_cooldown'):** Response includes cooldown end timestamp; UI displays "Stop Fired — Cooldown (Xh remaining)" with explanation; mutation buttons disabled
+- **A3a (lifecycle_state='lp_closing'):** Bot close is in progress; UI displays "Bot close is in progress. Please wait." (E-EXBOT-021); all mutation buttons disabled
+- **A3b (lifecycle_state='closed'):** Bot fully closed; record still exists in D1; 200 response with `lifecycle_state='closed'`; UI displays "Bot safely closed. Funds have been returned to your wallet." (E-EXBOT-022); all mutation buttons disabled
+- **A6 (lifecycle_state='lp_rebalancing'):** LP range rebalance in progress; 200 response with `lifecycle_state='lp_rebalancing'`; UI displays "Rebalancing in progress"; all mutation buttons disabled
+- **A7 (status='error'):** Bot error requiring admin intervention; 200 response with `status='error'`; UI displays "Bot error — admin intervention required"; only "Close Bot (emergency)" enabled
+- **A8 (MarketDataDO unavailable or stale):** Step 4 — `current_tick: null`, `range_state: null` returned in response; all other fields returned normally; no 503, no retry. UI displays "—" for range state indicator
+- **A4 (no bot record found for botId):** 404 response (E-EXBOT-023); UI shows empty state "No active bot found for this account." Note: `closed` bots return 200 (record retained in D1), not 404
+- **A5 (Operator Facade unavailable):** 503 Service Unavailable — Cloudflare/infra-level response, not application-defined; no E-EXBOT code required. UI shows error banner "Status service temporarily unavailable"
 
 ## 5. Postconditions
 - Investor successfully views current ExBot status including LP range, hedge size, margin health, and lifecycle state

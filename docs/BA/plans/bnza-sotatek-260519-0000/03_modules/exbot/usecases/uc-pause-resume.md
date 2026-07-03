@@ -3,10 +3,11 @@ type: use-case
 module: exbot
 status: draft
 created: 2026-06-18
-updated: 2026-06-18
+updated: 2026-07-03
 owner: "@hienduong"
 linked_stories: [US-EXBOT-003]
 changelog:
+  - 2026-07-03 | /ba-do | Q8: scope boundary — "Investor receives UI confirmation" → "POOL UI displays confirmation". Q9: step 7/6 reference MSG-SUC-81/82
   - 2026-06-18 | /ba-do | initial draft from FR-EXBOT-005
 ---
 
@@ -47,8 +48,8 @@ Investor initiates pause or resume action via Operator API endpoints or UI.
 4. Worker does NOT modify `bots.lifecycle_state` — it remains at pre-pause value (e.g., `'active'`)
 5. Existing HL short position (`hedge_legs.last_known_hl_short_size`) remains untouched
 6. Existing LP NFT (`positions.token_id`) remains intact
-7. Operator API returns status response: `{ status: "paused", message: "Paused — hedge is maintained, LP is maintained" }`
-8. Investor receives UI confirmation: "Bot paused. Hedge and LP are maintained."
+7. ExBot Worker returns API response: `{ status: "paused", message: "Paused — hedge is maintained, LP is maintained" }`
+8. POOL UI displays confirmation: MSG-SUC-81 "Bot paused. Hedge and LP are maintained."
 
 ---
 
@@ -59,8 +60,8 @@ Investor initiates pause or resume action via Operator API endpoints or UI.
 3. Worker restores `bots.status='active'` and persists atomically to D1
 4. Worker reads pre-pause `lifecycle_state` from D1 (unchanged) — confirms it matches expected state (e.g., `'active'`)
 5. Worker schedules next light-check: set `bot_runtime_state.next_light_check_at` to `now + 5min + jitter(−45s, +45s)` and enqueues `light-check` message
-6. Operator API returns status response: `{ status: "active", message: "Bot resumed. Monitoring resumed." }`
-7. Investor receives UI confirmation: "Bot resumed. Monitoring will resume shortly."
+6. ExBot Worker returns API response: `{ status: "active", message: "Bot resumed. Monitoring resumed." }`
+7. POOL UI displays confirmation: MSG-SUC-82 "Bot resumed. Monitoring will resume shortly."
 
 ---
 

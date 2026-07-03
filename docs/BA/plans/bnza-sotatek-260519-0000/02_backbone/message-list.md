@@ -6,6 +6,7 @@ updated: 2026-07-01
 module: bnza-backbone
 owner: "@hien.duong"
 changelog:
+  - "2026-07-03 | /ba-do | Q9: add MSG-EXBOT section — MSG-SUC-81 (pause) + MSG-SUC-82 (resume) for POOL UI"
   - "2026-07-01 | manual | add E-EXBOT-019/020: stuck marker notifications for deep-audit (stop_trigger_crossed_at > 30min, stop_replacing_started_at > 60s)"
   - "2026-07-01 | manual | add E-EXBOT-018: bot_safe_close hedge close failed after 3 retries (residual_hl_liability)"
   - "2026-07-01 | manual | add E-EXBOT-017: bot start preflight no active key_status row (key-provision arc update)"
@@ -363,4 +364,18 @@ changelog:
 | E-EXBOT-018 | bot_safe_close hedge close failed after 3 retries — `close_operations.state='residual_hl_liability'` | "Bot safe close failed: HL hedge could not be closed after 3 attempts. Manual intervention required. Bot held at residual_hl_liability." | — (internal alert) |
 | E-EXBOT-019 | `stop_trigger_crossed_at` stuck > 30 minutes — deep-audit backstop detection; bot enters SAFE_MODE | "Stop trigger marker stuck for over 30 minutes. Bot entered Safe Mode. Manual review required." | — (internal alert) |
 | E-EXBOT-020 | `stop_replacing_started_at` stuck > 60 seconds — deep-audit backstop detection; bot enters SAFE_MODE | "Stop replacement marker stuck for over 60 seconds. Bot entered Safe Mode. Manual review required." | — (internal alert) |
+| E-EXBOT-021 | `lifecycle_state='lp_closing'` — bot_safe_close in progress, close not yet complete | "Bot close is in progress. Please wait." | 200 |
+| E-EXBOT-022 | `lifecycle_state='closed'` after bot_safe_close — close complete, funds returned | "Bot safely closed. Funds have been returned to your wallet." | 200 |
+| E-EXBOT-023 | No bot record found for user — `GET /api/exbot/status` returns 404 | "No active bot found for this account." | 404 |
 | Symbol not found | Symbol removed from Hyperliquid | "Symbol not found" (chart) | User can search another symbol |
+
+---
+
+## MSG-EXBOT — ExBot Module UI Messages (bnza-exbot / POOL UI)
+
+> Success messages returned by ExBot Worker API, displayed by POOL UI (PTL-05). ExBot scope ends at API response; POOL UI owns rendering.
+
+| Code | Type | Screen | Text |
+|------|------|--------|------|
+| MSG-SUC-81 | SUC | exbot-status (PTL-05) | "Bot paused. Hedge and LP are maintained." |
+| MSG-SUC-82 | SUC | exbot-status (PTL-05) | "Bot resumed. Monitoring will resume shortly." |

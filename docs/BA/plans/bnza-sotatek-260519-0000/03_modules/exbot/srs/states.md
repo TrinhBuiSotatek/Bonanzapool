@@ -6,6 +6,7 @@ created: 2026-06-12
 updated: 2026-06-18
 owner: "@hienduong"
 changelog:
+  - 2026-07-03 | /ba-do | Q7: clarify paused row — pause only allowed from lifecycle_state='active'; hedge_stopped_cooldown and lp_rebalancing cannot be paused
   - 2026-06-29 | manual | replace Agent Key Approval Status section (approval_status, 4-state) with Agent Key Status (key_status, 3-state — active/superseded/revoked)
   - 2026-06-26 | manual | QC I-23 fix: add hl_agent_keys.approval_status state diagram (4 states, 4 transitions; reject path deferred OQ-EXBOT-016)
   - 2026-06-18 | /ba-do hld-decisions | remove cooldown/parked states from state machine; remove funds_parked from close_operations; update bot_safe_close terminal transition
@@ -68,7 +69,7 @@ stateDiagram-v2
 | `closed` | closed | Fully closed | skip | skip | skip |
 | `safe_mode` | safe_mode | No mutations; monitor only | limited (no HL) | blocked | when HL recovers |
 | `error` | error | Admin required | skip | skip | skip |
-| (pre-pause value) | paused | Hedge maintained; no new mutations; deep-audit may trigger SAFE_MODE via stuck marker detection | skip | skip | every 6h |
+| `active` (pre-pause) | paused | Hedge maintained; no new mutations; deep-audit may trigger SAFE_MODE via stuck marker detection. **Pause only allowed from `lifecycle_state='active'`** — `hedge_stopped_cooldown` and `lp_rebalancing` cannot be paused | skip | skip | every 6h |
 
 **Note (HLD 2026-06-18):** `cooldown` and `parked` lifecycle states removed — park/redeploy feature dropped. After bot_safe_close, lifecycle transitions directly to `closed`.
 
