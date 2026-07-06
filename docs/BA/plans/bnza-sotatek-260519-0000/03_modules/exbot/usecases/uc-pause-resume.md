@@ -3,10 +3,11 @@ type: use-case
 module: exbot
 status: draft
 created: 2026-06-18
-updated: 2026-07-03
+updated: 2026-07-04
 owner: "@hienduong"
 linked_stories: [US-EXBOT-003]
 changelog:
+  - 2026-07-04 | arc-migration | replace Cloudflare primitives with AWS equivalents (D1→Aurora PostgreSQL, ExBot Worker→ExBot Lambda)
   - 2026-07-03 | /ba-do | Q8: scope boundary — "Investor receives UI confirmation" → "POOL UI displays confirmation". Q9: step 7/6 reference MSG-SUC-81/82
   - 2026-06-18 | /ba-do | initial draft from FR-EXBOT-005
 ---
@@ -23,7 +24,7 @@ Investor initiates pause or resume action via Operator API endpoints or UI.
 
 - **Primary:** USDC Investor (pause/resume requester)
 - **Secondary:** ExBot System Operator (status update worker)
-- **System:** Hyperliquid (HL short position read-only), BnzaExVault (LP NFT read-only), D1
+- **System:** Hyperliquid (HL short position read-only), BnzaExVault (LP NFT read-only), Aurora PostgreSQL
 
 ---
 
@@ -36,19 +37,19 @@ Investor initiates pause or resume action via Operator API endpoints or UI.
 
 ### For Resume Flow
 - Bot exists with `bots.status='paused'`
-- Bot's `lifecycle_state` is unchanged from its pre-pause value (preserved in D1)
+- Bot's `lifecycle_state` is unchanged from its pre-pause value (preserved in Aurora PostgreSQL)
 
 ---
 
 ## 3. Main Success Scenario — Pause Flow
 
 1. Investor requests pause via `POST /api/exbot/pause` with `botId`
-2. Status update worker queries D1: verify `bots.status='active'` and `lifecycle_state='active'`
-3. Worker sets `bots.status='paused'` and persists atomically to D1
+2. Status update worker queries Aurora PostgreSQL: verify `bots.status='active'` and `lifecycle_state='active'`
+3. Worker sets `bots.status='paused'` and persists atomically to Aurora PostgreSQL
 4. Worker does NOT modify `bots.lifecycle_state` — it remains at pre-pause value (e.g., `'active'`)
 5. Existing HL short position (`hedge_legs.last_known_hl_short_size`) remains untouched
 6. Existing LP NFT (`positions.token_id`) remains intact
-7. ExBot Worker returns API response: `{ status: "paused", message: "Paused — hedge is maintained, LP is maintained" }`
+7. ExBot Lambda returns API response: `{ status: "paused", message: "Paused — hedge is maintained, LP is maintained" }`
 8. POOL UI displays confirmation: MSG-SUC-81 "Bot paused. Hedge and LP are maintained."
 
 ---
@@ -56,11 +57,11 @@ Investor initiates pause or resume action via Operator API endpoints or UI.
 ## 4. Main Success Scenario — Resume Flow
 
 1. Investor requests resume via `POST /api/exbot/resume` with `botId`
-2. Status update worker queries D1: verify `bots.status='paused'`
-3. Worker restores `bots.status='active'` and persists atomically to D1
-4. Worker reads pre-pause `lifecycle_state` from D1 (unchanged) — confirms it matches expected state (e.g., `'active'`)
+2. Status update worker queries Aurora PostgreSQL: verify `bots.status='paused'`
+3. Worker restores `bots.status='active'` and persists atomically to Aurora PostgreSQL
+4. Worker reads pre-pause `lifecycle_state` from Aurora PostgreSQL (unchanged) — confirms it matches expected state (e.g., `'active'`)
 5. Worker schedules next light-check: set `bot_runtime_state.next_light_check_at` to `now + 5min + jitter(−45s, +45s)` and enqueues `light-check` message
-6. ExBot Worker returns API response: `{ status: "active", message: "Bot resumed. Monitoring resumed." }`
+6. ExBot Lambda returns API response: `{ status: "active", message: "Bot resumed. Monitoring resumed." }`
 7. POOL UI displays confirmation: MSG-SUC-82 "Bot resumed. Monitoring will resume shortly."
 
 ---
@@ -69,19 +70,19 @@ Investor initiates pause or resume action via Operator API endpoints or UI.
 
 **A1 — Pause Rejected in SAFE_MODE:**
 - Precondition: bot `status='safe_mode'`
-- Worker queries D1, finds `bots.status='safe_mode'`
+- Worker queries Aurora PostgreSQL, finds `bots.status='safe_mode'`
 - Worker returns error: HTTP 409, message E-EXBOT-013 "Bot is in Safe Mode. You can close the bot instead."
 - No state change occurs
 
 **A2 — Resume on Already-Active Bot:**
 - Precondition: bot `status='active'` (not paused)
-- Worker queries D1, finds `bots.status='active'`
+- Worker queries Aurora PostgreSQL, finds `bots.status='active'`
 - Worker returns success response (idempotent): "Bot already active. No change needed."
 - No state change occurs
 
 **A3 — Pause on Already-Paused Bot:**
 - Precondition: bot `status='paused'` (already paused)
-- Worker queries D1, finds `bots.status='paused'`
+- Worker queries Aurora PostgreSQL, finds `bots.status='paused'`
 - Worker returns success response (idempotent): "Bot already paused. No change needed."
 - No state change occurs
 
@@ -107,7 +108,7 @@ While bot is in `status='paused'`:
 ## 7. Postconditions
 
 ### After Successful Pause
-- `bots.status='paused'` persisted in D1
+- `bots.status='paused'` persisted in Aurora PostgreSQL
 - `bots.lifecycle_state` unchanged (e.g., still `'active'`)
 - HL short position maintained at current size
 - LP NFT maintained at current token ID
@@ -115,7 +116,7 @@ While bot is in `status='paused'`:
 - Audit log entry recorded: "Bot paused by investor"
 
 ### After Successful Resume
-- `bots.status='active'` persisted in D1
+- `bots.status='active'` persisted in Aurora PostgreSQL
 - `bots.lifecycle_state` confirmed unchanged
 - `bot_runtime_state.next_light_check_at` scheduled within 5 minutes
 - `light-check` message enqueued for next cycle
@@ -137,15 +138,15 @@ sequenceDiagram
     actor Investor
     participant API as Operator API
     participant Worker as Status Worker
-    participant D1 as D1 Database
+    participant AuroraDB as "Aurora PostgreSQL"
     participant HL as Hyperliquid
     participant Vault as BnzaExVault
     
     Investor->>API: POST /api/exbot/pause
     API->>Worker: Pause request
-    Worker->>D1: Query bot status
+    Worker->>AuroraDB: Query bot status
     alt status = 'active'
-        Worker->>D1: Set status='paused'
+        Worker->>AuroraDB: Set status='paused'
         Note over HL,Vault: HL short & LP NFT remain unchanged
         Worker->>API: Return { status: "paused", ... }
         API->>Investor: UI: "Bot paused"
@@ -156,11 +157,11 @@ sequenceDiagram
     
     Investor->>API: POST /api/exbot/resume
     API->>Worker: Resume request
-    Worker->>D1: Query bot status
+    Worker->>AuroraDB: Query bot status
     alt status = 'paused'
-        Worker->>D1: Set status='active'
-        Worker->>D1: Schedule next_light_check_at
-        Worker->>D1: Enqueue light-check message
+        Worker->>AuroraDB: Set status='active'
+        Worker->>AuroraDB: Schedule next_light_check_at
+        Worker->>AuroraDB: Enqueue light-check message
         Worker->>API: Return { status: "active", ... }
         API->>Investor: UI: "Bot resumed"
     end

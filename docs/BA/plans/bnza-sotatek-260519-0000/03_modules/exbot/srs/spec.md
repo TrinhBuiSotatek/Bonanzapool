@@ -2,7 +2,7 @@
 type: srs
 status: draft
 created: 2026-06-12
-updated: 2026-06-29
+updated: 2026-07-04
 owner: "@hienduong"
 module: exbot
 lang: en
@@ -12,6 +12,8 @@ links:
   - ../usecases/index.md
   - ../userstories/index.md
 changelog:
+  - 2026-07-04 | arc-migration | FR-EXBOT-010: sync queue count to 11 (add key-provision), fixing inconsistency with FM-XB-02 backbone label
+  - 2026-07-03 | arc-migration | replace Cloudflare primitives with AWS equivalents across all FRs
   - 2026-06-29 | manual | flow change: §1 intro; FM-XB-02/05/06; FR-002/080 KMS; remove FR-081/082/083; BR rewrite; remove E-003/004/014/015/016; add E-017; §6/7/8; FR-090; NFR-006; IC-005; close OQ-16
   - 2026-06-20 | /ba-do | QC audit fixes: OQ-EXBOT-13/14/15/16/17 added to §9
   - 2026-06-18 | /ba-do hld-decisions | FR-070/071/073 update: drop park/re-entry; IC-EXBOT-002 remove uninvestedBalanceOf stub; scope FM-XB-08 update; us-012 emergency authority
@@ -24,8 +26,8 @@ changelog:
 # SRS: BNZA-EXBOT Infrastructure (Module 4)
 
 > **Trace:** FM-XB-01 → FM-XB-08 (Feature Map §5.4)
-> **Architecture:** Standalone Cloudflare Worker (`apps/bnza-exbot/`) — NOT co-deployed with OPERATOR
-> **Entry point:** OPERATOR Facade `/api/exbot/*` → CF service binding → ExBot Worker (internal token)
+> **Architecture:** Standalone AWS Lambda service (`apps/bnza-exbot/`) — NOT co-deployed with OPERATOR
+> **Entry point:** OPERATOR Facade `/api/exbot/*` → API Gateway + Lambda Authorizer (HMAC) → ExBot Lambda
 > **Source truth:** SPEC v5.2.6 (zen-approved). Where this SRS conflicts with SPEC v5.2.6, SPEC prevails.
 
 ---
@@ -34,7 +36,7 @@ changelog:
 
 ### 1.1 Scope
 
-BNZA-EXBOT is the backend infrastructure for a managed delta-hedged LP Bot. SOTATEK builds infrastructure only — trading strategy logic (PositionCalc, hedge math, stop safety factor tuning) is zen-proprietary. ExBot Worker runs as a standalone Cloudflare Worker, separate from OPERATOR. The OPERATOR acts as a thin public-facing facade that proxies `start/status/close/margin` to ExBot via CF service binding.
+BNZA-EXBOT is the backend infrastructure for a managed delta-hedged LP Bot. SOTATEK builds infrastructure only — trading strategy logic (PositionCalc, hedge math, stop safety factor tuning) is zen-proprietary. ExBot Lambda runs as a standalone AWS Lambda service, separate from OPERATOR. The OPERATOR acts as a thin public-facing facade that proxies `start/status/close/margin` to ExBot Lambda via API Gateway with HMAC Lambda Authorizer.
 
 This SRS covers FM-XB-01 through FM-XB-08 for Phase A (1–100 bots, Base + Optimism dual-chain).
 
@@ -42,10 +44,10 @@ This SRS covers FM-XB-01 through FM-XB-08 for Phase A (1–100 bots, Base + Opti
 
 | Feature Map ID | Feature | Priority |
 |---|---|---|
-| FM-XB-01 | D1 Schema (control_db + state_db_shard) | P0 |
-| FM-XB-02 | Queue Topology (11 queues) | P0 |
-| FM-XB-03 | Durable Objects (HLRateLimitDO, UserLockDO, MarketDataDO) | P0 |
-| FM-XB-04 | Cron Jobs (deep-audit, metrics-rollup, stop-integrity scan) | P1 |
+| FM-XB-01 | Aurora PostgreSQL Serverless v2 Schema (control_db + state_db_shard) | P0 |
+| FM-XB-02 | Queue Topology (11 queues via SQS / Redis BullMQ) | P0 |
+| FM-XB-03 | ElastiCache Redis — rate limiter (HLRateLimit), per-user mutex (UserLock via Redlock), pool slot0 cache (MarketData) | P0 |
+| FM-XB-04 | Scheduled Jobs via EventBridge Scheduler (deep-audit, metrics-rollup, stop-integrity scan) | P1 |
 | FM-XB-05 | HL Adapter (rate limit, cloid, delta-only, reconcile, agent key signing via KMS Signing Lambda) | P1 |
 | FM-XB-06 | Operator Facade API (`/api/exbot/*` — 4 endpoints) | P1 |
 | FM-XB-07 | Lifecycle State Machine (18 states) | P0 |
@@ -58,7 +60,7 @@ This SRS covers FM-XB-01 through FM-XB-08 for Phase A (1–100 bots, Base + Opti
 - Phase 0 verification tasks (NV-1 to NV-14) — zen/SOTATEK verification tasks
 - Backtest module (separate module)
 - POOL UI changes for ExBot tab — POOL module scope
-- Phase B+ features (multi-bot per user, D1 sharding >1 shard, R2 archive, Analytics Engine)
+- Phase B+ features (multi-bot per user, Aurora PostgreSQL sharding >1 shard, S3 archive, Analytics Engine)
 
 ### 1.4 Related Artifacts
 
@@ -91,7 +93,7 @@ The system shall enforce a maximum of one active ExBot per user in Phase A. Befo
 
 The system shall run five preflight checks in sequence before creating a bot record: (1) one-bot policy check, (2) HL isolated margin balance ≥ required margin × 2.0, (3) `hl_agent_keys.key_status='active'` (system-provisioned at deposit — if not active, block with E-EXBOT-017), (4) builder fee (5bps) confirmed on HL, (5) LP mint simulation passes. Any single failure blocks the start with a specific message identifying the failed check.
 
-**Acceptance criteria:** Insufficient margin returns "Required HL margin: $X (with 100% buffer). Current: $Y. Please deposit $Z to HL." Key not provisioned (`key_status` not `active`) returns E-EXBOT-017. Each check failure produces a distinct error; no partial bot record is left in D1.
+**Acceptance criteria:** Insufficient margin returns "Required HL margin: $X (with 100% buffer). Current: $Y. Please deposit $Z to HL." Key not provisioned (`key_status` not `active`) returns E-EXBOT-017. Each check failure produces a distinct error; no partial bot record is left in Aurora PostgreSQL.
 
 ---
 
@@ -101,7 +103,7 @@ The system shall run five preflight checks in sequence before creating a bot rec
 
 The system shall track bot state using two fields: `bots.status` (coarse-grained: active/paused/closing/closed/safe_mode/error) and `bots.lifecycle_state` (fine-grained: 18 canonical values). The initialization sequence is fixed: idle → preflight → lp_opening → lp_opened → hedge_pre_open → hedge_post_confirmed → stop_placing → stop_verified → active. No step may be skipped.
 
-**Acceptance criteria:** A bot that completes initialization has `lifecycle_state='active'` and `status='active'`. Each transition is persisted atomically to D1 before proceeding to the next step.
+**Acceptance criteria:** A bot that completes initialization has `lifecycle_state='active'` and `status='active'`. Each transition is persisted atomically to Aurora PostgreSQL before proceeding to the next step.
 
 ---
 
@@ -111,7 +113,7 @@ The system shall track bot state using two fields: `bots.status` (coarse-grained
 
 The system shall support Base and Optimism from Phase 1. `wethIndex` (0 or 1, indicating whether WETH is token0 or token1 in the pool) shall be verified per chain and stored in `positions.weth_index` at LP open. The hedge leg (HL ETH-USD perpetual short) is chain-independent; dual-chain impact is LP side only.
 
-**Acceptance criteria:** A bot on Base and a bot on Optimism can run simultaneously under different users. `weth_index` is populated correctly for each chain; LP ETH amount calculation uses `weth_index` from D1, not a hardcoded assumption.
+**Acceptance criteria:** A bot on Base and a bot on Optimism can run simultaneously under different users. `weth_index` is populated correctly for each chain; LP ETH amount calculation uses `weth_index` from Aurora PostgreSQL, not a hardcoded assumption.
 
 ---
 
@@ -125,13 +127,13 @@ The system shall support pausing a bot by setting `bots.status='paused'` while l
 
 ---
 
-### FR-EXBOT-010 — Queue Topology (10 Queues)
+### FR-EXBOT-010 — Queue Topology (11 Queues via SQS / Redis BullMQ)
 **Trace:** FM-XB-02, US-EXBOT-005
 **Priority:** P0
 
-The system shall implement exactly 10 queues: `bot-scan`, `light-check`, `hedge-sync`, `reconcile`, `deep-audit`, `price-near-stop-audit`, `partial_repair`, `user_redeem` (highest priority, SLA 5 min), `notification`, `metrics-rollup`. All queue `sendBatch` calls shall go through the `chunkSendBatch()` helper (max 100 messages per call). Direct `queue.sendBatch()` without the helper is forbidden.
+The system shall implement exactly 11 queues: `bot-scan`, `light-check`, `hedge-sync`, `reconcile`, `deep-audit`, `price-near-stop-audit`, `partial_repair`, `user_redeem` (highest priority, SLA 5 min), `notification`, `metrics-rollup`, `key-provision`. All queue `sendBatch` calls shall go through the `chunkSendBatch()` helper (max 10 messages per call — SQS hard limit). Direct `queue.sendBatch()` without the helper is forbidden.
 
-**Acceptance criteria:** No producer calls `sendBatch` directly. Batch sizes exceeding 100 are chunked automatically. Dead-letter queue receives poison messages from any consumer.
+**Acceptance criteria:** No producer calls `sendBatch` directly. Batch sizes exceeding 10 are chunked automatically. Dead-letter queue (SQS DLQ, maxReceiveCount=3) receives poison messages from any consumer.
 
 ---
 
@@ -141,7 +143,7 @@ The system shall implement exactly 10 queues: `bot-scan`, `light-check`, `hedge-
 
 Every queue consumer shall insert `message_id` with `state='started'` into the `queue_idempotency` table at the start of processing. A UNIQUE constraint conflict on `message_id` indicates duplicate delivery; the consumer shall return immediately without processing. On completion, the consumer updates `state='succeeded'`; on failure, `state='failed'` or `'retryable'`.
 
-**Acceptance criteria:** Redelivering the same queue message twice produces exactly one successful execution. The second delivery exits immediately after the UNIQUE constraint conflict. `queue_idempotency` row is present for every processed message.
+**Acceptance criteria:** Redelivering the same queue message twice produces exactly one successful execution. The second delivery exits immediately after the UNIQUE constraint conflict. `queue_idempotency` row is present for every processed message. Lambda SQS consumers shall use `reportBatchItemFailures` response format; failed individual records are returned to SQS for retry while succeeded records are not re-delivered.
 
 ---
 
@@ -149,13 +151,13 @@ Every queue consumer shall insert `message_id` with `state='started'` into the `
 **Trace:** FM-XB-02, US-EXBOT-005
 **Priority:** P0
 
-The light-check worker shall evaluate each active bot's rebalance need using only D1 `bot_runtime_state`, `MarketDataDO` (sqrtPriceX96, currentTick), and local TickMath computation. No Hyperliquid API calls are permitted in light-check (HL weight = 0). The worker shall evaluate the canonical `RebalanceReason[]` enum and enqueue `hedge-sync` when rebalance is needed and `circuit_breakers.state != 'open'`. Light-check shall be skipped entirely for bots with `lifecycle_state IN ('lp_rebalancing','lp_closing')` or `status='paused'`.
+The light-check worker shall evaluate each active bot's rebalance need using only Aurora PostgreSQL `bot_runtime_state`, ElastiCache Redis pool slot0 cache (sqrtPriceX96, currentTick — written by Fargate price poller), and local TickMath computation. No Hyperliquid API calls are permitted in light-check (HL weight = 0). The worker shall evaluate the canonical `RebalanceReason[]` enum and enqueue `hedge-sync` when rebalance is needed and `circuit_breakers.state != 'open'`. Light-check shall be skipped entirely for bots with `lifecycle_state IN ('lp_rebalancing','lp_closing')` or `status='paused'`.
 
 In addition to rebalance evaluation, each light-check pass shall:
 1. Check `stop_replacing_started_at IS NOT NULL AND (now − stop_replacing_started_at) > 60s` — if true, enqueue `partial_repair` with `reason='stop_replacing_overrun'` and enter SAFE_MODE (primary detection, ≤5 min; see FR-EXBOT-033).
-2. Use `uniPoolPrice` (Uniswap V3 pool slot0 `sqrtPriceX96`, sourced from `MarketDataDO`) when computing `deltaErrorUsd` for drift threshold evaluation. `hlMarkPrice` is used only for stop trigger detection (`markPrice >= stop_price`). `hlOraclePrice` is used only for margin calculations. These three price sources must not be interchanged (v5.2.6 X-5 3-way price split).
+2. Use `uniPoolPrice` (Uniswap V3 pool slot0 `sqrtPriceX96`, sourced from ElastiCache Redis pool slot0 cache) when computing `deltaErrorUsd` for drift threshold evaluation. `hlMarkPrice` is used only for stop trigger detection (`markPrice >= stop_price`). `hlOraclePrice` is used only for margin calculations. These three price sources must not be interchanged (v5.2.6 X-5 3-way price split).
 
-**Acceptance criteria:** A 10,000-bot light-check cycle does not consume any HL API rate limit weight. Any HL fetch introduced into light-check is an architectural violation flagged by code review. `deltaErrorUsd` computation uses pool slot0 price, not HL mark or oracle price.
+**Acceptance criteria:** A 10,000-bot light-check cycle does not consume any HL API rate limit weight. Any HL fetch introduced into light-check is an architectural violation flagged by code review. `deltaErrorUsd` computation uses pool slot0 price from ElastiCache Redis, not HL mark or oracle price. 10,000 concurrent light-check workers make at most 1 RPC call per refresh interval (via the Fargate price poller writing to ElastiCache Redis), not 10,000.
 
 ---
 
@@ -163,9 +165,9 @@ In addition to rebalance evaluation, each light-check pass shall:
 **Trace:** FM-XB-02
 **Priority:** P0
 
-`next_light_check_at` shall be set to `now + 5min + random(−45s, +45s)`. The jitter is computed per-bot as a value, but the D1 write is batched (1 UPDATE statement per shard, not a per-bot individual write).
+`next_light_check_at` shall be set to `now + 5min + random(−45s, +45s)`. The jitter is computed per-bot as a value, but the Aurora PostgreSQL write is batched (1 UPDATE statement per shard, not a per-bot individual write).
 
-**Acceptance criteria:** No D1 per-bot write for `next_light_check_at`. Bot scan shows even distribution of check times across the 5-minute window.
+**Acceptance criteria:** No Aurora PostgreSQL per-bot write for `next_light_check_at`. Bot scan shows even distribution of check times across the 5-minute window.
 
 ---
 
@@ -189,7 +191,7 @@ When light-check detects `rangeState != 'in'` (range_out condition), the system 
 
 ---
 
-### FR-EXBOT-016 — Deep-Audit Cron
+### FR-EXBOT-016 — Deep-Audit Scheduled Job (EventBridge Scheduler)
 **Trace:** FM-XB-04, US-EXBOT-005
 **Priority:** P1
 
@@ -235,7 +237,7 @@ Delta-only adjustment is the default for all hedge-sync operations. Full close �
 
 Rebalance triggers shall use only the canonical `RebalanceReason[]` enum values: `drift_threshold`, `drift_relative`, `range_out`, `range_boundary_near`, `margin_warning`, `funding_alert`, `time_fallback`, `manual_admin`, `recovery_reconcile`. No aliases or alternate naming are permitted. `stop_trigger_crossed` is not a `RebalanceReason`; it routes to `price-near-stop-audit`.
 
-**Acceptance criteria:** `rebalance_attempts.reason` column contains only canonical values (CSV for multiple). No variant spellings or custom trigger names appear in D1 or queue messages.
+**Acceptance criteria:** `rebalance_attempts.reason` column contains only canonical values (CSV for multiple). No variant spellings or custom trigger names appear in Aurora PostgreSQL or queue messages.
 
 ---
 
@@ -259,13 +261,13 @@ After every hedge mutation, the worker shall fetch the actual HL position via `c
 
 ---
 
-### FR-EXBOT-026 — UserLockDO Lease (Concurrency Control)
+### FR-EXBOT-026 — User Lock (Redis Redlock — Concurrency Control)
 **Trace:** FM-XB-03, US-EXBOT-006
 **Priority:** P0
 
-Before any Hyperliquid mutation for a given user, the hedge-sync worker shall acquire a lease from `UserLockDO` (TTL=90s, caller-generated `holderToken` UUID). The work runs in the caller, not the DO. If `acquired=false`, the worker re-queues the message with a delay. If work exceeds 30 seconds, the worker extends the lease via `heartbeat()`. The lease is released in a `finally` block.
+Before any Hyperliquid mutation for a given user, the hedge-sync worker shall acquire a distributed lock via Redis Redlock (ElastiCache) with TTL=90s and a caller-generated `holderToken` UUID. The work runs in the caller Lambda, not the lock layer. If `acquired=false`, the worker re-queues the message with a delay. If work exceeds 30 seconds, the worker extends the lock TTL via a `heartbeat` extend call. The lock is released in a `finally` block.
 
-**Acceptance criteria:** Two hedge-sync workers for the same user cannot run HL mutations concurrently. A lease that expires auto-releases after 90s; the next worker acquires and reconciles before any new mutation.
+**Acceptance criteria:** Two hedge-sync workers for the same user cannot run HL mutations concurrently. A lock that expires auto-releases after 90s TTL; the next worker acquires and reconciles before any new mutation.
 
 ---
 
@@ -273,9 +275,9 @@ Before any Hyperliquid mutation for a given user, the hedge-sync worker shall ac
 **Trace:** FM-XB-05, US-EXBOT-006
 **Priority:** P0
 
-Before acquiring the `UserLockDO` lease, the hedge-sync worker shall read `bot_runtime_state.state_version` and compare it with the `stateVersion` in the queue message. A mismatch means the state changed since the message was enqueued; the worker shall discard the message (record `rebalance_attempts.status='skipped'`) without submitting any HL order.
+Before acquiring the Redis Redlock, the hedge-sync worker shall read `bot_runtime_state.state_version` and compare it with the `stateVersion` in the queue message. A mismatch means the state changed since the message was enqueued; the worker shall discard the message (record `rebalance_attempts.status='skipped'`) without submitting any HL order.
 
-**Acceptance criteria:** A stale hedge-sync message (stateVersion < current D1 value) is silently discarded. No HL order is submitted for discarded messages.
+**Acceptance criteria:** A stale hedge-sync message (stateVersion < current Aurora PostgreSQL value) is silently discarded. No HL order is submitted for discarded messages.
 
 ---
 
@@ -381,7 +383,7 @@ In SAFE_MODE the following are forbidden: cancel stops, open positions, rebalanc
 
 Margin status is computed as `marginUsage = marginRequiredUsd / marginBalanceUsd` where `marginRequiredUsd = (lpEthAmount × hedgeRatio × hlOraclePrice) / leverage`. Thresholds: `ok` when marginUsage < 0.55; `warning` when 0.55 ≤ marginUsage < 0.75; `critical` when marginUsage ≥ 0.75.
 
-Margin status shall be updated only during hedge-sync preflight (HL `marginSummary` fetch) and deep-audit. Light-check reads `hedge_legs.margin_status` from D1 only — no HL fetch.
+Margin status shall be updated only during hedge-sync preflight (HL `marginSummary` fetch) and deep-audit. Light-check reads `hedge_legs.margin_status` from Aurora PostgreSQL only — no HL fetch.
 
 **Acceptance criteria:** `warning` state disables size-increase hedge adjustments and sends investor a UI banner notification. `critical` state (twice in a row) triggers SAFE_MODE and alerts admin. Margin update never occurs during light-check; HL weight in light-check remains 0.
 
@@ -430,7 +432,7 @@ The system shall initiate `bot_safe_close` when any of the following conditions 
 **Trace:** FM-XB-08
 **Priority:** P0
 
-The `bot_safe_close` execution follows a fixed hedge-first sequence tracked atomically in `close_operations`: (1) `requested` — trigger received, `close_operations` row created; (2) `hedge_close_pending` — close HL short position fully via `closeShortReduceOnlyIoc` (target = 0); cancel stop via `replaceStopProtected(size=0)` — both are actions within this step, not separate states; (3) `hedge_closed` — `close_operations.state` advances to `hedge_closed` only after reconcile confirms HL position size = 0 and stop is cancelled; (4) `lp_closed` — call `vault.executeStrategy(RedeemStrategyV1, user, botId, params)` via ExBot Worker; BnzaExPositionManager closes LP position, fees routed via LpFeeOps, principal returned; `PositionClosed` event emitted; (5) `redemption_queued` — RedemptionQueue.createRequest(user, botId, tokenId, hlPortionId) enqueued; RequestCreated event emitted; (6) `done` — Operator calls fulfillRequest(tokens, amounts); FIFO pop; safeTransferFrom(operator, user, amount) on-chain; RequestFulfilled event emitted; bots.status='closed'. On hedge close failure, the system retries up to 3 times before escalating to admin and holding at `hedge_close_pending`. LP close is not attempted until hedge is confirmed closed.
+The `bot_safe_close` execution follows a fixed hedge-first sequence tracked atomically in `close_operations`: (1) `requested` — trigger received, `close_operations` row created; (2) `hedge_close_pending` — close HL short position fully via `closeShortReduceOnlyIoc` (target = 0); cancel stop via `replaceStopProtected(size=0)` — both are actions within this step, not separate states; (3) `hedge_closed` — `close_operations.state` advances to `hedge_closed` only after reconcile confirms HL position size = 0 and stop is cancelled; (4) `lp_closed` — call `vault.executeStrategy(RedeemStrategyV1, user, botId, params)` via ExBot Lambda; BnzaExPositionManager closes LP position, fees routed via LpFeeOps, principal returned; `PositionClosed` event emitted; (5) `redemption_queued` — RedemptionQueue.createRequest(user, botId, tokenId, hlPortionId) enqueued; RequestCreated event emitted; (6) `done` — Operator calls fulfillRequest(tokens, amounts); FIFO pop; safeTransferFrom(operator, user, amount) on-chain; RequestFulfilled event emitted; bots.status='closed'. On hedge close failure, the system retries up to 3 times before escalating to admin and holding at `hedge_close_pending`. LP close is not attempted until hedge is confirmed closed.
 
 **Acceptance criteria:** `close_operations` state transitions are sequential — no step is skipped. LP close is never attempted before `hedge_closed`. RedemptionQueue request is enqueued at step 5; user funds are returned on-chain when Operator calls fulfillRequest. A failure at any step holds `close_operations.status` at the failed step — does not silently advance.
 
@@ -462,33 +464,33 @@ On user on-chain deposit, the system automatically provisions a per-user **maste
 
 ---
 
-### FR-EXBOT-091 — HLRateLimitDO
+### FR-EXBOT-091 — HL Rate Limiter (ElastiCache Redis)
 **Trace:** FM-XB-03
 **Priority:** P0
 
-`HLRateLimitDO` implements a sliding-window rate limiter for all outbound Hyperliquid API calls. BNZA operating budget: 800 weight/min (67% of HL's hard limit of 1,200 weight/min). Each HL API call category has a known weight; the caller declares the weight before the call is made. If the declared weight would exceed the remaining budget in the current window, the DO returns `{allowed: false, retryAfterMs}` and the caller re-queues the message with the indicated delay. The weight window resets every 60 seconds. Multiple CF Worker invocations share a single DO instance per geographic region.
+An ElastiCache Redis atomic token bucket implements a sliding-window rate limiter for all outbound Hyperliquid API calls. BNZA operating budget: 800 weight/min (67% of HL's hard limit of 1,200 weight/min). Each HL API call category has a known weight; the caller declares the weight before the call is made. If the declared weight would exceed the remaining budget in the current window, the rate limiter returns `{allowed: false, retryAfterMs}` and the caller re-queues the message with the indicated delay. The weight window resets every 60 seconds. Multiple Lambda invocations share a single ElastiCache Redis cluster endpoint. Rate limit operations are atomic via Lua script to prevent race conditions between concurrent Lambda invocations.
 
 **Acceptance criteria:** Total HL API weight consumed in any 60-second window does not exceed 800. A caller receiving `{allowed: false}` must not proceed with the HL call. Weight accounting covers all 5 HL endpoint categories (clearinghouseState, marginSummary, openOrders, placeOrder, cancelOrder).
 
 ---
 
-### FR-EXBOT-092 — UserLockDO (Lease-Based Concurrency)
+### FR-EXBOT-092 — User Lock (Redis Redlock via ElastiCache)
 **Trace:** FM-XB-03, FR-EXBOT-026
 **Priority:** P0
 
-`UserLockDO` provides a lease-based mutex preventing concurrent HL mutations for the same user. Interface: `acquire(holderToken, ttlMs=90_000, idempotencyKey?)` → `{acquired: boolean, leaseId?}`; `heartbeat(holderToken, ttlMs)` → extends lease if still held by caller; `release(holderToken, idempotencyKey?, result?)` → releases and optionally caches result for replay. The work runs in the caller (CF Worker), not inside the DO. A `holderToken` mismatch on `release` or `heartbeat` is a no-op. TTL expiry auto-releases the lease. The `idempotencyKey` pattern `hedge-sync:{botId}:{stateVersion}` prevents duplicate execution on message redelivery.
+A Redis Redlock (ElastiCache) provides a distributed mutex preventing concurrent HL mutations for the same user. Interface: `acquire(holderToken, ttlMs=90_000, idempotencyKey?)` → `{acquired: boolean, lockKey?}`; `extend(holderToken, ttlMs)` → extends TTL if still held by caller (Lua script ownership check); `release(holderToken, idempotencyKey?)` → releases lock (Lua script ownership check). The work runs in the caller Lambda. A `holderToken` mismatch on `release` or `extend` is a no-op. TTL expiry auto-releases the lock. The `idempotencyKey` pattern `hedge-sync:{botId}:{stateVersion}` prevents duplicate execution on message redelivery; replay result is cached in `queue_idempotency` table.
 
-**Acceptance criteria:** Two hedge-sync workers for the same user cannot hold the lease simultaneously. A lease that expires at 90s auto-releases; the next worker acquires and reconciles before submitting any HL order. `heartbeat` called by the correct holder extends the TTL; called by any other token is a no-op. Result caching via `idempotencyKey` prevents reprocessing the same stateVersion twice.
+**Acceptance criteria:** Two hedge-sync workers for the same user cannot hold the lock simultaneously. A lock that expires at 90s TTL auto-releases; the next worker acquires and reconciles before submitting any HL order. `extend` called by the correct holder extends the TTL; called by any other token is a no-op. Replay prevention via `idempotencyKey` in `queue_idempotency` table prevents reprocessing the same stateVersion twice.
 
 ---
 
-### FR-EXBOT-093 — MarketDataDO (Pool Slot0 Cache)
+### FR-EXBOT-093 — Pool Slot0 Cache (ElastiCache Redis)
 **Trace:** FM-XB-03
 **Priority:** P0
 
-`MarketDataDO` provides a shared cache for Uniswap V3 pool slot0 data (`sqrtPriceX96`, `currentTick`, `blockNumber`). All light-check workers read from this DO instead of making individual RPC calls to the RPC provider. The DO refreshes its cache at an interval defined by the Phase 0 NV-12 verification result (OQ-EXBOT-03). A single DO instance serves all light-check workers within a CF region. Cache staleness older than 2× the refresh interval is logged as a warning and the DO initiates a forced refresh.
+ElastiCache Redis provides a shared cache for Uniswap V3 pool slot0 data (`sqrtPriceX96`, `currentTick`, `blockNumber`). The Fargate HL WS Poller writes to this cache at an interval defined by the Phase 0 NV-12 verification result (OQ-EXBOT-03). All light-check Lambda workers read from this cache instead of making individual RPC calls to the RPC provider. Cache staleness older than 2× the refresh interval is logged as a warning and the Fargate poller initiates a forced refresh.
 
-**Acceptance criteria:** 10,000 concurrent light-check workers in one region make at most 1 RPC call per refresh interval (via the DO), not 10,000. A stale cache (2× refresh interval) triggers a forced DO refresh and a warning log entry. The `blockNumber` field in the cache monotonically increases — a DO that returns a lower `blockNumber` than a prior read is treated as a cache regression and re-fetches.
+**Acceptance criteria:** 10,000 concurrent light-check workers make at most 1 RPC call per refresh interval (via the Fargate poller), not 10,000. A stale cache (2× refresh interval) triggers a forced Fargate poller refresh and a warning log entry. The `blockNumber` field in the cache monotonically increases — a cache value with a lower `blockNumber` than a prior read is treated as a cache regression and triggers a re-fetch.
 
 ---
 
@@ -496,9 +498,9 @@ On user on-chain deposit, the system automatically provisions a per-user **maste
 **Trace:** FM-XB-06, US-EXBOT-012
 **Priority:** P1
 
-The OPERATOR shall expose four endpoints under `/api/exbot/*`, each proxied to ExBot Worker via CF service binding with internal token authentication. ExBot Worker is not internet-accessible. Endpoints: `POST /api/exbot/start`, `GET /api/exbot/status`, `POST /api/exbot/close`, `POST /api/exbot/margin`. The OPERATOR does not own any ExBot business logic; it only forwards requests.
+The OPERATOR shall expose four endpoints under `/api/exbot/*`, each proxied to ExBot Lambda via API Gateway with HMAC Lambda Authorizer. ExBot Lambda is not internet-accessible. Endpoints: `POST /api/exbot/start`, `GET /api/exbot/status`, `POST /api/exbot/close`, `POST /api/exbot/margin`. The OPERATOR does not own any ExBot business logic; it only forwards requests.
 
-**Acceptance criteria:** Direct HTTP requests to ExBot Worker return 403 (not publicly accessible). All four endpoints are reachable via the Operator Facade. OPERATOR logs show service binding calls for each proxied request.
+**Acceptance criteria:** Direct HTTP requests to ExBot Lambda return 403 (not publicly accessible). All four endpoints are reachable via the Operator Facade. OPERATOR logs show API Gateway calls for each proxied request.
 
 ---
 
@@ -510,14 +512,14 @@ The OPERATOR shall expose four endpoints under `/api/exbot/*`, each proxied to E
 | NFR-EXBOT-002 | Latency | One hedge-sync should complete within 30 seconds under normal conditions. | P0 |
 | NFR-EXBOT-003 | SLA | `user_redeem` hedge close must complete within 5 minutes of event detection. Overrun triggers admin escalation. | P0 |
 | NFR-EXBOT-004 | Rate Limit | HL API usage must not exceed 800 weight/min (67% of the 1,200/min hard limit). | P0 |
-| NFR-EXBOT-005 | D1 Write Budget | `bot_runtime_state` written only on diff. `next_light_check_at` batch-updated per shard (1 stmt). No unconditional UPDATE per light-check. | P0 |
+| NFR-EXBOT-005 | Aurora PostgreSQL Write Budget | `bot_runtime_state` written only on diff. `next_light_check_at` batch-updated per shard (1 stmt). No unconditional UPDATE per light-check. | P0 |
 | NFR-EXBOT-006 | Security | Master key + agent key generated and retained in AWS KMS; private keys never leave KMS; all signing via Signing Lambda (IAM role kms:Sign only); no key material in app memory or logs. | P0 |
 | NFR-EXBOT-007 | Idempotency | `queue_idempotency.message_id` UNIQUE prevents double execution. Cloid deterministic prevents double HL order. | P0 |
 | NFR-EXBOT-008 | Precision | All hedge, stop, and margin computations use BigDecimal. Float/number arithmetic forbidden for financial values. | P0 |
 | NFR-EXBOT-009 | Multi-Chain | Base + Optimism from Phase 1. `wethIndex` verified per chain at LP open. Not hardcoded. | P0 |
 | NFR-EXBOT-010 | Availability | SAFE_MODE and `bot_safe_close` lead to autonomous recovery. Neither is a terminal state. | P0 |
-| NFR-EXBOT-011 | Concurrency | Max 6 simultaneous outbound connections per CF Worker invocation. Parallel HL fetches within 1 invocation ≤ 6. | P0 |
-| NFR-EXBOT-012 | Scalability | Phase A: 1 D1 shard. Phase B: 4 shards. Phase C: 16 shards (deferred, requires 10k-equivalent load benchmark). `shard_id = hash(bot_id) % shard_count`. | P0 |
+| NFR-EXBOT-011 | Concurrency | Outbound HL API call concurrency is governed by the rate limiter (FR-EXBOT-091, 800 weight/min). No per-invocation connection limit is imposed on AWS Lambda. | P0 |
+| NFR-EXBOT-012 | Scalability | Phase A: 1 Aurora PostgreSQL shard. Phase B: 4 shards. Phase C: 16 shards (deferred, requires 10k-equivalent load benchmark). `shard_id = hash(bot_id) % shard_count`. | P0 |
 
 ---
 
@@ -533,8 +535,8 @@ The OPERATOR shall expose four endpoints under `/api/exbot/*`, each proxied to E
 | BR-EXBOT-006 | `user_redeem` LP-portion repayment is unconditional. Hedge close failure must never block or reverse the LP-portion return to the user. | P0 |
 | BR-EXBOT-007 | SAFE_MODE is never a terminal state. Every SAFE_MODE path must lead to auto-recovery or `bot_safe_close` → §16.7 re-entry closed loop. | P0 |
 | BR-EXBOT-008 | "BnzaExVault/Vault" (LP NFT custody Solidity contract) is unrelated to "vaultAddress/subaccount" (HL subaccount identifier) despite naming similarity. These must never be conflated in code or documents. | P0 |
-| BR-EXBOT-009 | D1 schema changes after Phase A deploy: ADD COLUMN only. DROP and RENAME of existing columns are forbidden. | P0 |
-| BR-EXBOT-010 | ExBot Worker (`apps/bnza-exbot/`) must not be co-deployed with OPERATOR (`apps/bnza-operator/`). They communicate via CF service binding only. | P0 |
+| BR-EXBOT-009 | Aurora PostgreSQL schema changes after Phase A deploy: ADD COLUMN only. DROP and RENAME of existing columns are forbidden. | P0 |
+| BR-EXBOT-010 | ExBot Lambda (`apps/bnza-exbot/`) must not be co-deployed with OPERATOR (`apps/bnza-operator/`). They communicate via API Gateway + HMAC Lambda Authorizer only. | P0 |
 | BR-EXBOT-012 | Only one `hl_agent_keys` row per user may have `key_status='active'` at any time. This constraint is enforced at the database level. Source: FR-EXBOT-080. | P0 |
 | BR-EXBOT-013 | Agent key rows are immutable after write — revocation and rotation are non-destructive. `revoked` and `superseded` rows must never be overwritten or deleted; they are retained for audit purposes. Source: FR-EXBOT-080. | P0 |
 | BR-EXBOT-014 | During key rotation, the old row's `key_status='superseded'` and the new row's `key_status='active'` must be committed atomically in the same transaction. There is no window where both rows are `active` or neither is `active`. Source: FR-EXBOT-080. | P0 |
@@ -615,15 +617,15 @@ Full story files in `../userstories/`. 11 active stories across 4 epics (US-011 
 | OQ-EXBOT-06 | Margin thresholds (0.55/0.75) — finalized via Phase 0 backtest (zen task) | FR-EXBOT-060 values pending | Open |
 | OQ-EXBOT-07 | `stopSafetyFactor` Phase B+ value — finalized via Phase 0 backtest (zen task) | FR-EXBOT-030 Phase B value pending | Open |
 | OQ-EXBOT-08 | BnzaExVault final ABI — confirmed when zen deploys contract at Phase 0 | IC-EXBOT-002 (integration constraints) | Open |
-| OQ-EXBOT-09 | MarketDataDO cache refresh interval — determined by Phase 0 NV-12 RPC verification | Blocks FR-EXBOT-093 TTL configuration | Open |
+| OQ-EXBOT-09 | ElastiCache Redis pool slot0 cache refresh interval — determined by Phase 0 NV-12 RPC verification | Blocks FR-EXBOT-093 TTL configuration | Open |
 | OQ-EXBOT-10 | `range_boundary_near` exact computation: is "90% to upper/lower" measured in tick distance or price distance? Formula needed before implementation. E.g. tick-based: `currentTick >= tickUpper - 0.10 × (tickUpper - tickLower)` vs price-based: `sqrtPrice >= sqrtUpper × 0.90`. Owner: zen/SOTATEK to confirm. | Blocks FR-EXBOT-012 `range_boundary_near` implementation | **Closed (2026-07-02)** — Price-based USD. Formula: `nearestFraction = min(distToLower, distToUpper) / halfRange`; fires when `nearestFraction <= rangeBoundaryFraction` (default 0.9). Example: range $3,000–$3,400 → fires when price ≤ $3,020 or ≥ $3,380. Source: `packages/exbot-strategy/src/triggers/range-boundary.trigger.ts` + test suite. Note: code comment has typo (`>=` should be `<=`). |
 | OQ-EXBOT-11 | `lpValueUsd` formula: how is `bot_runtime_state.lp_value_usd` computed and updated? Candidate: `(lpEthAmount × uniPoolPrice) + lpUsdcAmount` — but SPEC v5.2.6 does not define it explicitly. Owner: zen to confirm or SOTATEK to propose. | Blocks FR-EXBOT-012 `drift_threshold` (lpValueUsd × 3% term) | Open |
 | OQ-EXBOT-12 | 7d funding APR aggregation formula: how is `funding_alert` condition (`7d APR < −15%`) computed from `funding_daily_metrics`? Candidate (from SPEC v5.2.6 §7.5): sum of latest 7 rows `funding_net_usd`, annualize relative to LP capital — but exact annualization formula not specified. Owner: zen to confirm. | Blocks FR-EXBOT-012 `funding_alert` implementation | Open |
-| OQ-EXBOT-13 | delta=0 behavior in hedge-sync: if computed delta=0, should the Worker skip HL order entirely and proceed directly to stop replacement, or abort the sync? Owner: Tech Lead. | Blocks UC-EXBOT-hedge-sync step 5 / A6 | Open |
-| OQ-EXBOT-14 | `marginSummary` fetch ordering in hedge-sync preflight: does the Worker fetch marginSummary before or after acquiring UserLockDO? Ordering affects lock TTL design. Owner: Tech Lead. | Blocks FR-EXBOT-060 preflight step ordering | Open |
-| OQ-EXBOT-15 | HLRateLimitDO + UserLockDO interaction in hedge-sync: should rate-limit weight be consumed before or after lock acquisition? Determines retry behavior on rate-limit hit while lock is held. Owner: Tech Lead. | Blocks FR-EXBOT-091 + hedge-sync flow | Open |
+| OQ-EXBOT-13 | delta=0 behavior in hedge-sync: if computed delta=0, should the Lambda skip HL order entirely and proceed directly to stop replacement, or abort the sync? Owner: Tech Lead. | Blocks UC-EXBOT-hedge-sync step 5 / A6 | Open |
+| OQ-EXBOT-14 | `marginSummary` fetch ordering in hedge-sync preflight: does the Lambda fetch marginSummary before or after acquiring Redis Redlock? Ordering affects lock TTL design. Owner: Tech Lead. | Blocks FR-EXBOT-060 preflight step ordering | Open |
+| OQ-EXBOT-15 | HL Rate Limiter (Redis) + User Lock (Redis Redlock) interaction in hedge-sync: should rate-limit weight be consumed before or after lock acquisition? Determines retry behavior on rate-limit hit while lock is held. Owner: Tech Lead. | Blocks FR-EXBOT-091 + hedge-sync flow | Open |
 | OQ-EXBOT-16 | Admin reject path for agent key: when admin rejects a pending key, what is the resulting row status — remain `pending`, set to `rejected`, or delete? | Blocks UC-EXBOT-agent-key A4 admin reject enum | **Closed (2026-06-29)** — UC-EXBOT-agent-key retired; manual agent key flow removed. Admin reject path no longer applicable. |
-| OQ-EXBOT-17 | `hlMarkPrice` data source in light-check step 11: given the zero-HL-calls invariant (BR-EXBOT-003), what is the authoritative source for mark price used to evaluate stop trigger? Candidate: `bot_runtime_state.eth_price_usd`. Staleness policy needed. Owner: Tech Lead. | Blocks UC-EXBOT-light-check step 11 | **Closed (2026-07-02)** — Primary: `HlMarkDO.markPriceUsd`. Fallback: `bot_runtime_state.eth_price_usd` (last-known from prior light-check). Stale threshold: 120s → audit `hl_mark_price_stale`, widen near-stop band 2%→4%, freeze routine hedge-sync. Source: Tech Lead code review. |
+| OQ-EXBOT-17 | `hlMarkPrice` data source in light-check step 11: given the zero-HL-calls invariant (BR-EXBOT-003), what is the authoritative source for mark price used to evaluate stop trigger? Candidate: `bot_runtime_state.eth_price_usd`. Staleness policy needed. Owner: Tech Lead. | Blocks UC-EXBOT-light-check step 11 | **Closed (2026-07-02)** — Primary: ElastiCache Redis HlMark price key (written by Fargate HL WS Poller). Fallback: `bot_runtime_state.eth_price_usd` (last-known from prior light-check). Stale threshold: 120s → audit `hl_mark_price_stale`, widen near-stop band 2%→4%, freeze routine hedge-sync. Source: Tech Lead code review. |
 
 ---
 
@@ -631,8 +633,8 @@ Full story files in `../userstories/`. 11 active stories across 4 epics (US-011 
 
 | IC ID | External Dependency | Constraint | Blocks |
 |---|---|---|---|
-| IC-EXBOT-001 | Hyperliquid REST API (info + exchange endpoints) | BNZA budget capped at 800 weight/min. All outbound calls routed through HLRateLimitDO (FR-EXBOT-091). Weight table per endpoint category must be maintained in code. HL API schema changes (field renames, endpoint deprecations) require immediate SRS review. | FR-EXBOT-060, 091 |
-| IC-EXBOT-002 | BnzaExVault Solidity contract (LP NFT custody, redeem) + RedemptionQueue (FIFO payout) | SOTATEK integrates via ABI only — no contract development. Final ABI confirmed when zen deploys at Phase 0 (OQ-EXBOT-08). Until ABI is confirmed, vault.executeStrategy(RedeemStrategyV1, user, botId, params) and RedemptionQueue.createRequest/fulfillRequest calls are stubbed. uninvestedBalanceOf() is no longer part of the integration surface. Contract address (Base + Optimism) must be injected via Cloudflare Secrets Store, not hardcoded. | FR-EXBOT-015, 070, 073 |
-| IC-EXBOT-003 | Uniswap V3 Pool (Base + Optimism, USDC/WETH 0.3%) | Pool addresses and `wethIndex` confirmed via Phase 0 NV-12 verification (OQ-EXBOT-03). `MarketDataDO` (FR-EXBOT-093) must be pointed to the correct pool address per chain. Pool address changes (e.g., pool migration) require coordinated deploy of new DO configuration. | FR-EXBOT-004, 093 |
-| IC-EXBOT-004 | Cloudflare Platform (Workers, D1, Queues, Durable Objects, Secrets Store) | ExBot Worker is deployed exclusively as a Cloudflare Worker. Service binding to OPERATOR is required for all Facade API calls. Max 6 simultaneous outbound connections per Worker invocation (NFR-EXBOT-011). D1 concurrent write limits apply; batch patterns (FR-EXBOT-013) are required by design. Cloudflare platform outages are a SAFE_MODE trigger condition. | All FR-EXBOT-* |
+| IC-EXBOT-001 | Hyperliquid REST API (info + exchange endpoints) | BNZA budget capped at 800 weight/min. All outbound calls routed through ElastiCache Redis rate limiter (FR-EXBOT-091). Weight table per endpoint category must be maintained in code. HL API schema changes (field renames, endpoint deprecations) require immediate SRS review. | FR-EXBOT-060, 091 |
+| IC-EXBOT-002 | BnzaExVault Solidity contract (LP NFT custody, redeem) + RedemptionQueue (FIFO payout) | SOTATEK integrates via ABI only — no contract development. Final ABI confirmed when zen deploys at Phase 0 (OQ-EXBOT-08). Until ABI is confirmed, vault.executeStrategy(RedeemStrategyV1, user, botId, params) and RedemptionQueue.createRequest/fulfillRequest calls are stubbed. uninvestedBalanceOf() is no longer part of the integration surface. Contract address (Base + Optimism) must be injected via AWS Secrets Manager, not hardcoded. | FR-EXBOT-015, 070, 073 |
+| IC-EXBOT-003 | Uniswap V3 Pool (Base + Optimism, USDC/WETH 0.3%) | Pool addresses and `wethIndex` confirmed via Phase 0 NV-12 verification (OQ-EXBOT-03). ElastiCache Redis pool slot0 cache (FR-EXBOT-093) must be pointed to the correct pool address per chain. Pool address changes (e.g., pool migration) require coordinated deploy of new Fargate poller configuration. | FR-EXBOT-004, 093 |
+| IC-EXBOT-004 | AWS Platform (Lambda, Aurora PostgreSQL Serverless v2, SQS, ElastiCache Redis, Secrets Manager, KMS, ECS Fargate, API Gateway) | ExBot Lambda is deployed on AWS Lambda, not co-deployed with OPERATOR. API Gateway + HMAC Lambda Authorizer is required for all Facade API calls. Aurora PostgreSQL concurrent write limits apply; batch patterns (FR-EXBOT-013) are required by design. AWS regional outages are a SAFE_MODE trigger condition. | All FR-EXBOT-* |
 | IC-EXBOT-005 | AWS KMS (per-user master key + agent key custody) | Private keys are generated and retained inside KMS HSM — they never leave KMS. All signing requests go through the Signing Lambda; only the Signing Lambda IAM role holds `kms:Sign` permission. KMS credentials are injected via AWS Secrets Manager (not hardcoded). KMS API rate limits apply — key-provision worker must implement backoff on ThrottlingException. KMS failure during key generation aborts provisioning and enqueues retry (max 3); final failure triggers admin alert. KMS failure during hedge-sync signing transitions bot to SAFE_MODE. | FR-EXBOT-080 |

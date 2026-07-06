@@ -3,10 +3,11 @@ type: use-case
 module: exbot
 status: draft
 created: 2026-06-12
-updated: 2026-06-20
+updated: 2026-07-04
 owner: "@hienduong"
 linked_stories: [US-EXBOT-006, US-EXBOT-008]
 changelog:
+  - 2026-07-04 | arc-migration | replace UserLockDO with User Lock (Redis Redlock via ElastiCache), D1 with Aurora PostgreSQL per FR-EXBOT-092
   - 2026-06-20 | /ba-do | QC audit fixes: trigger updated, step 5 delta=0 note, A5 primary/secondary fix, A6 added, BR consecutive failures def, stale template removed
   - 2026-06-18 | /ba-do | add US-008 to linked_stories; fix phantom ref in A5 to point at uc-deep-audit.md
   - 2026-06-12 | /ba-start srs | initial draft
@@ -22,7 +23,7 @@ hedge-sync Worker dequeues a message from the hedge-sync queue. Message is enque
 
 ## 1. Actors
 - **Primary:** ExBot System Operator (Hedge-Sync Worker)
-- **System:** UserLockDO, Hyperliquid, D1, Reconcile Worker
+- **System:** User Lock (Redis Redlock via ElastiCache), Hyperliquid, Aurora PostgreSQL, Reconcile Worker
 
 ## 2. Preconditions
 - `hedge-sync` message received with `{botId, reasons: RebalanceReason[], stateVersion}`
@@ -31,8 +32,8 @@ hedge-sync Worker dequeues a message from the hedge-sync queue. Message is enque
 
 ## 3. Main Success Scenario
 1. Worker inserts `message_id` into `queue_idempotency` (started); UNIQUE conflict → skip
-2. Worker reads D1 `bots.state_version`; if mismatch with message `stateVersion` → discard (status='skipped'); Worker rechecks `circuit_breakers.state` at execution time; if `open` → discard (status='skipped'); no HL order submitted
-3. Worker calls `UserLockDO.acquire(holderToken, ttl=90s, idempotencyKey=hedge-sync:{botId}:{stateVersion})`
+2. Worker reads Aurora PostgreSQL `bots.state_version`; if mismatch with message `stateVersion` → discard (status='skipped'); Worker rechecks `circuit_breakers.state` at execution time; if `open` → discard (status='skipped'); no HL order submitted
+3. Worker calls `User Lock.acquire(holderToken, ttl=90s, idempotencyKey=hedge-sync:{botId}:{stateVersion})`
 4. Fetch actual HL position via `clearinghouseState` (weight=2)
 5. Compute `delta = BigDecimal(targetShortEth).sub(actualShortEth)` (BigDecimal only, no float)
    - Note: if delta=0, no HL order submitted; flow continues to stop replacement. Behavior pending OQ-EXBOT-013.
@@ -40,7 +41,7 @@ hedge-sync Worker dequeues a message from the hedge-sync queue. Message is enque
 7. Enqueue `reconcile` message: `{botId, attemptId, expectedAbsSize, hedgeLegId}`
 8. Execute stop replacement via INV-STOP protocol (§19.5): `stop_replacing_started_at` set, protected cancel→place
 9. Clear `stop_replacing_started_at` in finally block
-10. `UserLockDO.release(holderToken, idempotencyKey, result)`
+10. `User Lock.release(holderToken, idempotencyKey, result)`
 11. Reconcile Worker: fetch actual HL position, verify size = expected
 12. Extract `entry_price`, `liquidation_price`, `effective_leverage` from reconcile
 13. Recompute `stop_trigger_px` (BigDecimal); record new `stop_cloid`, `stop_price` in `hedge_legs`

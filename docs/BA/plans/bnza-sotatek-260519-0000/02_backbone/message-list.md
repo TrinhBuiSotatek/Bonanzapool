@@ -2,10 +2,14 @@
 type: message-list
 status: draft
 created: 2026-06-02
-updated: 2026-07-01
+updated: 2026-07-03
 module: bnza-backbone
 owner: "@hien.duong"
 changelog:
+  - "2026-07-03 | manual | add MSG-ERR-100 for concurrent rotation block (EF-08); add {bot_list} format spec to MSG-WRN-03"
+  - "2026-07-03 | manual | update MSG-ERR-96 and MSG-WRN-03 to reflect client rotation decisions"
+  - "2026-07-02 | /ba-start | add E-ADM-026/027/028 for SIWE and 2FA authentication errors"
+  - "2026-07-02 | manual | register E-pool-011 and MSG-ERR-15 for master_rotation_in_progress"
   - "2026-07-03 | /ba-do | Q9: add MSG-EXBOT section — MSG-SUC-81 (pause) + MSG-SUC-82 (resume) for POOL UI"
   - "2026-07-01 | manual | add E-EXBOT-019/020: stuck marker notifications for deep-audit (stop_trigger_crossed_at > 30min, stop_replacing_started_at > 60s)"
   - "2026-07-01 | manual | add E-EXBOT-018: bot_safe_close hedge close failed after 3 retries (residual_hl_liability)"
@@ -81,6 +85,7 @@ changelog:
 | E-pool-008 | `already_stopped` | stop: bot already stopped | Treated as success — no error shown |
 | E-pool-009 | 5xx on atomic-start | API server error | Retry available (up to 3x per BR-PL-16) |
 | E-pool-010 | Gas reserve insufficient | < 0.001 ETH in wallet before bot start | "Insufficient ETH for gas. Add at least 0.001 ETH." |
+| E-pool-011 | `master_rotation_in_progress` | atomic-start: WL master wallet is rotating | "A master wallet rotation is currently in progress for this chain. Please try again in a few minutes." |
 
 ---
 
@@ -108,6 +113,10 @@ changelog:
 | E-ADM-018 | 409 | A master wallet already exists for this chain | "A master wallet already exists for this chain." |
 | E-ADM-019 | 409 | This wallet is already active in another Whitelabel partner program | "This wallet is already active in another Whitelabel partner program." |
 | E-ADM-025 | 409 | Member or wl_code not active | "Member or wl_code not active - retry not allowed" |
+| E-ADM-026 | 401 | SIWE signature verification fails | "Invalid signature. Please try again." |
+| E-ADM-027 | 401 | 2FA code is invalid or expired | "Invalid 2FA code. Please try again." |
+| E-ADM-028 | 401 | JWT session has expired or been revoked | "Session expired. Please log in again." |
+
 
 ---
 
@@ -180,6 +189,7 @@ changelog:
 | MSG-ERR-13 | ERR | buy (SCR-POOL-10) | "Please enter a valid payment amount." |
 | MSG-ERR-14 | ERR | bot (SCR-POOL-03) | "Pool resolution failed. Please try again or select a different pool." |
 | MSG-ERR-14 | ERR | buy (SCR-POOL-10) | "Purchase failed. Please try again." |
+| MSG-ERR-15 | ERR | bot-create (SCR-POOL-01) | "A master wallet rotation is currently in progress for this chain. Please try again in a few minutes." |
 | MSG-WRN-01 | WRN | bot (SCR-POOL-03) | "You have reached the maximum of 10 bots on this chain." |
 | MSG-WRN-01 | WRN | bot-monitor (SCR-POOL-02) | "Your position is out of range. The bot is not earning fees." |
 | MSG-WRN-01 | WRN | bot-create (SCR-POOL-01) | "You have reached the maximum of 10 bots on this chain." |
@@ -271,11 +281,13 @@ changelog:
 | MSG-ERR-93 | ERR | whitelabel (SCR-ADM-02) | "The operation failed due to a state mismatch. The page will reload. Please retry." |
 | MSG-ERR-94 | ERR | plans (SCR-ADM-03) | "Failed to save bot type configuration. Please retry." |
 | MSG-ERR-95 | ERR | relayer (SCR-ADM-12) | "Status unavailable — API error" |
+| MSG-ERR-96 | ERR | whitelabel (SCR-ADM-02) | "Rotation blocked. The Whitelabel partner is currently suspended. Resume the partner before initiating rotation." |
 | MSG-ERR-97 | ERR | reports debug bar (SCR-ADM-07) | `"failed: {error.message}"` |
-| MSG-ERR-98 | ERR | whitelabel (SCR-ADM-02) | "Bot Config ID must be a positive integer." |
-| MSG-ERR-99 | ERR | whitelabel (SCR-ADM-02) | "Position ID must be a valid numeric token ID." |
+| MSG-ERR-98 | ERR | attribution-history (SCR-ADM-23) | "Bot Config ID must be a positive integer." |
+| MSG-ERR-99 | ERR | attribution-history (SCR-ADM-23) | "Position ID must be a valid numeric token ID." |
+| MSG-ERR-100 | ERR | whitelabel (SCR-ADM-02) | "A master wallet rotation is already in progress on this chain. Please wait for it to complete before initiating a new rotation." |
 | MSG-INF-70 | INF | dashboard (SCR-ADM-01) | "Dashboard data updates every 30s." |
-| MSG-INF-71 | INF | dashboard (SCR-ADM-01) | "This escalation has already been acknowledged." |
+| MSG-INF-71 | INF | escalations (SCR-ADM-21) | "This escalation has already been acknowledged." |
 | MSG-INF-97 | INF | reports debug bar (SCR-ADM-07) | `"Last request: {endpoint path with params}"` |
 | MSG-INF-98 | INF | reports debug bar (SCR-ADM-07) | `"success ({n} rows)"` |
 | MSG-INF-99 | INF | reports debug bar (SCR-ADM-07) | `"mock data ({n} rows)"` |
@@ -311,6 +323,7 @@ changelog:
 | MSG-SUC-80 | SUC | whitelabel (SCR-ADM-02) | "Master wallet activated." |
 | MSG-WRN-01 | WRN | whitelabel (SCR-ADM-02) | "Bots are still being unset. Please wait before confirming leave." *(tooltip on disabled [Confirm Leave] — GAP-ITEM-02)* |
 | MSG-WRN-02 | WRN | relayer (SCR-ADM-12) | "Balance data may be stale — last synced {timestamp}" |
+| MSG-WRN-03 | WRN | whitelabel (SCR-ADM-02) | "Rotation initiated. Active bots will be rotated; bots in transient/error/leaving states are skipped: {bot_list}." `{bot_list}` = comma-separated `bot_config_id` values (e.g. `"42, 107, 203"`). |
 
 ---
 

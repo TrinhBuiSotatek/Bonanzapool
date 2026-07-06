@@ -5,8 +5,8 @@
 | Ngày tạo | 2026-07-01 |
 | Ngày cập nhật | 2026-07-03 |
 | Người tạo | QC UC Read ExBot Agent |
-| Version | v2 |
-| Nguồn audited | UC-EXBOT-user-redeem_user-redeem_audited_20260701_v1.md |
+| Version | v3 |
+| Nguồn audited | UC-EXBOT-user-redeem_user-redeem_audited_20260703_v2.md |
 | Nguồn câu trả lời | docs/BA/qc-responses-2026-07-03.md (owner: @hienduong) |
 
 ---
@@ -17,6 +17,8 @@
 |----|----------|-----|----------|----------------|--------|
 | I-02 | High | uc-user-redeem.md §3 step 12-14; flows.md F-04 | UC mô tả Worker "gửi HL-portion USDC về nhà đầu tư qua RedemptionQueue ledger" nhưng không định nghĩa: (a) HL-portion được tính như thế nào (tổng số tiền từ HL closing position minus fees? minus funding?); (b) ai thực sự là người thực hiện on-chain transfer USDC (Worker gọi trực tiếp hay qua Operator Facade?); (c) transaction hash của HL-portion transfer có được lưu vào `close_operations.hedge_close_tx` không? | Không có công thức hoặc mô tả source of truth cho HL-portion amount → tester không thể verify số tiền nhà đầu tư nhận đúng không. | Outdated vs AWS arc — HL-portion transfer mechanism changed. Pending Tech Lead for updated flow details. |
 | I-03 | Medium | uc-user-redeem.md §3 step 8; spec.md FR-EXBOT-026; flows.md F-04 | UC step 8 xác nhận Redeem Worker có acquire `UserLockDO` lease — vấn đề không phải là "có lock hay không". Sau khi cross-check tài liệu, câu hỏi được thu hẹp còn 2 điểm chưa rõ: **(a) Behavior khi acquired=false:** UC step 8 chỉ ghi "acquires UserLockDO lease" nhưng không mô tả behavior khi lock đang bị giữ bởi hedge-sync worker. spec.md FR-EXBOT-026 định nghĩa pattern cho hedge-sync: `acquired=false → re-queue với delay`. User_redeem có dùng cùng pattern không, hay chờ spin-wait, hay fail ngay? Với user_redeem có SLA 5 phút, re-queue với delay có thể vi phạm SLA. **(b) flows.md F-04 không hiển thị UserLockDO:** Sequence diagram F-04 không có participant UserLockDO (trong khi F-02 hedge-sync hiển thị rõ). Đây là lỗi thiếu trong diagram hay user_redeem dùng cơ chế khác? | Behavior khi lock contention xảy ra ảnh hưởng trực tiếp đến test case SLA. | Outdated vs AWS arc — UserLockDO replaced by Postgres advisory lock + SQS FIFO. Lock behavior details pending Tech Lead confirmation under new arc. |
+| I-N1 | Medium | uc-user-redeem.md §2 Preconditions (v2, updated 2026-07-03); states.md State Registry | UC §2 v2 mở rộng precondition: "Bot `status='active'` (or paused/safe_mode — user may redeem from any non-closed state)". Thông tin này mới so với v1 và **chưa được phản ánh trong states.md** State Registry. Cụ thể cần xác nhận: (a) Bot ở `hedge_stopped_cooldown` có thể được redeem không? (b) Bot ở `lp_rebalancing` có thể được redeem không? (c) Bot ở `error` có thể được redeem không? states.md chỉ liệt kê `lp_closing` như là bước chuyển tiếp khi có close request, nhưng không nói rõ các trạng thái nào được phép khởi tạo close request. | Tester cần biết chính xác các trạng thái bắt đầu hợp lệ để thiết kế pre-condition cho test case. Nếu precondition sai → test case fail vì lý do sai, không phải vì lỗi thực. | Open — cần BA confirm và update states.md |
+| I-N2 | Low | uc-user-redeem.md §3 step 9 | UC step 9 chỉ nói "retries up to 3 times on reject/timeout" nhưng không mô tả: (a) Retry strategy: trong cùng Worker invocation hay re-queue message? (b) Có backoff delay giữa các lần retry không? Nếu re-queue với delay, tổng thời gian 3 retries có thể vượt SLA 5 phút. | Ảnh hưởng thiết kế test case simulate HL partial failure và timing. Không block happy path design nhưng cần biết để test retry behavior chính xác. | Open — Minor, thông tin phụ trợ |
 
 ---
 

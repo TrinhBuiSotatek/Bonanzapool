@@ -3,10 +3,11 @@ type: use-case
 module: exbot
 status: draft
 created: 2026-06-12
-updated: 2026-07-03
+updated: 2026-07-04
 owner: "@hienduong"
 linked_stories: [US-EXBOT-004]
 changelog:
+  - 2026-07-04 | arc-migration | replace UserLockDO with User Lock (Redis Redlock via ElastiCache) per FR-EXBOT-092
   - 2026-07-03 | /ba-do | I-11: define retry count 3 for closeShortReduceOnlyIoc (align with bot_safe_close); arc update deferred
   - 2026-07-03 | /ba-do | I-09: remove duplicate boilerplate Postconditions section
   - 2026-07-03 | /ba-do | I-08: expand A2 to cover reconcile failure — same residual_hl_liability path, SAFE_MODE does not apply
@@ -44,7 +45,7 @@ User navigates to the relevant screen or initiates the described action.
    - Insert (kind='user_redeem', state='requested')
    - Update state=`lp_closed` (LP liquidated on-chain — confirmed from step 2)
    - Update state=`funds_returned` (LP-portion USDC in investor wallet — on-chain guarantee from step 3)
-8. Redeem Worker acquires `UserLockDO` lease for this user
+8. Redeem Worker acquires a User Lock (Redis Redlock via ElastiCache) lease for this user
 9. Redeem Worker calls HL full close (`closeShortReduceOnlyIoc`, cloid) — retries up to 3 times on reject/timeout before escalating
 10. Cancels existing stop via `§19.5 replaceStopProtected` with size=0
 11. Reconcile: verify HL position size = 0

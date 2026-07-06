@@ -3,10 +3,11 @@ type: use-case
 module: exbot
 status: draft
 created: 2026-06-18
-updated: 2026-06-29
+updated: 2026-07-04
 owner: "@hienduong"
 linked_stories: [US-EXBOT-005, US-EXBOT-008, US-EXBOT-010]
 changelog:
+  - 2026-07-04 | arc-migration | replace Cloudflare primitives with AWS equivalents (D1→Aurora PostgreSQL, HLRateLimitDO→HL Rate Limiter (ElastiCache Redis), Cron scheduler→EventBridge Scheduler)
   - 2026-06-29 | manual | remove step 7 (agent key expiry check); remove expiry postcon; remove duplicate Postconditions section; remove FR-EXBOT-083 from trace; update Mermaid diagram
   - 2026-06-18 | /ba-do | initial draft from FR-EXBOT-016; resolves phantom ref in uc-hedge-sync.md A5
 ---
@@ -15,33 +16,33 @@ changelog:
 
 ## Trigger
 
-Cron scheduler (system-initiated, background worker).
+EventBridge Scheduler (system-initiated, background worker).
 
 ---
 
 ## 1. Actors
 - **Primary:** ExBot System Operator (Deep-Audit Worker)
-- **System:** D1, Hyperliquid, Notification Queue
+- **System:** Aurora PostgreSQL, Hyperliquid, Notification Queue
 
 ## 2. Preconditions
-- `deep-audit` cron fires per schedule:
+- `deep-audit` EventBridge Scheduler fires per schedule:
   - **Normal:** every 6 hours for all bots with `status IN ('active','paused')`
   - **High-risk mode:** every 1 hour when `circuit_breakers.state != 'closed'` OR `margin_status IN ('warning','critical')`
 
 ## 3. Main Success Scenario
-1. Worker reads bot state from D1: `bots.status`, `bots.lifecycle_state`, `hedge_legs`, `circuit_breakers.state`, `margin_status`
-2. Worker fetches `clearinghouseState` from HL (weight=2; gated by HLRateLimitDO FR-EXBOT-091)
-3. Verify actual short size from HL matches `hedge_legs.last_known_hl_short_size` — if mismatch: record mismatch in D1, trigger SAFE_MODE entry (see A3)
+1. Worker reads bot state from Aurora PostgreSQL: `bots.status`, `bots.lifecycle_state`, `hedge_legs`, `circuit_breakers.state`, `margin_status`
+2. Worker fetches `clearinghouseState` from HL (weight=2; gated by HL Rate Limiter (ElastiCache Redis) FR-EXBOT-091)
+3. Verify actual short size from HL matches `hedge_legs.last_known_hl_short_size` — if mismatch: record mismatch in Aurora PostgreSQL, trigger SAFE_MODE entry (see A3)
 4. Detect `stop_trigger_crossed_at` set AND `(now − stop_trigger_crossed_at) > 30 minutes` — if true: trigger SAFE_MODE entry (see A4)
 5. Detect `stop_replacing_started_at` set AND `(now − stop_replacing_started_at) > 60 seconds` — if true: trigger SAFE_MODE entry; secondary backstop detection path per FR-EXBOT-033 (see A4)
 6. Fetch `marginSummary` from HL; update `hedge_legs.margin_status` from fresh HL data
-7. Update D1 audit timestamp: `hedge_legs.last_audit_at = now`
+7. Update Aurora PostgreSQL audit timestamp: `hedge_legs.last_audit_at = now`
 8. Insert `queue_idempotency` row: `state='succeeded'`
 
 ## 4. Alternate Flows
-- **A1 (HL unreachable):** Step 2 — HLRateLimitDO returns `{allowed: false}` or HL API returns 5xx; skip HL-dependent steps (2, 3, 4, 6, 7); update cadence to high-risk interval (1 hour); enqueue notification "Hyperliquid API unreachable"; record retry-pending state
+- **A1 (HL unreachable):** Step 2 — HL Rate Limiter (ElastiCache Redis) returns `{allowed: false}` or HL API returns 5xx; skip HL-dependent steps (2, 3, 4, 6, 7); update cadence to high-risk interval (1 hour); enqueue notification "Hyperliquid API unreachable"; record retry-pending state
 - **A2 (bot status='paused'):** Full audit still runs at 6-hour cadence — pause does NOT skip deep-audit scheduling. All detection paths (steps 3–7) execute normally, including stuck marker detection (steps 4–5); if triggered, bot transitions from `paused` to `safe_mode`.
-- **A3 (reconcile mismatch detected):** Step 3 — actual short size ≠ `last_known_hl_short_size`; record mismatch in D1; trigger SAFE_MODE entry; enqueue admin notification with size delta
+- **A3 (reconcile mismatch detected):** Step 3 — actual short size ≠ `last_known_hl_short_size`; record mismatch in Aurora PostgreSQL; trigger SAFE_MODE entry; enqueue admin notification with size delta
 - **A4 (stuck stop marker detected):** Step 4 or 5 — trigger SAFE_MODE entry; enqueue admin escalation notification with timestamp and reason (E-EXBOT-019: "stop_trigger_crossed_at stuck > 30min"; E-EXBOT-020: "stop_replacing_started_at stuck > 60s")
 
 ## 5. Postconditions
@@ -56,7 +57,7 @@ Cron scheduler (system-initiated, background worker).
 - BR-EXBOT-003 does NOT apply here — deep-audit IS permitted to call HL API (HL weight ≠ 0 for deep-audit)
 - Deep-audit is the backstop; light-check (primary ≤5 min detection, FR-EXBOT-012) is the fast path for stop_replacing_started_at overrun
 - Deep-audit continues for paused bots — pause ≠ skip audit
-- Cron cadence switches to high-risk (1 hour) when ANY of: circuit_breakers.state != 'closed', margin_status='warning', margin_status='critical'
+- EventBridge Scheduler cadence switches to high-risk (1 hour) when ANY of: circuit_breakers.state != 'closed', margin_status='warning', margin_status='critical'
 
 ---
 
@@ -66,32 +67,32 @@ Cron scheduler (system-initiated, background worker).
 
 ```mermaid
 sequenceDiagram
-    actor Cron
+    actor Cron as "EventBridge Scheduler"
     participant Worker
-    participant D1
+    participant AuroraDB as "Aurora PostgreSQL"
     participant HL
     participant NotifQ
     Cron->>Worker: trigger deep-audit
-    Worker->>D1: read bot state
+    Worker->>AuroraDB: read bot state
     Worker->>HL: fetch clearinghouseState
-    Worker->>D1: verify short size match
+    Worker->>AuroraDB: verify short size match
     alt mismatch detected
-        Worker->>D1: record mismatch, trigger SAFE_MODE
+        Worker->>AuroraDB: record mismatch, trigger SAFE_MODE
         Worker->>NotifQ: admin escalation
     end
-    Worker->>D1: check stop_trigger_crossed_at stuck > 30min
+    Worker->>AuroraDB: check stop_trigger_crossed_at stuck > 30min
     alt stuck detected
-        Worker->>D1: trigger SAFE_MODE
+        Worker->>AuroraDB: trigger SAFE_MODE
         Worker->>NotifQ: admin escalation
     end
-    Worker->>D1: check stop_replacing_started_at stuck > 60s
+    Worker->>AuroraDB: check stop_replacing_started_at stuck > 60s
     alt stuck detected
-        Worker->>D1: trigger SAFE_MODE
+        Worker->>AuroraDB: trigger SAFE_MODE
         Worker->>NotifQ: admin escalation
     end
     Worker->>HL: fetch marginSummary
-    Worker->>D1: update margin_status
-    Worker->>D1: set last_audit_at, mark idempotency succeeded
+    Worker->>AuroraDB: update margin_status
+    Worker->>AuroraDB: set last_audit_at, mark idempotency succeeded
 ```
 
 ## 7. FR Trace

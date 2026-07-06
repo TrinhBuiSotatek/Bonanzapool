@@ -3,9 +3,10 @@ type: srs-erd
 module: exbot
 status: draft
 created: 2026-06-12
-updated: 2026-06-29
+updated: 2026-07-04
 owner: "@hienduong"
 changelog:
+  - 2026-07-04 | arc-migration | rename D1 header to Aurora PostgreSQL; annotate hl_agent_keys legacy fields as retired per FR-EXBOT-080 KMS flow
   - 2026-06-29 | manual | update hl_agent_keys table description: envelope encryption → AWS KMS key metadata
   - 2026-06-26 | manual | QC I-13 fix: add approved_by field to hl_agent_keys for admin audit trail
   - 2026-06-26 | manual | QC I-07 fix: add note to expires_at field — system-set at submitted_at + 90 days
@@ -14,7 +15,7 @@ changelog:
 
 # SRS ERD — BNZA-EXBOT Infrastructure
 
-## D1 Entity Relationship Diagram
+## Entity Relationship Diagram (Aurora PostgreSQL)
 
 ```mermaid
 erDiagram
@@ -53,15 +54,15 @@ erDiagram
         TEXT user_id FK
         TEXT hl_user_address
         TEXT agent_address
-        BLOB encrypted_secret
-        BLOB secret_iv
-        BLOB secret_auth_tag
-        BLOB wrapped_dek
-        BLOB dek_iv
-        INTEGER encryption_key_version
-        TEXT approval_status
-        TEXT approved_at
-        TEXT approved_by
+        BLOB encrypted_secret "RETIRED — legacy manual-approval flow, superseded by FR-EXBOT-080 KMS auto-provisioning"
+        BLOB secret_iv "RETIRED — legacy manual-approval flow, superseded by FR-EXBOT-080 KMS auto-provisioning"
+        BLOB secret_auth_tag "RETIRED — legacy manual-approval flow, superseded by FR-EXBOT-080 KMS auto-provisioning"
+        BLOB wrapped_dek "RETIRED — legacy manual-approval flow, superseded by FR-EXBOT-080 KMS auto-provisioning"
+        BLOB dek_iv "RETIRED — legacy manual-approval flow, superseded by FR-EXBOT-080 KMS auto-provisioning"
+        INTEGER encryption_key_version "RETIRED — legacy manual-approval flow, superseded by FR-EXBOT-080 KMS auto-provisioning"
+        TEXT approval_status "RETIRED — legacy manual-approval flow, superseded by FR-EXBOT-080 KMS auto-provisioning"
+        TEXT approved_at "RETIRED — legacy manual-approval flow, superseded by FR-EXBOT-080 KMS auto-provisioning"
+        TEXT approved_by "RETIRED — legacy manual-approval flow, superseded by FR-EXBOT-080 KMS auto-provisioning"
         TEXT expires_at "system-set: submitted_at + 90 days; not supplied by user"
         TEXT rotated_from FK
         TEXT created_at

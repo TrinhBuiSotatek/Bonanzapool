@@ -3,7 +3,7 @@ type: frd
 module: exbot
 status: draft
 created: 2026-06-12
-updated: 2026-06-29
+updated: 2026-07-04
 owner: "@hienduong"
 version: 0.1.0
 sources:
@@ -11,6 +11,7 @@ sources:
   - Google Doc: EXBOT System & Smart Contract Overview (Daniel, June 2026)
   - Google Sheet: BNZA ExBot Feature Tracker
 changelog:
+  - 2026-07-04 | arc-migration | replace Cloudflare primitives with AWS equivalents; sync queue count to 11 in spec.md
   - 2026-06-29 | manual | flow change: ACT-I role; §3 scope (KMS, deposit watcher, key-provision, 11 queues); FR-081 KMS rewrite; FR-010 queue 11; FR-100 endpoints; NFR-006; Phase0 gate NV-3; IC-EXBOT-005
   - 2026-06-24 | /ba-do | remove §7 Open Questions — 8 OQs migrated to SRS §9 (OQ-EXBOT-01..08); SRS is source of truth
   - 2026-06-18 | /ba-do hld-decisions | ACT-M removed; bot_safe_close flow updated (drop park/re-entry); lifecycle states cooldown/parked removed; emergencyTransfer authority updated
@@ -30,8 +31,8 @@ links:
 | Module | BNZA-EXBOT Infrastructure |
 | Line | Line 2 (independent of Line 1 WL ecosystem) |
 | Scope | Backend infrastructure only. Trading strategy logic is zen-proprietary. |
-| Architecture | Standalone Cloudflare Worker (`apps/bnza-exbot/`). NOT co-deployed with OPERATOR. |
-| Entry point | OPERATOR thin facade at `/api/exbot/*` → service binding → ExBot Worker (internal token auth) |
+| Architecture | Standalone AWS Lambda service (`apps/bnza-exbot/`). NOT co-deployed with OPERATOR. |
+| Entry point | OPERATOR thin facade at `/api/exbot/*` → API Gateway + Lambda Authorizer (HMAC) → ExBot Lambda |
 | Chain support | Base + Optimism from Phase 1 (v5.2.6 Theme E) |
 | Phase A limit | 1 active ExBot per user |
 | Source of truth | SPEC v5.2.6 (zen-approved). Where this FRD conflicts with SPEC, SPEC prevails. |
@@ -54,13 +55,13 @@ links:
 ## 3. System Boundary
 
 **In scope (SOTATEK builds):**
-- ExBot Cloudflare Worker (`apps/bnza-exbot/`)
-- D1 schema (control_db + state_db_shard)
+- ExBot AWS Lambda service (`apps/bnza-exbot/`)
+- Aurora PostgreSQL schema (control_db + state_db_shard)
 - Queue topology (11 queues)
-- Durable Objects (HLRateLimitDO, UserLockDO, MarketDataDO)
+- ElastiCache Redis services (HL Rate Limiter, User Lock, Pool Slot0 Cache)
 - Hyperliquid Adapter (rate limit, cloid, error parser, delta-only adjust, reconcile)
 - Operator Facade API (`/api/exbot/*` endpoints on OPERATOR side)
-- Cron workers (bot-scan, deep-audit, metrics-rollup)
+- Scheduled jobs (EventBridge Scheduler) — bot-scan, deep-audit, metrics-rollup
 - Agent key storage (AWS KMS — master key + agent key; private keys never leave KMS)
 - Deposit event watcher (chain indexer, Fargate — detects on-chain deposits)
 - Key-provision worker (auto-generates master key + agent key via AWS KMS on deposit; registers agent key with HL)
@@ -137,19 +138,19 @@ hedge_post_confirmed → stop_placing → stop_verified → active
 
 | Queue | Purpose | Producer | Consumer |
 |-------|---------|---------|---------|
-| `bot-scan` | Shard/window scan | Cron (1 min) | scan worker |
+| `bot-scan` | Shard/window scan | EventBridge Scheduler (1 min) | scan worker |
 | `light-check` | Per-bot check (no HL) | scan worker | light-check worker |
 | `hedge-sync` | Delta-only mutation candidate | light-check worker | hedge-sync worker |
 | `reconcile` | Post-order reconciliation | hedge-sync worker | reconcile worker |
-| `deep-audit` | Full HL state audit | Cron (6h) | deep-audit worker |
+| `deep-audit` | Full HL state audit | EventBridge Scheduler (6h) | deep-audit worker |
 | `price-near-stop-audit` | Stop/range boundary priority audit | light-check worker | stop-audit worker |
 | `partial_repair` | Partial reconcile / stop replace failure repair | hedge-sync worker | repair worker |
 | `user_redeem` | Hedge close for instant redemption (SLA 5 min) | redeem event watcher | redeem worker |
 | `notification` | User/admin alerts | any worker | notification worker |
-| `metrics-rollup` | Hourly/daily aggregation | Cron (hourly) | rollup worker |
+| `metrics-rollup` | Hourly/daily aggregation | EventBridge Scheduler (hourly) | rollup worker |
 | `key-provision` | Generate master key + agent key via KMS on deposit | deposit event watcher (chain indexer) | key-provision worker |
 
-All queue `sendBatch` calls MUST go through `chunkSendBatch()` helper (CF max 100/call). Direct `queue.sendBatch()` is forbidden.
+All queue `sendBatch` calls MUST go through `chunkSendBatch()` helper (SQS max 10/call). Direct `queue.sendBatch()` is forbidden.
 
 Every consumer MUST insert `message_id` with `state='started'` into `queue_idempotency` at start. UNIQUE conflict = duplicate delivery → return immediately.
 
@@ -157,8 +158,8 @@ Every consumer MUST insert `message_id` with `state='started'` into `queue_idemp
 **Priority:** P0
 
 Light-check MUST NOT touch Hyperliquid (HL weight = 0). Sources:
-- D1 hot state (`bot_runtime_state.last_known_hl_short_size`)
-- `MarketDataDO` (sqrtPriceX96, currentTick)
+- Aurora PostgreSQL hot state (`bot_runtime_state.last_known_hl_short_size`)
+- ElastiCache Redis pool slot0 cache (sqrtPriceX96, currentTick)
 - Local TickMath (LP amount calculation)
 
 Evaluate `RebalanceReason[]` (canonical enum, §7.6):
@@ -166,12 +167,12 @@ Evaluate `RebalanceReason[]` (canonical enum, §7.6):
 - `drift_relative`: `|target - actual| / target > 0.15`
 - `range_out`: `rangeState != 'in'`
 - `range_boundary_near`: price 90% to range upper/lower
-- `margin_warning`: `hedge_legs.margin_status == 'warning'` (read from D1, no HL fetch)
+- `margin_warning`: `hedge_legs.margin_status == 'warning'` (read from Aurora PostgreSQL, no HL fetch)
 - `funding_alert`: 7d funding < −15% APR
 - `time_fallback`: 4h since last adjustment
 
 **Price source rules (v5.2.6 X-5 — 3-way split, MUST NOT be interchanged):**
-- `uniPoolPrice` — Uniswap V3 pool slot0 `sqrtPriceX96` via `MarketDataDO`: used for LP drift valuation (`deltaErrorUsd`)
+- `uniPoolPrice` — Uniswap V3 pool slot0 `sqrtPriceX96` via ElastiCache Redis pool slot0 cache: used for LP drift valuation (`deltaErrorUsd`)
 - `hlMarkPrice` — HL mark price: used only for stop trigger detection (`markPrice >= stop_price`)
 - `hlOraclePrice` — HL oracle price: used only for margin calculations (`marginRequiredUsd`)
 
@@ -192,7 +193,7 @@ If `circuit_breakers.state='half_open'` → allow ONE probe hedge-sync through.
 ```
 next_light_check_at = now + 5min + random(−45s, +45s)
 ```
-Prevents bot clustering at :00/:05 boundaries; reduces D1 write spikes.
+Prevents bot clustering at :00/:05 boundaries; reduces Aurora PostgreSQL write spikes.
 
 ---
 
@@ -262,7 +263,7 @@ On hedge open (size 0 → >0):
    - `stop_distance_pct = liq_distance_pct × stopSafetyFactor (0.70 Phase A)`
    - `stop_trigger_px = entry_price × (1 + stop_distance_pct)`
 4. Place reduce-only stop market with computed trigger (HL native stop)
-5. Verify placed; record `stop_cloid`, `stop_order_id`, `stop_price`, `stop_size` in D1
+5. Verify placed; record `stop_cloid`, `stop_order_id`, `stop_price`, `stop_size` in Aurora PostgreSQL
 
 All stop price computations MUST use BigDecimal (never float).
 
@@ -354,7 +355,7 @@ Margin status is updated ONLY at:
 1. Just before hedge-sync (fetch HL marginSummary)
 2. Deep-audit
 
-Light-check reads `hedge_legs.margin_status` from D1 only (NO HL fetch). Weight = 0.
+Light-check reads `hedge_legs.margin_status` from Aurora PostgreSQL only (NO HL fetch). Weight = 0.
 
 `warning` → disable size-increase hedges; alert user (POOL UI banner, Phase A only).
 `critical` → enter SAFE_MODE; alert admin; guide "deposit additional $Z to HL".
@@ -391,9 +392,9 @@ After bot_safe_close completes: bots.status='closed'. User receives notification
 
 ---
 
-### 4.9 D1 Schema
+### 4.9 Aurora PostgreSQL Schema
 
-#### FR-EXBOT-080 — D1 Architecture
+#### FR-EXBOT-080 — Aurora PostgreSQL Architecture
 **Priority:** P0
 
 Two physically separate databases:
@@ -424,7 +425,7 @@ Two physically separate databases:
 
 Shard key: `shard_id = hash(bot_id) % shard_count`.
 
-D1 write budget rule: write `bot_runtime_state` ONLY on change (no-op detection). Batch `next_light_check_at` updates (1 statement per shard). Forbidden: unconditional UPDATE per light-check.
+Aurora PostgreSQL write budget rule: write `bot_runtime_state` ONLY on change (no-op detection). Batch `next_light_check_at` updates (1 statement per shard). Forbidden: unconditional UPDATE per light-check.
 
 Schema change rule: ADD COLUMN only. DROP / RENAME of existing columns is FORBIDDEN.
 
@@ -446,29 +447,29 @@ On user on-chain deposit, the key-provision worker automatically provisions a pe
 
 ---
 
-### 4.10 Durable Objects
+### 4.10 Shared State Services (ElastiCache Redis)
 
-#### FR-EXBOT-090 — HLRateLimitDO
+#### FR-EXBOT-090 — HL Rate Limiter (ElastiCache Redis)
 **Priority:** P0
 
 Sliding-window rate limit for HL API calls. BNZA operating budget: 800 weight/min (67% of HL's 1,200/min hard limit). Excess → queue + delay.
 
-#### FR-EXBOT-091 — UserLockDO (Lease-Based)
+#### FR-EXBOT-091 — User Lock (Redis Redlock)
 **Priority:** P0
 
 Lease-based mutex for same-user HL mutations:
 - `acquire(holderToken, ttlMs=90_000, idempotencyKey?)` → `{acquired: true/false}`
-- `heartbeat(holderToken, ttlMs)` → extend lease if still held
+- `extend(holderToken, ttlMs)` → extend lease if still held
 - `release(holderToken, idempotencyKey?, result?)` → release + optional cache result for replay
 
-holderToken mismatch on release = noop. TTL expiry = auto-release. Caller (not DO) runs the work.
+holderToken mismatch on release = noop. TTL expiry = auto-release. Caller Lambda (not the lock layer) runs the work.
 
 `idempotencyKey` pattern: `hedge-sync:{botId}:{stateVersion}`. Prevents duplicate execution of same stateVersion on redelivery.
 
-#### FR-EXBOT-092 — MarketDataDO
+#### FR-EXBOT-092 — Pool Slot0 Cache (ElastiCache Redis)
 **Priority:** P0
 
-Shared cache for pool slot0 (sqrtPriceX96, currentTick, blockNumber). All light-check workers read from this DO instead of individual RPC calls. Cache TTL and refresh cadence: per SPEC NV-12 result.
+Shared cache for pool slot0 (sqrtPriceX96, currentTick, blockNumber). All light-check workers read from this cache instead of individual RPC calls. Cache TTL and refresh cadence: per SPEC NV-12 result.
 
 ---
 
@@ -477,7 +478,7 @@ Shared cache for pool slot0 (sqrtPriceX96, currentTick, blockNumber). All light-
 #### FR-EXBOT-100 — Operator Facade Endpoints
 **Priority:** P1
 
-OPERATOR exposes `/api/exbot/*` which proxies to ExBot Worker via CF service binding + internal token. ExBot Worker is NOT directly accessible from the internet.
+OPERATOR exposes `/api/exbot/*` which proxies to ExBot Lambda via API Gateway + HMAC Lambda Authorizer. ExBot Lambda is NOT directly accessible from the internet.
 
 | Endpoint | Method | Action | Actor |
 |----------|--------|--------|-------|
@@ -500,9 +501,9 @@ Forbidden at scale (light-check must NOT):
 - Fetch `openOrders` for all bots every 5 min
 - Fetch `userFunding` for all bots every 5 min
 
-D1 sharding: Phase A = 1 shard; Phase B = 4; Phase C = 16 (deferred until Phase B stable + 10k-equivalent load benchmark passes).
+Aurora PostgreSQL sharding: Phase A = 1 shard; Phase B = 4; Phase C = 16 (deferred until Phase B stable + 10k-equivalent load benchmark passes).
 
-CF Workers simultaneous outbound connections: max 6 per invocation. Parallel fetches within 1 invocation must be limited to 6 concurrent.
+Outbound HL API call concurrency is governed by the rate limiter (FR-EXBOT-090, 800 weight/min). No per-invocation connection limit is imposed on AWS Lambda.
 
 ---
 
@@ -514,7 +515,7 @@ CF Workers simultaneous outbound connections: max 6 per invocation. Parallel fet
 | NFR-EXBOT-002 | Latency | 1 hedge-sync normally completes < 30s (queue lag reduction) |
 | NFR-EXBOT-003 | SLA | user_redeem hedge close: ≤ 5 min from event detection |
 | NFR-EXBOT-004 | Rate limit | HL API: ≤ 800 weight/min (67% of 1,200 hard limit) |
-| NFR-EXBOT-005 | D1 write | No unconditional UPDATE per light-check; write-on-change only |
+| NFR-EXBOT-005 | Aurora PostgreSQL write | No unconditional UPDATE per light-check; write-on-change only |
 | NFR-EXBOT-006 | Security | Master key + agent key generated and retained in AWS KMS; private keys never leave KMS; all signing via Signing Lambda (IAM role kms:Sign only); no key material in app memory or logs |
 | NFR-EXBOT-007 | Idempotency | All queue consumers: idempotency ledger insert at start; UNIQUE conflict = skip |
 | NFR-EXBOT-008 | Precision | All hedge/stop/margin computations: BigDecimal only (float/number arithmetic forbidden) |
@@ -532,7 +533,7 @@ All 4 conditions must be met before Phase A work begins:
 3. AWS KMS integration verified: key-provision worker can generate master key + agent key via KMS, call HL `approveAgent`, and set `key_status='active'` (NV-3)
 4. WL stability gate: 7 consecutive post-launch days with zero SAFE_MODE + no major incident
 
-Before gate clears: SOTATEK prepares D1 schema + Queue skeleton only (no HL integration).
+Before gate clears: SOTATEK prepares Aurora PostgreSQL schema + Queue skeleton only (no HL integration).
 
 ---
 

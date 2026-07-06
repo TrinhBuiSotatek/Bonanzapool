@@ -3,11 +3,12 @@ type: use-case
 module: exbot
 status: draft
 created: 2026-06-12
-updated: 2026-06-18
+updated: 2026-07-04
 owner: "@hienduong"
 linked_stories: [US-EXBOT-009, US-EXBOT-010, US-EXBOT-012]
 changelog:
-  - 2026-06-18 | /ba-do hld-decisions | rewrite: drop park/redeploy/re-entry loop; new flow: executeStrategy(RedeemStrategyV1) → RedemptionQueue FIFO → user receives funds
+  - 2026-07-04 | arc-migration | replace UserLockDO with User Lock (Redis Redlock via ElastiCache), D1 with Aurora PostgreSQL per FR-EXBOT-092
+  - "2026-06-18 | /ba-do hld-decisions | rewrite: drop park/redeploy/re-entry loop; new flow: executeStrategy(RedeemStrategyV1) → RedemptionQueue FIFO → user receives funds"
   - 2026-06-18 | /ba-do | add US-010 (SAFE_MODE/margin critical trigger) and US-012 (admin force-close trigger) to linked_stories
   - 2026-06-12 | /ba-start srs | initial draft
 ---
@@ -22,7 +23,7 @@ User navigates to the relevant screen or initiates the described action.
 
 ## 1. Actors
 - **Primary:** ExBot System Operator (Close Worker)
-- **System:** Hyperliquid, BnzaExVault, BnzaExPositionManager, RedemptionQueue, D1
+- **System:** Hyperliquid, BnzaExVault, BnzaExPositionManager, RedemptionQueue, Aurora PostgreSQL
 
 ## 2. Preconditions
 - Trigger condition met: circuit breaker retries exhausted, OR margin critical + SAFE_MODE irrecoverable, OR 3 stops within 7 days, OR admin force-close
@@ -30,7 +31,7 @@ User navigates to the relevant screen or initiates the described action.
 
 ## 3. Main Success Scenario
 1. Trigger creates `close_operations` row (kind='bot_safe_close', state='requested'); `lifecycle_state` set to `lp_closing`; `bots.status` set to `'closing'` — held until step 11
-2. Close Worker: acquire `UserLockDO` lease; full close HL short (`closeShortReduceOnlyIoc`)
+2. Close Worker: acquire `User Lock (Redis Redlock via ElastiCache)` lease; full close HL short (`closeShortReduceOnlyIoc`)
 3. Cancel stop via `§19.5 replaceStopProtected` with size=0
 4. Reconcile: verify HL size = 0; update `close_operations.state='hedge_closed'`
 5. Call `vault.executeStrategy(RedeemStrategyV1, user, botId, params)` — closes LP position via BnzaExPositionManager

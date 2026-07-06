@@ -3,10 +3,11 @@ type: use-case
 module: exbot
 status: draft
 created: 2026-06-12
-updated: 2026-06-29
+updated: 2026-07-04
 owner: "@hienduong"
 linked_stories: [US-EXBOT-001]
 changelog:
+  - 2026-07-04 | arc-migration | replace Cloudflare primitives with AWS equivalents (D1→Aurora PostgreSQL, ExBot Worker→ExBot Lambda, BR-EXBOT-010 annotation standalone Worker→standalone Lambda)
   - 2026-06-29 | manual | flow change: trigger→system (deposit+key-provision); remove agent key approval precondition; rewrite step 3 (key_status check); remove A3/A9; add Signing Lambda to actors
   - 2026-06-20 | /ba-do | QC audit fixes: A5-A11 added, step 7/10 named params, A3 verbatim fix, on-chain preconditions confirmed, FR trace note, stale template removed
   - 2026-06-12 | /ba-start srs | initial draft
@@ -22,7 +23,7 @@ System-initiated: on-chain deposit detected by chain indexer (Fargate) → key-p
 
 ## 1. Actors
 - **Primary:** System (key-provision worker, after deposit detected by chain indexer)
-- **System:** ExBot Worker, BnzaExVault (Solidity), Hyperliquid, AWS KMS, Signing Lambda
+- **System:** ExBot Lambda, BnzaExVault (Solidity), Hyperliquid, AWS KMS, Signing Lambda
 
 ## 2. Preconditions
 - User has no existing ExBot with `status IN ('active','paused','closing','safe_mode','error')`
@@ -34,14 +35,14 @@ System-initiated: on-chain deposit detected by chain indexer (Fargate) → key-p
 
 ## 3. Main Success Scenario
 1. Key-provision worker enqueues bot-start job after setting `hl_agent_keys.key_status='active'`
-2. ExBot Worker receives bot-start job
-3. ExBot Worker runs preflight: one-bot check → margin check → `hl_agent_keys.key_status='active'` check (block with E-EXBOT-017 if not active) → builder fee check → LP mint simulation
-4. ExBot Worker creates bot record (`lifecycle_state='preflight'`)
-5. ExBot Worker calls `BnzaExVault.vaultMint(...)` → receives `VaultMinted` event with `tokenId`
-6. D1 `positions` updated with `tokenId`, `tickLower`, `tickUpper`, `wethIndex`, `lifecycle_state='lp_opened'`
-7. ExBot Worker requests HL short IOC via Signing Lambda (`targetShortEth = lpEthAmount × hedgeRatio (Phase A = 0.70)`)
+2. ExBot Lambda receives bot-start job
+3. ExBot Lambda runs preflight: one-bot check → margin check → `hl_agent_keys.key_status='active'` check (block with E-EXBOT-017 if not active) → builder fee check → LP mint simulation
+4. ExBot Lambda creates bot record (`lifecycle_state='preflight'`)
+5. ExBot Lambda calls `BnzaExVault.vaultMint(...)` → receives `VaultMinted` event with `tokenId`
+6. Aurora PostgreSQL `positions` updated with `tokenId`, `tickLower`, `tickUpper`, `wethIndex`, `lifecycle_state='lp_opened'`
+7. ExBot Lambda requests HL short IOC via Signing Lambda (`targetShortEth = lpEthAmount × hedgeRatio (Phase A = 0.70)`)
 8. Post-order reconcile: fetches actual HL position, extracts `entry_price`, `liquidation_price`, `effective_leverage`
-9. `lifecycle_state='hedge_post_confirmed'`; D1 `hedge_legs` updated
+9. `lifecycle_state='hedge_post_confirmed'`; Aurora PostgreSQL `hedge_legs` updated
 10. Computes `stop_trigger_px` (BigDecimal, `stopSafetyFactor (Phase A = 0.70)`); places reduce-only stop market on HL via Signing Lambda
 11. Stop confirmed → `lifecycle_state='stop_verified'` → `'active'`
 12. Bot active; status visible in POOL UI on next status poll
@@ -64,7 +65,7 @@ System-initiated: on-chain deposit detected by chain indexer (Fargate) → key-p
 - `hedge_legs.stop_price`, `stop_cloid`, `entry_price`, `effective_leverage` populated
 
 ## 6. Business Rules
-- BR-EXBOT-001 (one-bot policy), BR-EXBOT-010 (standalone Worker)
+- BR-EXBOT-001 (one-bot policy), BR-EXBOT-010 (standalone Lambda)
 
 ---
 

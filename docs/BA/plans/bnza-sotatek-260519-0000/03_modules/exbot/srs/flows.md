@@ -3,9 +3,10 @@ type: srs-flows
 module: exbot
 status: draft
 created: 2026-06-12
-updated: 2026-06-29
+updated: 2026-07-04
 owner: "@hienduong"
 changelog:
+  - 2026-07-04 | arc-migration | replace Cloudflare primitives with AWS equivalents across F-01, F-02, F-03, F-04, F-05
   - 2026-06-29 | manual | rewrite F-03: deposit-triggered KMS key-provision + Signing Lambda flow; remove manual Investor/Operator path
   - 2026-06-20 | /ba-do | QC audit fixes: F-05 rewritten — remove park/re-entry/cooldown, reflect direct close flow
   - 2026-06-12 | /ba-start srs | initial draft
@@ -17,15 +18,15 @@ changelog:
 
 ```mermaid
 sequenceDiagram
-    participant Cron as "Cron Worker (1 min)"
+    participant Cron as "EventBridge Scheduler (1 min)"
     participant ScanQ as "bot-scan queue"
     participant ScanW as "Scan Worker"
     participant LCQ as "light-check queue"
     participant LCW as "Light-Check Worker"
     participant HSQ as "hedge-sync queue"
     participant PSAQ as "price-near-stop-audit queue"
-    participant D1 as "D1"
-    participant MDO as "MarketDataDO"
+    participant D1 as "Aurora PostgreSQL"
+    participant MDO as "ElastiCache Redis"
 
     Cron->>ScanQ: sendBatch via chunkSendBatch
     ScanQ->>ScanW: deliver batch
@@ -55,9 +56,9 @@ sequenceDiagram
 sequenceDiagram
     participant HSQ as hedge-sync queue
     participant HSW as Hedge-Sync Worker
-    participant UDO as UserLockDO
+    participant UDO as "Redis Redlock"
     participant HL as Hyperliquid API
-    participant D1 as D1
+    participant D1 as "Aurora PostgreSQL"
     participant RQ as reconcile queue
 
     HSQ->>HSW: deliver {botId, reasons, stateVersion}
@@ -94,10 +95,10 @@ sequenceDiagram
     participant KMS as "AWS KMS"
     participant HL as "Hyperliquid"
     participant BSQ as "bot-start queue"
-    participant EXW as "ExBot Worker"
+    participant EXW as "ExBot Lambda"
     participant VAULT as "BnzaExVault"
     participant SL as "Signing Lambda"
-    participant DB as "D1 (control_db + shard)"
+    participant DB as "Aurora PostgreSQL (control_db + shard)"
 
     CHAIN->>CHAIN: on-chain deposit event detected
     CHAIN->>KPQ: enqueue key-provision job {userId, depositAmount, txHash}
@@ -150,7 +151,7 @@ sequenceDiagram
     participant UREQ as user_redeem queue
     participant UREW as Redeem Worker
     participant HL as Hyperliquid
-    participant D1 as D1
+    participant D1 as "Aurora PostgreSQL"
 
     INV->>VAULT: redeem(tokenId) [on-chain tx]
     VAULT-->>INV: LP liquidated, LP-portion USDC returned in same tx
@@ -180,18 +181,18 @@ sequenceDiagram
 sequenceDiagram
     actor Investor
     participant OperatorFacade
-    participant ExBotWorker
+    participant ExBotLambda
     participant RedemptionQueue
     participant Operator
 
     Investor->>OperatorFacade: POST /api/exbot/close
-    OperatorFacade->>ExBotWorker: forward via service binding
-    ExBotWorker->>ExBotWorker: executeStrategy(RedeemStrategyV1)
-    ExBotWorker->>RedemptionQueue: createRequest(botId, userId, amount)
-    RedemptionQueue-->>ExBotWorker: requestId
-    ExBotWorker->>ExBotWorker: lifecycle_state = 'closing'
-    ExBotWorker-->>Investor: "Close request queued. Funds will be returned after FIFO processing."
+    OperatorFacade->>ExBotLambda: forward via API Gateway + HMAC Lambda Authorizer
+    ExBotLambda->>ExBotLambda: executeStrategy(RedeemStrategyV1)
+    ExBotLambda->>RedemptionQueue: createRequest(botId, userId, amount)
+    RedemptionQueue-->>ExBotLambda: requestId
+    ExBotLambda->>ExBotLambda: lifecycle_state = 'closing'
+    ExBotLambda-->>Investor: "Close request queued. Funds will be returned after FIFO processing."
     Operator->>RedemptionQueue: fulfillRequest(requestId) [FIFO]
     RedemptionQueue-->>Investor: funds transferred
-    ExBotWorker->>ExBotWorker: lifecycle_state = 'closed'
+    ExBotLambda->>ExBotLambda: lifecycle_state = 'closed'
 ```
