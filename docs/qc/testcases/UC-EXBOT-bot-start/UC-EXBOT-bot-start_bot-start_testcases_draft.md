@@ -2,10 +2,10 @@
 
 **Total test cases:** 46 (FUNC: 33, INTG: 8, NFR: 5)
 **Scope:** Logic-only (backend / API / bot — no UI)
-**Source UC:** UC-EXBOT-bot-start_bot-start_audited_20260630_v1.md
-**Source scenarios (if any):** UC-EXBOT-bot-start_bot-start_scenarios_20260702_v2.md
+**Source UC:** UC-EXBOT-bot-start_bot-start_audited_20260706_v3.md
+**Source scenarios (if any):** UC-EXBOT-bot-start_bot-start_scenarios_20260706_v3.md
 **Output language:** English
-**Version:** v4 | **Delta (v3 → v4):** +0 new, ~2 updated (TC_028, TC_029), -0 deleted | **Update trigger:** REQUIREMENT_DELTA (scenarios v2 — I-11 flagged on TS_028/TS_029)
+**Version:** v5 | **Delta (v4 → v5):** +0 new, ~28 updated, -0 deleted | **Update trigger:** REQUIREMENT_DELTA (arc-migration 2026-07-04: audited v3, scenarios v3)
 
 #### Requirement Traceability Matrix
 
@@ -53,7 +53,7 @@
 - **Step:**
   1. Check `hl_agent_keys.key_status` before HL confirmation arrives; then let HL confirm `approveAgent` and check again.
 - **Expected Result:**
-  1. Before HL confirmation: `key_status` is not `active` (remains `provisioning` or absent). After HL confirms: `key_status='active'` is written atomically to D1 and a `bot-start` job is enqueued. (Reference: FR-EXBOT-080, SRS F-03.)
+  1. Before HL confirmation: `key_status` is not `active` (remains `provisioning` or absent). After HL confirms: `key_status='active'` is written atomically to Aurora PostgreSQL and a `bot-start` job is enqueued. (Reference: FR-EXBOT-080, SRS F-03.)
 - **Priority:** P0
 
 #### TC_003
@@ -79,13 +79,12 @@
   1. `hl_agent_keys.key_status` stays at `provisioning` (not changed to `active`); the worker re-enqueues a retry via the `key-provision` queue; no `bot-start` job is enqueued until `key_status='active'` is confirmed. An admin alert is sent when the SLA wait time is exceeded. (Reference: FR-EXBOT-080.)
 - **Priority:** P0
 
-
 #### TC_005
 
 - **Title:** Verify duplicate key-provision queue message does not provision a second key pair
 - **Pre-condition:**
   1. A `key-provision` message has already been processed once and `key_status='active'` is set.
-  2. The same message is redelivered (Cloudflare Queue at-least-once semantics).
+  2. The same message is redelivered (SQS at-least-once semantics).
 - **Step:**
   1. Deliver the same `key-provision` message a second time with the same `message_id`.
 - **Expected Result:**
@@ -113,9 +112,9 @@
 - **Pre-condition:**
   1. Key-provision flow has completed successfully; `hl_agent_keys.key_status='active'`.
 - **Step:**
-  1. Dump the `hl_agent_keys` table from D1; search application logs for the time window of the provisioning run; inspect any API response bodies from Key-Provision Worker.
+  1. Dump the `hl_agent_keys` table from Aurora PostgreSQL; search application logs for the time window of the provisioning run; inspect any API response bodies from Key-Provision Worker.
 - **Expected Result:**
-  1. No hex-encoded or base64-encoded 256-bit/512-bit private key pattern appears in any D1 field, log line, or response payload. Only `hl_user_address`, `agent_address`, and metadata (status, timestamps) are stored in plaintext. Private keys remain exclusively in AWS KMS HSM. (Reference: FR-EXBOT-080, NFR-EXBOT-006.)
+  1. No hex-encoded or base64-encoded 256-bit/512-bit private key pattern appears in any Aurora PostgreSQL field, log line, or response payload. Only `hl_user_address`, `agent_address`, and metadata (status, timestamps) are stored in plaintext. Private keys remain exclusively in AWS KMS HSM. (Reference: FR-EXBOT-080, NFR-EXBOT-006.)
 - **Priority:** P0
 
 ---
@@ -178,7 +177,7 @@
 - **Step:**
   1. Process the `bot-start` preflight with the user's margin set just below the minimum threshold.
 - **Expected Result:**
-  1. Preflight step 2 fails with `E-EXBOT-002` (HTTP 400). The message includes the required amount, current amount, and exact shortfall. No bot record is created in D1. (Reference: FR-EXBOT-002, FR-EXBOT-061.)
+  1. Preflight step 2 fails with `E-EXBOT-002` (HTTP 400). The message includes the required amount, current amount, and exact shortfall. No bot record is created in Aurora PostgreSQL. (Reference: FR-EXBOT-002, FR-EXBOT-061.)
 - **Priority:** P0
 
 #### TC_013
@@ -259,7 +258,7 @@
 - **Pre-condition:**
   1. This test is run five times — once for each preflight step — with each step configured to fail while all prior steps pass.
 - **Step:**
-  1. Fail preflight at step 1; query D1 for new bot records. Repeat for steps 2, 3, 4, and 5.
+  1. Fail preflight at step 1; query Aurora PostgreSQL for new bot records. Repeat for steps 2, 3, 4, and 5.
 - **Expected Result:**
   1. After each preflight failure, `bot_registry` and `bots` contain zero new rows for the user. The bot record is only created AFTER all 5 preflight checks pass (FR-EXBOT-002 AC). No partial record under any failure scenario. (Reference: FR-EXBOT-002, FR-EXBOT-003.)
 - **Priority:** P0
@@ -270,25 +269,25 @@
 
 - **Title:** Verify the HL rate-limit weight is consumed at step 2 even when a later preflight step fails
 - **Pre-condition:**
-  1. The `HLRateLimitDO` sliding-window state is accessible and shows current consumed weight.
+  1. The ElastiCache Redis HL rate-limit sliding-window state is accessible and shows current consumed weight.
   2. Preflight step 2 (margin check, weight = 2) is configured to succeed; step 3 (key_status check) is configured to fail.
 - **Step:**
   1. Process the `bot-start` preflight so that step 2 runs and step 3 fails immediately after.
 - **Expected Result:**
-  1. `HLRateLimitDO` shows that weight = 2 was declared and consumed at step 2; this weight is not reversed by the subsequent step 3 failure. The rate-limit budget reflects the actual HL call made. (Reference: FR-EXBOT-091, NFR-EXBOT-004.)
+  1. ElastiCache Redis HL rate-limit sliding-window shows that weight = 2 was declared and consumed at step 2; this weight is not reversed by the subsequent step 3 failure. The rate-limit budget reflects the actual HL call made. (Reference: FR-EXBOT-091, NFR-EXBOT-004.)
 - **Priority:** P1
 
 ### II.3. Non-functional (logic) verification — Operation: Bot Start Preflight
 
 #### TC_021
 
-- **Title:** Verify the ExBot Worker returns 403 when accessed directly without the CF service binding
+- **Title:** Verify the ExBot Lambda returns 403 when accessed directly without going through API Gateway + HMAC Lambda Authorizer
 - **Pre-condition:**
-  1. No CF service binding is used; the caller sends a direct HTTP request to ExBot Worker's URL without an internal token.
+  1. API Gateway + HMAC Lambda Authorizer is not used; the caller sends a direct HTTP request to ExBot Lambda's URL without an internal token.
 - **Step:**
-  1. Send a direct HTTP POST to ExBot Worker's worker URL bypassing the OPERATOR Facade.
+  1. Send a direct HTTP POST to ExBot Lambda's endpoint URL bypassing the OPERATOR Facade.
 - **Expected Result:**
-  1. ExBot Worker returns HTTP 403 and does not process the request. All bot-start operations must only be accessible via the OPERATOR Facade at `POST /api/exbot/start` via CF service binding with internal token. (Reference: FR-EXBOT-090, BR-EXBOT-010.)
+  1. ExBot Lambda returns HTTP 403 and does not process the request. All bot-start operations must only be accessible via the OPERATOR Facade at `POST /api/exbot/start` via API Gateway + HMAC Lambda Authorizer with internal token. (Reference: FR-EXBOT-090, BR-EXBOT-010.)
 - **Priority:** P0
 
 
@@ -304,19 +303,19 @@
 - **Pre-condition:**
   1. All 5 preflight checks have passed for the user.
 - **Step:**
-  1. Check D1 `bots` table immediately after all preflight pass and before `vaultMint` is called on-chain.
+  1. Check Aurora PostgreSQL `bots` table immediately after all preflight pass and before `vaultMint` is called on-chain.
 - **Expected Result:**
-  1. A bot record exists in D1 with `lifecycle_state='preflight'` written in a single atomic INSERT. No `vaultMint` on-chain call has been made yet. (Reference: FR-EXBOT-003, UC §3 step 4.)
+  1. A bot record exists in Aurora PostgreSQL with `lifecycle_state='preflight'` written in a single atomic INSERT. No `vaultMint` on-chain call has been made yet. (Reference: FR-EXBOT-003, UC §3 step 4.)
 - **Priority:** P0
 
 #### TC_023
 
-- **Title:** Verify LP mint produces a VaultMinted event and D1 positions row is updated with tokenId and lifecycle_state=lp_opened
+- **Title:** Verify LP mint produces a VaultMinted event and positions row is updated with tokenId and lifecycle_state=lp_opened
 - **Pre-condition:**
   1. Bot record exists with `lifecycle_state='preflight'`.
   2. BnzaExVault is available (testnet or mocked ABI) and `vaultMint` is set to succeed.
 - **Step:**
-  1. ExBot Worker calls `BnzaExVault.vaultMint(user, tickLower, tickUpper, amount0, amount1, slippageBps)` on-chain; wait for confirmation.
+  1. ExBot Lambda calls `BnzaExVault.vaultMint(user, tickLower, tickUpper, amount0, amount1, slippageBps)` on-chain; wait for confirmation.
 - **Expected Result:**
   1. On-chain: `VaultMinted(user, botId, tokenId, liquidity)` event is emitted by BnzaExVault.
   2. Off-chain: `positions.token_id` is populated with the `tokenId` from the event; `positions.custodian='vault'`; `positions.tick_lower`, `positions.tick_upper` are stored; `bots.lifecycle_state='lp_opened'`. (Reference: FR-EXBOT-004, UC §3 step 5–6.)
@@ -329,7 +328,7 @@
   1. Bot record exists with `lifecycle_state='preflight'`.
   2. `BnzaExVault.vaultMint` is mocked to revert (e.g., slippage exceeded or insufficient allowance).
 - **Step:**
-  1. ExBot Worker calls `vaultMint` while it is set to fail.
+  1. ExBot Lambda calls `vaultMint` while it is set to fail.
 - **Expected Result:**
   1. On-chain: the vault transaction reverts; no LP NFT is minted; no `VaultMinted` event is emitted.
   2. Off-chain: `bots.lifecycle_state` transitions to `error`; no `positions.token_id` is written. (Note: the "return funds" mechanism is pending OQ-EXBOT-08 — this TC verifies the state transition only; fund recovery postcondition is blocked.) (Reference: UC §4 A4, FR-EXBOT-003.)
@@ -357,7 +356,7 @@
 - **Step:**
   1. Trigger hedge computation; inspect the intermediate and final values used in `targetShortEth = lpEthAmount × hedgeRatio`.
 - **Expected Result:**
-  1. No intermediate `Number()` conversion is used for `lpEthAmount` or `hedgeRatio`. The result stored in D1 is a TEXT string (not a JSON number). `normalizeTargetRatioBps("0.70")` returns 7000n — not 6999n or 7001n due to float rounding. (Reference: FR-EXBOT-021, NFR-EXBOT-008.)
+  1. No intermediate `Number()` conversion is used for `lpEthAmount` or `hedgeRatio`. The result stored in Aurora PostgreSQL is a TEXT string (not a JSON number). `normalizeTargetRatioBps("0.70")` returns 7000n — not 6999n or 7001n due to float rounding. (Reference: FR-EXBOT-021, NFR-EXBOT-008.)
 - **Priority:** P0
 
 #### TC_027
@@ -367,9 +366,9 @@
   1. `targetShortEth` has been computed; the bot is in `hedge_pre_open` state.
   2. Signing Lambda and KMS are available (testnet or mocked).
 - **Step:**
-  1. ExBot Worker sends the signing request to Signing Lambda; verify the IAM principal that calls `kms:Sign` and the order payload sent to HL.
+  1. ExBot Lambda sends the signing request to Signing Lambda; verify the IAM principal that calls `kms:Sign` and the order payload sent to HL.
 - **Expected Result:**
-  1. Signing Lambda calls KMS `kms:Sign` using the agent key (not the master key). The signed IOC order is sent to HL. Signing Lambda is the only IAM principal that calls `kms:Sign`. No private key material appears in any signed payload, log, or ExBot Worker memory. (Reference: FR-EXBOT-080, NFR-EXBOT-006, SRS F-03.)
+  1. Signing Lambda calls KMS `kms:Sign` using the agent key (not the master key). The signed IOC order is sent to HL. Signing Lambda is the only IAM principal that calls `kms:Sign`. No private key material appears in any signed payload, log, or ExBot Lambda memory. (Reference: FR-EXBOT-080, NFR-EXBOT-006, SRS F-03.)
 - **Priority:** P0
 
 #### TC_028
@@ -379,7 +378,7 @@
   1. Bot is in `lp_opened` state; LP NFT has been minted and `VaultMinted` received.
   2. HL API (mocked) is set to be unreachable when the short IOC order is submitted.
 - **Step:**
-  1. Let ExBot Worker attempt to send the short IOC order while HL is unreachable.
+  1. Let ExBot Lambda attempt to send the short IOC order while HL is unreachable.
 - **Expected Result:**
   1. On-chain: LP NFT remains held by BnzaExVault (LP was already minted; `custodian='vault'` unchanged).
   2. Off-chain: `E-EXBOT-008` is surfaced; no stop order is placed; the LP NFT remains held by BnzaExVault (`custodian='vault'` unchanged). `bots.lifecycle_state` transitions away from `hedge_pre_open` — the destination state is `error` per UC §4 A7 but `safe_mode` per `srs/states.md` (`hedge_pre_open → safe_mode`); this conflict is tracked as **I-11 (open blocker, pending BA confirmation)**. Until I-11 is resolved, this TC verifies the failure gate and the LP-open-without-hedge condition; the specific destination state (`error` vs `safe_mode`) must be re-confirmed once I-11 is answered. (Reference: UC §4 A7, E-EXBOT-008.)
@@ -405,7 +404,7 @@
   1. The short IOC order has been submitted; the bot is in `hedge_pre_open` state.
   2. HL `clearinghouseState` (mocked) returns an actual short size that matches the expected size.
 - **Step:**
-  1. ExBot Worker fetches `clearinghouseState` from HL; verify the reconcile result and D1 update.
+  1. ExBot Lambda fetches `clearinghouseState` from HL; verify the reconcile result and the database update.
 - **Expected Result:**
   1. Actual short size matches expected; `hedge_legs.entry_price`, `hedge_legs.liquidation_price`, and `hedge_legs.effective_leverage` are populated as BigDecimal TEXT strings; `hedge_legs.last_known_hl_short_size` is updated; `bots.lifecycle_state` transitions to `hedge_post_confirmed`. No `rebalance_attempts.status='success'` is written before reconcile confirms the state. (Reference: FR-EXBOT-025, UC §3 step 8–9.)
 - **Priority:** P0
@@ -430,10 +429,10 @@
 - **Pre-condition:**
   1. Bot-start has completed and `bots.lifecycle_state='active'`.
 - **Step:**
-  1. Query on-chain BnzaExVault for the LP NFT held for this user; compare with `positions.token_id` in D1.
+  1. Query on-chain BnzaExVault for the LP NFT held for this user; compare with `positions.token_id` in Aurora PostgreSQL.
 - **Expected Result:**
   1. On-chain: the NFT with the recorded `tokenId` is held by BnzaExVault, not by the user's wallet.
-  2. Off-chain: `positions.token_id` in D1 matches the `tokenId` from the `VaultMinted` event; `positions.custodian='vault'`. This consistency is required for future `user_redeem` and `bot_safe_close` flows. (Reference: FR-EXBOT-004, FR-EXBOT-070.)
+  2. Off-chain: `positions.token_id` in Aurora PostgreSQL matches the `tokenId` from the `VaultMinted` event; `positions.custodian='vault'`. This consistency is required for future `user_redeem` and `bot_safe_close` flows. (Reference: FR-EXBOT-004, FR-EXBOT-070.)
 - **Priority:** P0
 
 #### TC_033
@@ -453,12 +452,12 @@
 
 - **Title:** Verify the Signing Lambda is the only IAM principal allowed to call kms:Sign during hedge open
 - **Pre-condition:**
-  1. The bot is in `lp_opened` state and ExBot Worker is about to send a signing request.
+  1. The bot is in `lp_opened` state and ExBot Lambda is about to send a signing request.
   2. IAM audit logging is enabled for KMS.
 - **Step:**
   1. Trigger the hedge open; inspect AWS CloudTrail or equivalent logs for `kms:Sign` calls made during the operation.
 - **Expected Result:**
-  1. Only Signing Lambda's IAM role appears as the caller for `kms:Sign` during this operation. No other IAM principal (including ExBot Worker) makes a `kms:Sign` call. This verifies the principle of least privilege for the signing path. (Reference: FR-EXBOT-080, NFR-EXBOT-006, SRS F-03.)
+  1. Only Signing Lambda's IAM role appears as the caller for `kms:Sign` during this operation. No other IAM principal (including ExBot Lambda) makes a `kms:Sign` call. This verifies the principle of least privilege for the signing path. (Reference: FR-EXBOT-080, NFR-EXBOT-006, SRS F-03.)
 - **Priority:** P0
 
 
@@ -474,7 +473,7 @@
 - **Pre-condition:**
   1. Bot is in `hedge_post_confirmed` state; `hedge_legs.entry_price` and `hedge_legs.liquidation_price` are populated.
 - **Step:**
-  1. ExBot Worker computes `stop_trigger_px`; inspect the computation path and the final value stored in D1.
+  1. ExBot Lambda computes `stop_trigger_px`; inspect the computation path and the final value stored in Aurora PostgreSQL.
 - **Expected Result:**
   1. `stop_trigger_px = entry_price × (1 + ((liquidation_price − entry_price) / entry_price) × 0.70)` is computed entirely in BigDecimal with no intermediate `Number()` conversion. The result is stored as a TEXT BigDecimal string in `hedge_legs.stop_price`. For a position with isolated leverage, `stop_price` is less than `liquidation_price` with at least 30% buffer. (Reference: FR-EXBOT-030, NFR-EXBOT-008.)
 - **Priority:** P0
@@ -486,9 +485,9 @@
   1. Bot is in `hedge_post_confirmed` state.
   2. HL `clearinghouseState` returned a null or absent `liquidationPx` field.
 - **Step:**
-  1. ExBot Worker computes `stop_trigger_px` using the fallback formula.
+  1. ExBot Lambda computes `stop_trigger_px` using the fallback formula.
 - **Expected Result:**
-  1. `stop_trigger_px = entry_price × (1 + (1 / effective_leverage) × 0.70)` is computed using BigDecimal. The BigDecimal constraint still applies to the fallback. The result is stored as a TEXT string in D1. (Reference: FR-EXBOT-030.)
+  1. `stop_trigger_px = entry_price × (1 + (1 / effective_leverage) × 0.70)` is computed using BigDecimal. The BigDecimal constraint still applies to the fallback. The result is stored as a TEXT string in Aurora PostgreSQL. (Reference: FR-EXBOT-030.)
 - **Priority:** P1
 
 #### TC_037
@@ -498,10 +497,10 @@
   1. Bot is in `stop_placing` state; `stop_trigger_px` has been computed and stored.
   2. HL (mocked) is set to accept and confirm the stop market order.
 - **Step:**
-  1. ExBot Worker sends `placeReduceOnlyStopMarket(stopTriggerPx, size, cloid)` via Signing Lambda; wait for confirmation.
+  1. ExBot Lambda sends `placeReduceOnlyStopMarket(stopTriggerPx, size, cloid)` via Signing Lambda; wait for confirmation.
 - **Expected Result:**
   1. On-chain: HL confirms the reduce-only stop market order.
-  2. Off-chain: `hedge_legs.stop_cloid` and `hedge_legs.stop_price` are written to D1; `bots.lifecycle_state` transitions first to `stop_verified` then immediately to `active`; `bots.status='active'`. The bot cannot reach `active` without a confirmed stop — the INV-STOP invariant is satisfied from initialization. (Reference: FR-EXBOT-031, UC §3 step 10–11.)
+  2. Off-chain: `hedge_legs.stop_cloid` and `hedge_legs.stop_price` are written to Aurora PostgreSQL; `bots.lifecycle_state` transitions first to `stop_verified` then immediately to `active`; `bots.status='active'`. The bot cannot reach `active` without a confirmed stop — the INV-STOP invariant is satisfied from initialization. (Reference: FR-EXBOT-031, UC §3 step 10–11.)
 - **Priority:** P0
 
 #### TC_038
@@ -511,7 +510,7 @@
   1. Bot is in `stop_placing` state; the short IOC was already filled on HL.
   2. HL (mocked) is set to reject or not confirm the reduce-only stop market order.
 - **Step:**
-  1. Let ExBot Worker attempt `placeReduceOnlyStopMarket` while HL is set to fail.
+  1. Let ExBot Lambda attempt `placeReduceOnlyStopMarket` while HL is set to fail.
 - **Expected Result:**
   1. On-chain: the HL short position remains open but no stop order is placed.
   2. Off-chain: `E-EXBOT-009` ("Failed to place native stop on Hyperliquid. Bot cannot activate without a stop.") is surfaced; an operator alert is sent; the bot does NOT reach `lifecycle_state='active'`; `bots.lifecycle_state` transitions to `safe_mode` (per states.md `stop_placing → safe_mode`; I-06 resolved 2026-07-02). Auto-recovery per FR-EXBOT-050 begins: system retries when HL is responsive + 3 consecutive reconciles succeed; if irrecoverable → `bot_safe_close` is triggered. (Reference: UC §4 A8, FR-EXBOT-031, FR-EXBOT-050, E-EXBOT-009.)
@@ -523,9 +522,9 @@
 - **Pre-condition:**
   1. All preconditions for a full happy-path bot-start are met: no existing active bot, sufficient HL margin, agent key active, builder fee confirmed, LP mint simulation passes, BnzaExVault and HL are available.
 - **Step:**
-  1. Trigger the full bot-start flow from `bot-start` queue message to `active` state; observe D1 `bots.lifecycle_state` after each step completes.
+  1. Trigger the full bot-start flow from `bot-start` queue message to `active` state; observe Aurora PostgreSQL `bots.lifecycle_state` after each step completes.
 - **Expected Result:**
-  1. The sequence observed in D1 is exactly: `preflight → lp_opening → lp_opened → hedge_pre_open → hedge_post_confirmed → stop_placing → stop_verified → active` — with no state skipped, no state repeated, and each transition persisted atomically before the next step begins. Final state: `bots.lifecycle_state='active'`, `bots.status='active'`, `positions.custodian='vault'`, `positions.token_id` populated, `hedge_legs.stop_price` and `stop_cloid` populated as non-null BigDecimal TEXT strings. (Reference: FR-EXBOT-003, AC-01.)
+  1. The sequence observed in Aurora PostgreSQL is exactly: `preflight → lp_opening → lp_opened → hedge_pre_open → hedge_post_confirmed → stop_placing → stop_verified → active` — with no state skipped, no state repeated, and each transition persisted atomically before the next step begins. Final state: `bots.lifecycle_state='active'`, `bots.status='active'`, `positions.custodian='vault'`, `positions.token_id` populated, `hedge_legs.stop_price` and `stop_cloid` populated as non-null BigDecimal TEXT strings. (Reference: FR-EXBOT-003, AC-01.)
 - **Priority:** P0
 
 #### TC_040
@@ -535,7 +534,7 @@
   1. Bot-start has completed; bot is in `active` state.
   2. The hedge position was opened with a known isolated leverage setting. (Example: isolated leverage ≈ 3×.)
 - **Step:**
-  1. Read `hedge_legs.stop_price`, `hedge_legs.liquidation_price`, and `hedge_legs.entry_price` from D1; compute the actual buffer percentage.
+  1. Read `hedge_legs.stop_price`, `hedge_legs.liquidation_price`, and `hedge_legs.entry_price` from Aurora PostgreSQL; compute the actual buffer percentage.
 - **Expected Result:**
   1. `hedge_legs.stop_price` (BigDecimal) < `hedge_legs.liquidation_price`. The distance from `stop_price` to `liquidation_price`, expressed as a percentage of the entry-to-liquidation range, is at least 30% (confirming `stopSafetyFactor=0.70` is applied: stop fires at 70% of the distance to liquidation). (Reference: FR-EXBOT-030, AC-13.)
 - **Priority:** P0
@@ -544,11 +543,11 @@
 
 #### TC_041
 
-- **Title:** Verify light-check and deep-audit are scheduled in D1 after the bot reaches active state
+- **Title:** Verify light-check and deep-audit are scheduled after the bot reaches active state
 - **Pre-condition:**
   1. Bot-start has just completed; `bots.lifecycle_state='active'`.
 - **Step:**
-  1. Read `bots.next_light_check_at` and `bots.next_deep_audit_at` from D1 immediately after the bot reaches `active`.
+  1. Read `bots.next_light_check_at` and `bots.next_deep_audit_at` from Aurora PostgreSQL immediately after the bot reaches `active`.
 - **Expected Result:**
   1. `bots.next_light_check_at` is set to a time within 5 minutes plus jitter (−45s to +45s) from now. A deep-audit is scheduled within the next 6 hours (`bots.next_deep_audit_at` is in the future and within the 6h window). The cross-UC dependencies (UC-EXBOT-light-check, UC-EXBOT-deep-audit) are activated by the `active` lifecycle transition. (Reference: FR-EXBOT-012, FR-EXBOT-016, FR-EXBOT-013.)
 - **Priority:** P1
@@ -561,7 +560,7 @@
 - **Step:**
   1. Call `GET /api/exbot/status` via the OPERATOR Facade after the bot reaches `active`.
 - **Expected Result:**
-  1. The response includes `status='active'`, `botId`, and hedge/LP summary fields. The response does not expose any private key material. The OPERATOR logs show the request was proxied via CF service binding to ExBot Worker. (Reference: FR-EXBOT-090, FR-EXBOT-003, UC §3 step 12.)
+  1. The response includes `status='active'`, `botId`, and hedge/LP summary fields. The response does not expose any private key material. The OPERATOR logs show the request was proxied via API Gateway + HMAC Lambda Authorizer to ExBot Lambda. (Reference: FR-EXBOT-090, FR-EXBOT-003, UC §3 step 12.)
 - **Priority:** P1
 
 #### TC_043
@@ -572,7 +571,7 @@
 - **Step:**
   1. Deliver the same `bot-start` message a second time with the same `message_id`.
 - **Expected Result:**
-  1. The second delivery encounters a UNIQUE constraint conflict on `queue_idempotency.message_id` and exits immediately; only one bot record exists in D1 for the user; no duplicate HL orders are submitted; no duplicate `positions` or `hedge_legs` rows are created. (Reference: FR-EXBOT-011, NFR-EXBOT-007, AC-14.)
+  1. The second delivery encounters a UNIQUE constraint conflict on `queue_idempotency.message_id` and exits immediately; only one bot record exists in Aurora PostgreSQL for the user; no duplicate HL orders are submitted; no duplicate `positions` or `hedge_legs` rows are created. (Reference: FR-EXBOT-011, NFR-EXBOT-007, AC-14.)
 - **Priority:** P0
 
 #### TC_044
@@ -584,7 +583,7 @@
 - **Step:**
   1. Deliver both `bot-start` messages to two separate worker instances at the same time.
 - **Expected Result:**
-  1. Exactly one bot record is created in D1. The second worker either hits the `queue_idempotency` UNIQUE constraint or hits the one-bot policy check after the first bot is created — in either case no duplicate bot is created and no duplicate HL orders are placed. (Reference: FR-EXBOT-001, FR-EXBOT-011, BR-EXBOT-001.)
+  1. Exactly one bot record is created in Aurora PostgreSQL. The second worker either hits the `queue_idempotency` UNIQUE constraint or hits the one-bot policy check after the first bot is created — in either case no duplicate bot is created and no duplicate HL orders are placed. (Reference: FR-EXBOT-001, FR-EXBOT-011, BR-EXBOT-001.)
 - **Priority:** P0
 
 ### IV.3. Non-functional (logic) verification — Operation: Stop Placement & Bot Activation
@@ -598,17 +597,16 @@
 - **Step:**
   1. Run the bot-start so the agent key is decrypted for signing (for `openShortIoc` and `placeReduceOnlyStopMarket`); then read the worker logs and any error output.
 - **Expected Result:**
-  1. No private key material appears anywhere in the logs or error output. The agent private key is generated and retained exclusively in AWS KMS — it never leaves the HSM, is never passed to ExBot Worker or Signing Lambda's memory as plaintext, and is never written to D1. A dump of `hl_agent_keys` shows only public addresses and metadata. (Reference: FR-EXBOT-080, NFR-EXBOT-006, AC-11.)
+  1. No private key material appears anywhere in the logs or error output. The agent private key is generated and retained exclusively in AWS KMS — it never leaves the HSM, is never passed to ExBot Lambda or Signing Lambda's memory as plaintext, and is never written to Aurora PostgreSQL. A dump of `hl_agent_keys` shows only public addresses and metadata. (Reference: FR-EXBOT-080, NFR-EXBOT-006, AC-11.)
 - **Priority:** P0
 
 #### TC_046
 
-- **Title:** Verify all financial values in D1 after bot activation are stored as BigDecimal TEXT strings, not numeric types
+- **Title:** Verify all financial values in Aurora PostgreSQL after bot activation are stored as BigDecimal TEXT strings, not numeric types
 - **Pre-condition:**
   1. Bot-start has completed; bot is in `active` state.
 - **Step:**
-  1. Read the D1 schema and row values for `hedge_legs.entry_price`, `hedge_legs.liquidation_price`, `hedge_legs.effective_leverage`, `hedge_legs.stop_price`, `positions.token_id`.
+  1. Read the Aurora PostgreSQL schema and row values for `hedge_legs.entry_price`, `hedge_legs.liquidation_price`, `hedge_legs.effective_leverage`, `hedge_legs.stop_price`, `positions.token_id`.
 - **Expected Result:**
-  1. All financial amount fields (`entry_price`, `liquidation_price`, `effective_leverage`, `stop_price`) are stored as TEXT columns containing BigDecimal string values — not stored as REAL or INTEGER SQLite types. No JSON number literals (e.g., `0.7` instead of `"0.7"`) exist for any financial field. (Reference: NFR-EXBOT-008, ERD invariant.)
+  1. All financial amount fields (`entry_price`, `liquidation_price`, `effective_leverage`, `stop_price`) are stored as TEXT columns containing BigDecimal string values — not stored as REAL or INTEGER PostgreSQL numeric types. No JSON number literals (e.g., `0.7` instead of `"0.7"`) exist for any financial field. (Reference: NFR-EXBOT-008, ERD invariant.)
 - **Priority:** P0
-
