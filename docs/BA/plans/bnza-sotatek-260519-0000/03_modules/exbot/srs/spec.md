@@ -91,9 +91,9 @@ The system shall enforce a maximum of one active ExBot per user in Phase A. Befo
 **Trace:** FM-XB-07, UC-EXBOT-bot-start, US-EXBOT-001
 **Priority:** P0
 
-The system shall run five preflight checks in sequence before creating a bot record: (1) one-bot policy check, (2) HL isolated margin balance ≥ required margin × 2.0, (3) `hl_agent_keys.key_status='active'` (system-provisioned at deposit — if not active, block with E-EXBOT-017), (4) builder fee (5bps) confirmed on HL, (5) LP mint simulation passes. Any single failure blocks the start with a specific message identifying the failed check.
+The system shall run six preflight checks in sequence before creating a bot record: (1) one-bot policy check, (2) vault balance check — `BnzaExVault` balance > 0 for this user (block with E-EXBOT-025 if no confirmed deposit), (3) HL isolated margin balance ≥ required margin × 2.0, (4) `hl_agent_keys.key_status='active'` (provisioned automatically at deposit time — if not active, block with E-EXBOT-017), (5) builder fee (5bps) confirmed on HL, (6) LP mint simulation passes. Any single failure blocks the start with a specific message identifying the failed check.
 
-**Acceptance criteria:** Insufficient margin returns "Required HL margin: $X (with 100% buffer). Current: $Y. Please deposit $Z to HL." Key not provisioned (`key_status` not `active`) returns E-EXBOT-017. Each check failure produces a distinct error; no partial bot record is left in Aurora PostgreSQL.
+**Acceptance criteria:** No vault deposit returns E-EXBOT-025. Insufficient margin returns "Required HL margin: $X (with 100% buffer). Current: $Y. Please deposit $Z to HL." Key not provisioned (`key_status` not `active`) returns E-EXBOT-017. Each check failure produces a distinct error; no partial bot record is left in Aurora PostgreSQL.
 
 ---
 
@@ -558,8 +558,10 @@ The OPERATOR shall expose four endpoints under `/api/exbot/*`, each proxied to E
 | E-EXBOT-011 | Reconcile mismatch | "Hedge position mismatch detected. Bot entered Safe Mode pending reconciliation." | — (internal) |
 | E-EXBOT-012 | Close attempted on already-closed bot | "Bot is already closed. No action needed." | 409 |
 | E-EXBOT-013 | Pause attempted in SAFE_MODE | "Bot is in Safe Mode. You can close the bot instead." | 409 |
-| E-EXBOT-017 | Bot start preflight — no `hl_agent_keys` row with `key_status='active'` for this user | "Bot cannot start: agent key not yet provisioned. Please complete an on-chain deposit to trigger automatic setup." | 400 |
+| E-EXBOT-017 | Bot start preflight — no `hl_agent_keys` row with `key_status='active'` for this user | "Bot cannot start: agent key not yet provisioned. Please wait for deposit processing to complete." | 400 |
 | E-EXBOT-018 | bot_safe_close hedge close failed after 3 retries — `close_operations.state='residual_hl_liability'` | "Bot safe close failed: HL hedge could not be closed after 3 attempts. Manual intervention required. Bot held at residual_hl_liability." | — (internal alert) |
+| E-EXBOT-024 | user_redeem hedge close failed after 3 retries or reconcile mismatch — `close_operations.state='residual_hl_liability'` | "User redemption hedge close failed. Manual intervention required." | — (internal admin alert) |
+| E-EXBOT-025 | Bot start preflight — no confirmed deposit in `BnzaExVault` for this user | "No confirmed deposit found. Please complete an on-chain deposit before starting the bot." | 400 |
 
 ---
 
@@ -577,7 +579,7 @@ Full UC specs in `../usecases/`. Each file contains: actors, preconditions, main
 
 | UC slug | Description | FR trace |
 |---|---|---|
-| `uc-bot-start` | Start ExBot: deposit → key-provision → preflight → LP mint → hedge open → stop place → active | FR-EXBOT-001–004, 020, 030–031 |
+| `uc-bot-start` | Start ExBot: user calls POST /api/exbot/start → preflight (vault balance + margin + key_status + builder fee + LP sim) → LP mint → hedge open → stop place → active. Key-provision (KMS + approveAgent) runs automatically at deposit time (see F-03a). | FR-EXBOT-001–004, 020, 030–031 |
 | `uc-light-check` | Periodic scan (zero HL calls) → fan-out to hedge-sync or price-near-stop-audit | FR-EXBOT-012, 013, 014, 015, 016, 032 |
 | `uc-hedge-sync` | Delta-only hedge adjustment + INV-STOP protocol + post-order reconcile | FR-EXBOT-020, 021, 022, 024, 025, 026, 027, 035, 036 |
 | `uc-user-redeem` | LP-first instant redemption + HL hedge close SLA 5 min | FR-EXBOT-070, 071 |
@@ -591,7 +593,7 @@ Full story files in `../userstories/`. 11 active stories across 4 epics (US-011 
 
 | Story ID | Epic | Actor | Description | Priority |
 |---|---|---|---|---|
-| US-EXBOT-001 | Investor Lifecycle | USDC Investor | Start ExBot (system-triggered after deposit + key provisioning) | P0 |
+| US-EXBOT-001 | Investor Lifecycle | USDC Investor | Start ExBot (user-initiated via POOL UI; key already provisioned automatically at deposit) | P0 |
 | US-EXBOT-002 | Investor Lifecycle | USDC Investor | Monitor active ExBot status | P0 |
 | US-EXBOT-003 | Investor Lifecycle | USDC Investor | Pause and resume ExBot | P1 |
 | US-EXBOT-004 | Investor Lifecycle | USDC Investor | Close ExBot and redeem funds (user_redeem) | P0 |

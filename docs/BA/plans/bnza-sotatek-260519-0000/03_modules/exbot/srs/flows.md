@@ -3,9 +3,10 @@ type: srs-flows
 module: exbot
 status: draft
 created: 2026-06-12
-updated: 2026-07-04
+updated: 2026-07-07
 owner: "@hienduong"
 changelog:
+  - 2026-07-07 | manual | split F-03 into F-03a (auto key-provision on deposit) and F-03b (user-triggered bot start via POST /api/exbot/start)
   - 2026-07-04 | arc-migration | replace Cloudflare primitives with AWS equivalents across F-01, F-02, F-03, F-04, F-05
   - 2026-06-29 | manual | rewrite F-03: deposit-triggered KMS key-provision + Signing Lambda flow; remove manual Investor/Operator path
   - 2026-06-20 | /ba-do | QC audit fixes: F-05 rewritten — remove park/re-entry/cooldown, reflect direct close flow
@@ -83,9 +84,9 @@ sequenceDiagram
     HSW->>D1: insert rebalance_attempts (status=success/failed/partial)
 ```
 
-## F-03: Bot Initialization Flow
+## F-03a: Auto Key-Provision on Deposit
 
-> **Flow updated 2026-06-29:** Bot start is now fully automatic. On user on-chain deposit, the chain indexer (Fargate) enqueues a `key-provision` job. The key-provision worker generates a per-user master key and agent key entirely inside AWS KMS (private keys never leave the HSM), registers the agent key with Hyperliquid via `approveAgent`, then enqueues bot start. No investor UI action or admin approval is required.
+> **Triggered automatically** when Chain Indexer (Fargate) detects an on-chain deposit. No user action required. Bot start does NOT happen here — this flow only provisions the HL account so it is ready when the user later calls Start Bot.
 
 ```mermaid
 sequenceDiagram
@@ -94,10 +95,6 @@ sequenceDiagram
     participant KP as "Key-Provision Worker"
     participant KMS as "AWS KMS"
     participant HL as "Hyperliquid"
-    participant BSQ as "bot-start queue"
-    participant EXW as "ExBot Lambda"
-    participant VAULT as "BnzaExVault"
-    participant SL as "Signing Lambda"
     participant DB as "Aurora PostgreSQL (control_db + shard)"
 
     CHAIN->>CHAIN: on-chain deposit event detected
@@ -113,12 +110,29 @@ sequenceDiagram
     HL-->>KP: agent registered as delegate
 
     KP->>DB: INSERT hl_agent_keys (key_status='active', agent_address, hl_user_address)
-    KP->>BSQ: enqueue bot-start job {userId}
+    Note over KP,DB: Flow ends here — bot start is user-initiated (see F-03b)
+```
 
-    BSQ->>EXW: deliver bot-start job
+## F-03b: User-Triggered Bot Start
+
+> **Triggered by user** calling `POST /api/exbot/start` via POOL UI. Key-provision must already be complete (`key_status='active'`) from F-03a. Preflight now includes vault balance check as first guard.
+
+```mermaid
+sequenceDiagram
+    participant INV as "USDC Investor (POOL UI)"
+    participant EXW as "ExBot Lambda"
+    participant DB as "Aurora PostgreSQL (control_db + shard)"
+    participant HL as "Hyperliquid"
+    participant VAULT as "BnzaExVault"
+    participant SL as "Signing Lambda"
+    participant KMS as "AWS KMS"
+
+    INV->>EXW: POST /api/exbot/start
     EXW->>DB: one-bot policy check (bot_registry)
+    EXW->>VAULT: check vault balance > 0 for user (block with E-EXBOT-025 if no deposit)
     EXW->>HL: getMarginSummary (preflight margin check)
     EXW->>DB: key_status='active' check — block with E-EXBOT-017 if not active
+    EXW->>EXW: builder fee check
     EXW->>EXW: LP mint simulation
     EXW->>DB: create bot record (lifecycle_state=preflight)
 
@@ -139,6 +153,7 @@ sequenceDiagram
     KMS-->>SL: signature
     SL->>HL: signed stop order placed
     EXW->>DB: update hedge_legs (stop_cloid, stop_price, lifecycle_state=stop_verified → active)
+    EXW-->>INV: bot started successfully
 ```
 
 ## F-04: Close Flow — user_redeem (LP-First)
