@@ -338,12 +338,11 @@ Các actor đã được xác định rõ. Step 2 đã được cập nhật ch�
 | Q7 | Medium | MISSING_INFO | UC §3 step 2 vs FR-EXBOT-092 | Step 2 nói "acquire UserLockDO lease" — UserLockDO là Cloudflare Durable Object, không tồn tại trong ExBot architecture (FR-EXBOT-092 chỉ định Redis Redlock via ElastiCache). Không có document nào xác nhận UserLockDO có apply cho Close Worker. | **UC 2026-07-04 đã cập nhật:** Step 2 now correctly says "acquire User Lock (Redis Redlock via ElastiCache) lease". UserLockDO đã được thay hoàn toàn bằng Redis Redlock trong ExBot. | ✅ Answered (2026-07-04) | UC changelog 2026-07-04: "replace UserLockDO with User Lock (Redis Redlock via ElastiCache)" |
 | Q8 | Medium | INTERNAL_INCONSISTENCY | FR-EXBOT-073 vs SRS states.md | FR-EXBOT-073 step 3 nói "stop cancelled" nhưng close_operations states table (states.md) không có `stop_canceled` state. | **`stop cancelled` là action, không phải state riêng.** `closeShortReduceOnlyIoc` và `replaceStopProtected(size=0)` đều là actions trong step 2 (`hedge_close_pending`). `close_operations.state` chỉ advance lên `hedge_closed` sau khi reconcile confirm HL size = 0 AND stop đã cancel. FR-EXBOT-073 đã được update. | ✅ Answered | docs/BA/qc-notes-temp.md — Q8 UC-EXBOT-bot-safe-close |
 | Q11 | Minor | UNCLEAR_INFO | US-EXBOT-009 AC-EXBOT-009-2 | AC-009-2 nói "bots.status transitions to 'safe_mode'" sau hedge fail nhưng không specify `bots.lifecycle_state`. | **Cả hai đều chuyển sang `'safe_mode'`** — `lifecycle_state` và `status` có cùng giá trị per `states.md`. AC-009-2 đã được update để ghi rõ `lifecycle_state='safe_mode'`. | ✅ Answered | docs/BA/qc-notes-temp.md — Q11 UC-EXBOT-bot-safe-close |
+| Q4 | Medium | MISSING_INFO | UC §1, SRS flows.md F-05, FR-EXBOT-073 | UC §1 đặt "Close Worker" trong danh sách Actors, nhưng Close Worker KHÔNG phải actor — nó là **architecture component** (ExBot Lambda). Trigger mechanism đã rõ: 5 trigger conditions đến từ các workers khác (deep-audit, hedge-sync, partial_repair) HOẶC admin API (`POST /api/exbot/close`). Không có dedicated `bot_safe_close` queue trong 11 queues (FR-EXBOT-010). Test design cho duplicate scenario dựa trên UNIQUE constraint `close_operations.idempotency_key`, không cần biết trigger mechanism cụ thể. | ✅ Answered | QC Lead — phân tích nội bộ |
 
 #### 10.1.2 Câu hỏi còn mở
 
-| ID | Mức ưu tiên | Loại vấn đề | Tham chiếu nguồn | Nội dung vấn đề / câu hỏi cần xác nhận | Vì sao quan trọng | Owner đề xuất | Trạng thái |
-|---|---|---|---|---|---|---|---|
-| Q4 | Medium | MISSING_INFO | UC §1, SRS flows.md F-05 | UC không đề cập queue idempotency cho Close Worker. Close Worker được trigger như thế nào — via queue message hay direct call? flows.md F-05 diagram rất simplified, không show queue consumer pattern. Không có document nào mô tả trigger mechanism. | Tester cần biết trigger mechanism để design test cho duplicate scenario | Tech Lead | ⏳ Pending |
+*(Không có câu hỏi nào đang chờ — tất cả đã được trả lời hoặc deferred)*
 
 #### 10.1.3 Câu hỏi Deferred
 
@@ -362,7 +361,6 @@ Các actor đã được xác định rõ. Step 2 đã được cập nhật ch�
 | HL API field names for marginSummary (marginBalanceUsd) | API contract | Affects reconcile verification | HL API docs | ⏳ Open (OQ-EXBOT-01) |
 | Vault contract address (Base + Optimism) via AWS Secrets Manager | Environment | Affects integration test connectivity | SOTATEK | ⏳ Open |
 | park/redeploy removal verification (to ensure no remaining traces) | Documentation | **Đã xác nhận:** US-EXBOT-012 AC-012-1 đã được update, không còn trace của park/redeploy. | BA | ✅ Closed (Q2) |
-| Close Worker trigger mechanism (queue vs direct call) | Architecture | Affects test design cho duplicate scenario. **Pending Tech Lead.** | Tech Lead | ⏳ Pending |
 
 ---
 
@@ -372,7 +370,7 @@ Các actor đã được xác định rõ. Step 2 đã được cập nhật ch�
 |---|---|---|---|
 | v1 | 2026-06-30 | QC UC Read Agent | Tạo báo cáo audited lần đầu |
 | v2 | 2026-07-02 | QC Agent | Cập nhật từ BA responses (Q1, Q2, Q3, Q5, Q6, Q8, Q11): LP close method confirmed, AC-012-1 updated, bot status prerequisite clarified, E-EXBOT-018 added, status timing clarified, stop cancelled clarified as action, lifecycle_state clarified. Score improved: 56/100 → 85/100. Verdict: Not Ready → Ready. |
-| v3 | 2026-07-06 | QC Agent | Re-audit after BA document update (2026-07-04): **Q7 RESOLVED** — UC Step 2 updated from "UserLockDO" to "User Lock (Redis Redlock via ElastiCache)" per FR-EXBOT-092. Score stays 85/100. Verdict: Ready. Q4 remains open (pending Tech Lead). Q10 diagram gaps remain deferred (visual aid only, step-by-step is clear). |
+| v3 | 2026-07-06 | QC Agent | Re-audit after BA document update (2026-07-04): **Q7 RESOLVED** — UC Step 2 updated from "UserLockDO" to "User Lock (Redis Redlock via ElastiCache)" per FR-EXBOT-092. **Q4 REMOVED** — Close Worker is architecture (ExBot Lambda), not actor; trigger mechanism already defined in FR-EXBOT-073 (5 conditions from other workers + admin API). No dedicated bot_safe_close queue in FR-EXBOT-010. Score stays 85/100. Verdict: Ready. All 11 questions: 9 answered, 2 deferred (Q9, Q10). |
 
 ---
 
@@ -380,10 +378,10 @@ Các actor đã được xác định rõ. Step 2 đã được cập nhật ch�
 
 | Area | Max | Score | Status | Summary |
 |---:|---:|---:|---|---|
-| 1. Function/Operation & Data Object Inventory | 20 | 17 | ✅ Good | Q1, Q2, Q3 đã được giải quyết. Còn Q4 (pending Tech Lead). |
+| 1. Function/Operation & Data Object Inventory | 20 | 18 | ✅ Good | All major issues resolved. Q9 deferred (format detail, not blocking). |
 | 2. Data Object / State Attributes, BR & Messages | 25 | 23 | ✅ Good | Q5 (E-EXBOT-018), Q6 (status timing), Q8 (stop cancelled), Q11 (lifecycle_state), **Q7 (Redis Redlock clarification)** đã được giải quyết. |
 | 3. Functional Logic & Workflow Decomposition | 25 | 23 | ✅ Good | Q1 (LP close), Q2 (AC outdated), Q6 (status timing), Q7 (lock mechanism) đã được giải quyết. |
-| 4. Functional Integration & Data Consistency | 15 | 11 | ✅ Good | Multiple missing details đã được confirm. Còn Q4 (architecture decision pending). |
+| 4. Functional Integration & Data Consistency | 15 | 11 | ✅ Good | Multiple missing details đã được confirm. Q9 deferred (format detail, not blocking). |
 | 5. UC / Spec Documentation Quality | 15 | 12 | ✅ Good | Q1, Q2, Q8 major conflicts đã được fix. Q3-Q7, Q11 đã được clarify. Q10 diagram gaps remain deferred. |
 | **Total** | **100** | **85** | **Ready** | |
 
@@ -391,9 +389,12 @@ Các actor đã được xác định rõ. Step 2 đã được cập nhật ch�
 
 Issues resolved in v3:
 - **Q7: RESOLVED** — UC 2026-07-04 updated Step 2: "UserLockDO lease" → "User Lock (Redis Redlock via ElastiCache) lease". Redis Redlock replaces Cloudflare Durable Object throughout the ExBot architecture per FR-EXBOT-092. No remaining references to UserLockDO in UC documents.
+- **Q4: REMOVED** — Close Worker is not an actor; it is an architecture component (ExBot Lambda). Trigger mechanism is defined: 5 trigger conditions from other workers (deep-audit, hedge-sync, partial_repair) OR admin API. No dedicated bot_safe_close queue in FR-EXBOT-010. Duplicate scenario test design is based on UNIQUE constraint, not trigger mechanism.
 
-Remaining open items (pending Tech Lead):
-- Q4: Close Worker trigger mechanism — tester cần biết Close Worker được trigger qua queue hay direct call để design duplicate scenario test
+All questions resolved:
+- Answered: 9 (Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q8, Q11)
+- Deferred: 2 (Q9, Q10)
+- Total: 11
 
 Diagram gaps (already deferred, no test impact):
 - Q10: UC Figure 1 và flows.md F-05 simplified diagrams — step-by-step description in UC §3 và FR-EXBOT-073 đã đầy đủ, diagrams chỉ là visual aid
