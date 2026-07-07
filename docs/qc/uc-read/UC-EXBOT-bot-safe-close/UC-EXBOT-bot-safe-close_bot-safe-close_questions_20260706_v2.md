@@ -11,7 +11,9 @@
 
 > **Policy:** Không tự suy luận. Tất cả câu hỏi cần BA/Tech Lead xác nhận dựa trên documents.
 
-*(Không có câu hỏi nào đang chờ — tất cả đã được trả lời hoặc deferred)*
+| ID | Ưu tiên | Ref | Question | Evidence in Docs | Why It Matters | Owner | Status |
+|----|----------|-----|----------|------------------|----------------|-------|--------|
+| Q4 | Medium | UC §1, SRS flows.md F-05, FR-EXBOT-073 | UC §1 liệt kê "ExBot System Operator (Close Worker)" là Primary Actor. Tuy nhiên, từ UC §3 và FR-EXBOT-073, Close Worker không tự quyết định trigger — nó chỉ thực thi flow khi được gọi. 5 trigger conditions thực tế đến từ: (1) deep-audit worker, (2) hedge-sync worker, (3) partial_repair worker, (4) light-check/hedge-stopped, HOẶC (5) admin qua `POST /api/exbot/close`. Không có dedicated `bot_safe_close` queue trong 11 queues (FR-EXBOT-010). Vậy "Close Worker" trong UC §1 là **architecture component (ExBot Lambda)** hay **actor**? BA xác nhận lại role của Close Worker trong UC. | UC §1: "Primary: ExBot System Operator (Close Worker)"<br>UC §3 Step 1: "Close Worker: acquire User Lock..."<br>FR-EXBOT-073: 5 trigger conditions<br>FR-EXBOT-010: 11 queues — không có bot_safe_close queue | Nếu Close Worker là architecture chứ không phải actor, thì UC §1 Actor list cần được cập nhật để phản ánh đúng. Trigger mechanism cần được ghi rõ trong UC. | BA | ⏳ Pending |
 
 ---
 
@@ -27,7 +29,6 @@
 | Q7 | Medium | UC §3 step 2 vs FR-EXBOT-092 | Step 2 nói "acquire UserLockDO lease" — UserLockDO là Cloudflare Durable Object, không tồn tại trong ExBot architecture (FR-EXBOT-092 chỉ định Redis Redlock via ElastiCache). | **UC 2026-07-04 đã cập nhật:** Step 2 now correctly says "acquire User Lock (Redis Redlock via ElastiCache) lease". UserLockDO đã được thay hoàn toàn bằng Redis Redlock trong toàn bộ ExBot. | UC changelog 2026-07-04: "replace UserLockDO with User Lock (Redis Redlock via ElastiCache)" |
 | Q8 | Medium | FR-EXBOT-073 vs SRS states.md | "stop cancelled" là action hay state | `stop cancelled` là **action**, không phải state riêng. `closeShortReduceOnlyIoc` và `replaceStopProtected(size=0)` đều là actions trong step 2 (`hedge_close_pending`). `close_operations.state` chỉ advance lên `hedge_closed` sau khi reconcile confirm HL size = 0 AND stop đã cancel. FR-EXBOT-073 đã được update. | docs/BA/qc-notes-temp.md — Q8 UC-EXBOT-bot-safe-close |
 | Q11 | Minor | US-EXBOT-009 AC-EXBOT-009-2 | `bots.lifecycle_state` khi vào safe_mode | Cả hai đều chuyển sang `'safe_mode'` — `lifecycle_state` và `status` có cùng giá trị per `states.md`. AC-009-2 đã được update để ghi rõ `lifecycle_state='safe_mode'`. | docs/BA/qc-notes-temp.md — Q11 UC-EXBOT-bot-safe-close |
-| Q4 | Medium | UC §1, SRS flows.md F-05, FR-EXBOT-073 | UC §1 đặt "Close Worker" trong danh sách Actors, nhưng Close Worker KHÔNG phải actor — nó là **architecture component** (ExBot Lambda). Trigger mechanism đã rõ: 5 trigger conditions đến từ các workers khác (deep-audit, hedge-sync, partial_repair) HOẶC admin API (`POST /api/exbot/close`). Không có dedicated `bot_safe_close` queue trong 11 queues (FR-EXBOT-010). Test design cho duplicate scenario dựa trên UNIQUE constraint `close_operations.idempotency_key`, không cần biết trigger mechanism cụ thể. | QC Lead — phân tích nội bộ, không cần Tech Lead response |
 
 ---
 
@@ -46,8 +47,8 @@
 
 | Status | Count |
 |--------|-------|
-| Open (Pending Tech Lead) | 0 |
-| Answered | 9 (Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q8, Q11) |
+| Open (Pending BA) | 1 (Q4) |
+| Answered | 8 (Q1, Q2, Q3, Q5, Q6, Q7, Q8, Q11) |
 | Deferred | 2 (Q9, Q10) |
 | **Total** | **11** |
 

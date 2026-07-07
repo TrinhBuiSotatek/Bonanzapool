@@ -342,6 +342,10 @@ Các actor đã được xác định rõ. Step 2 đã được cập nhật ch�
 
 #### 10.1.2 Câu hỏi còn mở
 
+| Q4 | Medium | MISSING_INFO | UC §1, SRS flows.md F-05, FR-EXBOT-073 | UC §1 liệt kê "ExBot System Operator (Close Worker)" là Primary Actor. Tuy nhiên, từ UC §3 và FR-EXBOT-073, Close Worker không tự quyết định trigger — nó chỉ thực thi flow khi được gọi. 5 trigger conditions thực tế đến từ: (1) deep-audit worker, (2) hedge-sync worker, (3) partial_repair worker, (4) light-check/hedge-stopped, HOẶC (5) admin qua `POST /api/exbot/close`. Không có dedicated `bot_safe_close` queue trong 11 queues (FR-EXBOT-010). Vậy "Close Worker" trong UC §1 là **architecture component (ExBot Lambda)** hay **actor**? | Nếu Close Worker là architecture chứ không phải actor, thì UC §1 Actor list cần được cập nhật để phản ánh đúng. Trigger mechanism cần được ghi rõ trong UC. | BA | ⏳ Pending |
+
+#### 10.1.2 Câu hỏi còn mở
+
 *(Không có câu hỏi nào đang chờ — tất cả đã được trả lời hoặc deferred)*
 
 #### 10.1.3 Câu hỏi Deferred
@@ -389,12 +393,9 @@ Các actor đã được xác định rõ. Step 2 đã được cập nhật ch�
 
 Issues resolved in v3:
 - **Q7: RESOLVED** — UC 2026-07-04 updated Step 2: "UserLockDO lease" → "User Lock (Redis Redlock via ElastiCache) lease". Redis Redlock replaces Cloudflare Durable Object throughout the ExBot architecture per FR-EXBOT-092. No remaining references to UserLockDO in UC documents.
-- **Q4: REMOVED** — Close Worker is not an actor; it is an architecture component (ExBot Lambda). Trigger mechanism is defined: 5 trigger conditions from other workers (deep-audit, hedge-sync, partial_repair) OR admin API. No dedicated bot_safe_close queue in FR-EXBOT-010. Duplicate scenario test design is based on UNIQUE constraint, not trigger mechanism.
 
-All questions resolved:
-- Answered: 9 (Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q8, Q11)
-- Deferred: 2 (Q9, Q10)
-- Total: 11
+Open items (pending BA response):
+- **Q4: OPEN** — UC §1 lists "Close Worker" as Primary Actor, but Close Worker does not self-initiate triggers. 5 actual trigger conditions come from other workers (deep-audit, hedge-sync, partial_repair) OR admin API. No dedicated bot_safe_close queue in FR-EXBOT-010. BA to confirm: is "Close Worker" an **architecture component (ExBot Lambda)** or an **actor**?
 
 Diagram gaps (already deferred, no test impact):
 - Q10: UC Figure 1 và flows.md F-05 simplified diagrams — step-by-step description in UC §3 và FR-EXBOT-073 đã đầy đủ, diagrams chỉ là visual aid
