@@ -3,10 +3,10 @@
 | UC ID | UC-EXBOT-user-redeem |
 |-------|----------------------|
 | Ngày tạo | 2026-07-01 |
-| Ngày cập nhật | 2026-07-04 |
+| Ngày cập nhật | 2026-07-07 |
 | Người tạo | QC UC Read ExBot Agent |
 | Version | v4 |
-| Nguồn audited | UC-EXBOT-user-redeem_user-redeem_audited_20260704_v3.md |
+| Nguồn audited | UC-EXBOT-user-redeem_user-redeem_audited_20260707_v4.md |
 
 ---
 
@@ -19,6 +19,7 @@
 | I-N1 | Medium | uc-user-redeem.md §2 Preconditions (v2, updated 2026-07-03); states.md State Registry | UC §2 mở rộng precondition: "Bot status='active' (or paused/safe_mode — user may redeem from any non-closed state)". **BA update 2026-07-04 không address gap này.** states.md State Registry vẫn không liệt kê các trạng thái nào được phép khởi tạo close request. Cần xác nhận: (a) Bot ở `hedge_stopped_cooldown` có thể được redeem không? (b) Bot ở `lp_rebalancing` có thể được redeem không? (c) Bot ở `error` có thể được redeem không? | Tester cần biết chính xác các trạng thái bắt đầu hợp lệ để thiết kế pre-condition cho test case. | Open — cần BA confirm và update states.md |
 | I-N2 | Low | uc-user-redeem.md §3 step 9 | UC step 9 chỉ nói "retries up to 3 times on reject/timeout" nhưng không mô tả: (a) Retry strategy: trong cùng Worker invocation hay re-queue message? (b) Có backoff delay giữa các lần retry không? Nếu re-queue với delay, tổng thời gian 3 retries có thể vượt SLA 5 phút. | Ảnh hưởng thiết kế test case simulate HL partial failure và timing. Không block happy path design nhưng cần biết để test retry behavior chính xác. | Open — Minor, thông tin phụ trợ |
 | I-N3 | Medium | uc-user-redeem.md §3 step 7–12; states.md close_operations table | states.md close_operations table xác nhận `hedge_close_pending` là state hợp lệ cho user_redeem (có dấu ✓ trong cột user_redeem). UC main flow steps 7–12 không bao gồm transition tới `hedge_close_pending` — nhảy thẳng từ `funds_returned` (step 7) sang `hedge_closed` (step 12) mà không qua `hedge_close_pending`. State tồn tại trong canonical state table nhưng vắng mặt trong UC scenario description. | Tester không thể thiết kế test case cho trạng thái `hedge_close_pending` trong user_redeem vì UC không nói khi nào row close_operations vào trạng thái này trong happy path. | Open — Issue mới phát hiện trong v3 re-audit (2026-07-04) |
+| I-N4 | Low | srs/spec.md §FR-EXBOT-092; frd.md §FR-EXBOT-091 | spec.md đánh số **FR-EXBOT-092** cho `User Lock (Redis Redlock via ElastiCache)`; frd.md đánh số **FR-EXBOT-091** cho cùng tính năng. UC file §7 FR Trace và v3/v4 audit report đều tham chiếu `FR-EXBOT-092` (theo spec.md). Behaviour của Redlock (acquire/extend/release, TTL=90s, idempotencyKey pattern) mô tả nhất quán ở cả hai nguồn — chỉ số FR là khác. | Minor traceability risk: khi tester tra cứu FR-EXBOT-091 trong frd.md và FR-EXBOT-092 trong spec.md, có thể nhầm lẫn nếu không biết đây là cùng một requirement. | Open — phát hiện trong v4 re-audit (2026-07-07); BA cần đồng bộ số FR giữa spec.md và frd.md |
 
 ---
 
