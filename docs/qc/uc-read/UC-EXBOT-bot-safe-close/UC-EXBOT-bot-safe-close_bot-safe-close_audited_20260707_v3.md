@@ -38,7 +38,7 @@ Close Worker thu thập User Lock (Redis Redlock via ElastiCache) lease, đóng 
 
 | UC ID | Tên feature / use case | Version | Trạng thái tài liệu |
 |---|---|---|---|
-| UC-EXBOT-bot-safe-close | System-Initiated Safe Close + Auto Re-Entry | v1 (2026-07-04) | Draft |
+| UC-EXBOT-bot-safe-close | System-Initiated Safe Close + Auto Re-Entry | v1 (2026-07-04 | Draft |
 
 | Người viết / BA | Người duyệt | Ngày tạo | Cập nhật lần cuối |
 |---|---|---|---|
@@ -46,12 +46,12 @@ Close Worker thu thập User Lock (Redis Redlock via ElastiCache) lease, đóng 
 
 | Artefact đã đọc | Version / ngày cập nhật | Vai trò của artefact | Ghi chú |
 |---|---|---|---|
-| uc-bot-safe-close.md | 2026-07-04 | UC source | Primary UC — **cập nhật 2026-07-04**: Step 2 UserLockDO → Redis Redlock |
+| uc-bot-safe-close.md | 2026-07-04 | UC source | Primary UC — **cập nhật 2026-07-04**: UserLockDO → Redis Redlock |
 | us-009.md | 2026-06-18 | Linked User Story | US-EXBOT-009 (bot_safe_close happy path + edge cases) |
 | us-010.md | 2026-06-12 | Linked User Story | US-EXBOT-010 (SAFE_MODE + margin triggers) |
 | us-012.md | 2026-06-18 | Linked User Story | US-EXBOT-012 (admin force-close + emergencyTransfer) |
-| srs/spec.md | 2026-07-04 | SRS baseline | Canonical source of truth for ExBot logic — cập nhật Cloudflare→AWS, queue count sync 11 |
-| srs/states.md | 2026-07-03 | State diagram | close_operations state machine, lifecycle states — cập nhật paused row clarification |
+| srs/spec.md | 2026-07-04 | SRS baseline | Canonical source of truth — cập nhật Cloudflare→AWS, queue count sync 11 |
+| srs/states.md | 2026-07-03 | State diagram | close_operations state machine, lifecycle states |
 | srs/flows.md | 2026-07-04 | Flow diagram | F-05 bot_safe_close sequence — simplified diagram noted |
 | srs/erd.md | 2026-07-04 | ERD / Schema | close_operations table, queue_idempotency |
 | frd.md | 2026-07-04 | FRD | FR-EXBOT-070, 072, 073 |
@@ -108,10 +108,10 @@ Mục tiêu nghiệp vụ: đảm bảo investor nhận lại tiền qua Redempt
 | ExBot Admin (zen) | Primary (qua API) | Trigger force-close qua POST /api/exbot/close | Không được force-close bot đã closed | US-EXBOT-012 AC-012-4, E-EXBOT-012 |
 | Investor | Beneficiary | Nhận notification và funds | Không trigger bot_safe_close trực tiếp | UC step 12 |
 | Aurora PostgreSQL | System | Lưu close_operations, bots, hedge_legs state | Source of truth off-chain | FR-EXBOT-073, SRS erd.md |
-| User Lock (Redis Redlock via ElastiCache) | System | Cung cấp lease-based mutex cho HL mutations — TTL=90s, heartbeat supported | FR-EXBOT-026, 092 — **UC 2026-07-04 cập nhật**: Step 2 now correctly says "acquire User Lock (Redis Redlock via ElastiCache) lease" | UC §3 step 2, FR-EXBOT-092 |
+| User Lock (Redis Redlock via ElastiCache) | System | Cung cấp lease-based mutex cho HL mutations — TTL=90s, heartbeat supported | FR-EXBOT-026, 092 — **UC 2026-07-04 cập nhật**: Step 2 correctly says "acquire User Lock (Redis Redlock via ElastiCache) lease" | UC §3 step 2, FR-EXBOT-092 |
 
 **Nhận xét readiness:**
-Các actor đã được xác định rõ. Step 2 đã được cập nhật chính xác thành "User Lock (Redis Redlock via ElastiCache)" thay vì "UserLockDO" — Q7 đã được giải quyết.
+Các actor đã được xác định rõ. Step 2 đã được cập nhật chính xác thành "User Lock (Redis Redlock via ElastiCache)" — Q7 đã được giải quyết.
 
 ---
 
@@ -124,7 +124,7 @@ Các actor đã được xác định rõ. Step 2 đã được cập nhật ch�
 | 1 | Một trong 5 trigger conditions phải được met: circuit breaker exhausted, margin critical + irrecoverable, 3 stops in 7 days, partial_repair exhausted, admin force-close | Yes | UC §2, FR-EXBOT-072 |
 | 2 | `bots.status NOT IN ('closed', 'closing')` — trigger chỉ hợp lệ khi bot không ở trạng thái closed hoặc closing. Reject được enforce ở DB level bởi UNIQUE constraint trên `close_operations.idempotency_key`. | Yes (enforced by DB) | FR-EXBOT-072, UC §2 |
 | 3 | Không có close_operations row tồn tại cho bot này với `kind='bot_safe_close'` (idempotency_key UNIQUE prevents duplicate) | Yes (enforced by DB) | FR-EXBOT-070, SRS erd.md |
-| 4 | HL agent key phải có `key_status='active'` cho HL signing operations (nếu hedge cần sign) | Yes | FR-EXBOT-080 (applies to hedge close signing) |
+| 4 | HL agent key phải có `key_status='active'` cho HL signing operations | Yes | FR-EXBOT-080 (applies to hedge close signing) |
 
 ### 3.2 Kết quả sau khi hoàn tất
 
@@ -150,7 +150,7 @@ Các actor đã được xác định rõ. Step 2 đã được cập nhật ch�
 #### A. Luồng xử lý
 
 | Bước | Actor | Hành động / trigger | Phản hồi hệ thống - happy path | Luồng thay thế | Luồng lỗi / exception | Nguồn |
-|---|---|---|---|---|---|---|
+|---|---|---|---|---|---|---|---|
 | T1 | System (deep-audit/hedge-sync/partial_repair/admin) | Trigger condition met (5 loại) | Tạo `close_operations` row với `kind='bot_safe_close'`, `state='requested'`, `idempotency_key`, `trigger_reason` populated | A4: Nếu là 3rd trigger trong 7 ngày → proceed bình thường + admin notification | — | FR-EXBOT-072, FR-EXBOT-073 |
 | T2 | System (auto hoặc admin API) | Admin gọi POST /api/exbot/close HOẶC system trigger auto | OperatorFacade forward via API Gateway + HMAC Lambda Authorizer → ExBot Lambda | — | E-EXBOT-012 nếu bot đã closed (admin path) | FR-EXBOT-090, US-EXBOT-012 AC-012-4 |
 
@@ -179,7 +179,7 @@ Các actor đã được xác định rõ. Step 2 đã được cập nhật ch�
 #### A. Luồng xử lý
 
 | Bước | Actor | Hành động / trigger | Phản hồi hệ thống - happy path | Luồng thay thế | Luồng lỗi / exception | Nguồn |
-|---|---|---|---|---|---|---|
+|---|---|---|---|---|---|---|---|
 | H1 | Close Worker | **Bắt đầu step 1:** Trigger fires và `close_operations` row được tạo → **`bots.status='closing'`** và **`bots.lifecycle_state='lp_closing'`** được set đồng thời. Sau đó acquire User Lock (Redis Redlock via ElastiCache) lease (TTL=90s, holderToken UUID, idempotencyKey). | Lease acquired → proceed | Lock busy → re-queue message với delay | FR-EXBOT-072, FR-EXBOT-026, 092 |
 | H2 | Close Worker | Compute delta = 0 - actualShortEth (BigDecimal) | delta = full close size | — | — | FR-EXBOT-022 |
 | H3 | Close Worker + Signing Lambda | Gọi `closeShortReduceOnlyIoc(size)` với deterministic cloid | HL order submitted | A1: Order fails after 3 retries → `residual_hl_liability`, SAFE_MODE, no LP close | FR-EXBOT-073, FR-EXBOT-022 |
@@ -187,7 +187,7 @@ Các actor đã được xác định rõ. Step 2 đã được cập nhật ch�
 | H5 | Close Worker | Reconcile: fetch clearinghouseState, verify size = 0. `close_operations.state` advance lên `hedge_closed` sau khi reconcile confirm HL size = 0 AND stop đã cancel. | Size confirmed = 0 → `close_operations.state='hedge_closed'` | A1: Size != 0 → retry hoặc residual_hl_liability | FR-EXBOT-025, FR-EXBOT-073 |
 | H6 | Close Worker | Update `close_operations.hedge_close_tx` với tx hash | `hedge_close_tx` populated | — | — | FR-EXBOT-073 |
 
-> **Cập nhật 2026-07-04 (Q7 resolved):** Step 2 đã được cập nhật từ "UserLockDO lease" thành "User Lock (Redis Redlock via ElastiCache) lease" — align với FR-EXBOT-092 và spec.md FR-EXBOT-092. UserLockDO (Cloudflare Durable Object) đã được thay thế hoàn toàn bằng Redis Redlock qua ElastiCache trong toàn bộ hệ thống ExBot.
+> **Cập nhật 2026-07-04 (Q7 resolved):** Step 2 đã được cập nhật từ "UserLockDO lease" thành "User Lock (Redis Redlock via ElastiCache) lease" — align với FR-EXBOT-092. UserLockDO (Cloudflare Durable Object) đã được thay hoàn toàn bằng Redis Redlock qua ElastiCache trong toàn bộ hệ thống ExBot.
 
 #### B. Business rules và validation
 
@@ -205,7 +205,7 @@ Các actor đã được xác định rõ. Step 2 đã được cập nhật ch�
 | Trường hợp | Loại phản hồi | Nội dung phản hồi / message | Mã / mục gốc | Nguồn |
 |---|---|---|---|---|
 | Hedge close fail (A1) | State change | `close_operations.state='residual_hl_liability'`, `bots.status='safe_mode'` | — | UC A1, FR-EXBOT-073 |
-| A1 admin notification | Admin notification | Có, nội dung E-EXBOT-018: "Bot safe close failed: HL hedge could not be closed after 3 attempts. Manual intervention required. Bot held at residual_hl_liability." | E-EXBOT-018 | UC A1 |
+| A1 admin notification | Admin notification | E-EXBOT-018: "Bot safe close failed: HL hedge could not be closed after 3 attempts. Manual intervention required. Bot held at residual_hl_liability." | E-EXBOT-018 | UC A1 |
 | HL API unreachable | State change | Bot enters SAFE_MODE | E-EXBOT-008 | message-list.md |
 | Reconcile mismatch | State change | Bot enters SAFE_MODE | E-EXBOT-011 | message-list.md |
 
@@ -216,7 +216,7 @@ Các actor đã được xác định rõ. Step 2 đã được cập nhật ch�
 #### A. Luồng xử lý
 
 | Bước | Actor | Hành động / trigger | Phản hồi hệ thống - happy path | Luồng thay thế | Luồng lỗi / exception | Nguồn |
-|---|---|---|---|---|---|---|
+|---|---|---|---|---|---|---|---|
 | L1 | Close Worker | Gọi **`vault.executeStrategy(RedeemStrategyV1, user, botId, params)`** (LP close method chuẩn) | Contract executes strategy | A2: Revert after 3 retries → escalate admin | FR-EXBOT-073, IC-EXBOT-002 |
 | L2 | BnzaExPositionManager | Xử lý RedeemStrategyV1 | Earned fees routed via **LpFeeOps** (op fee + perf fee), principal returned in pair currency. PositionClosed event emitted. | — | — | UC step 6 |
 | L3 | Close Worker | Theo dõi PositionClosed event | Event received → `close_operations.state='lp_closed'`, `close_operations.lp_close_tx` populated | — | — | FR-EXBOT-073 |
@@ -228,7 +228,7 @@ Các actor đã được xác định rõ. Step 2 đã được cập nhật ch�
 #### A. Luồng xử lý
 
 | Bước | Actor | Hành động / trigger | Phản hồi hệ thống - happy path | Luồng thay thế | Luồng lỗi / exception | Nguồn |
-|---|---|---|---|---|---|---|
+|---|---|---|---|---|---|---|---|
 | R1 | Close Worker | Gọi `RedemptionQueue.createRequest(user, botId, tokenId, hlPortionId)` | Request enqueued → `close_operations.state='redemption_queued'`, `RequestCreated` event emitted | — | — | FR-EXBOT-073, UC step 8-9 |
 | R2 | Operator | Gọi `RedemptionQueue.fulfillRequest(tokens, amounts)` | FIFO pop from queue, `safeTransferFrom(operator, user, amount)` on-chain | A3: fulfillRequest fails → request stays queued, Operator retries | — | FR-EXBOT-070, UC step 10 |
 | R3 | Close Worker / System | Theo dõi `RequestFulfilled` event | Event received → `close_operations.state='done'`, `bots.status='closed'` | — | — | FR-EXBOT-073, UC step 11 |
@@ -249,7 +249,7 @@ Các actor đã được xác định rõ. Step 2 đã được cập nhật ch�
 #### A. Luồng xử lý
 
 | Bước | Actor | Hành động / trigger | Phản hồi hệ thống - happy path | Luồng thay thế | Luồng lỗi / exception | Nguồn |
-|---|---|---|---|---|---|---|
+|---|---|---|---|---|---|---|---|
 | F1 | Admin (zen) | Chọn bot trên admin dashboard, click "Force Close", confirm with reason | System initiates bot_safe_close flow | AC-012-2: SAFE_MODE bot → proceed với existing hedge state | AC-012-4: Already closed → reject | US-EXBOT-012, FR-EXBOT-090 |
 | F2 | System | Đóng hedge → đóng LP → RedemptionQueue (same as happy path T1-L4) | Full close flow | F2b: SAFE_MODE bot với irrecoverable hedge | F2c: Already closed | US-EXBOT-012 AC-012-1/2, FR-EXBOT-073 |
 | F3 | System | Gửi investor notification | "Your ExBot was administratively closed. USDC is available for withdrawal." | — | — | US-EXBOT-012 AC-012-1 |
@@ -292,7 +292,7 @@ Các actor đã được xác định rõ. Step 2 đã được cập nhật ch�
 |---|---|---|---|---|---|
 | AC-01 | Happy path — bot_safe_close completes | Bot ở `safe_mode` hoặc `active` với trigger condition met | Close Worker initiates bot_safe_close | HL short fully closed (size=0 confirmed via reconcile); LP closed; RedemptionQueue.createRequest enqueued; Operator fulfillRequest FIFO; bots.status='closed'; investor notified "Bot safely closed. Funds have been returned to your wallet." | US-EXBOT-009 AC-009-1, FR-EXBOT-070, 073 |
 | AC-02 | Happy path — state progression | Trigger condition met | close_operations row created | `state='requested'` → `hedge_close_pending` → `hedge_closed` → `lp_closed` → `redemption_queued` → `done` (sequential, no skip) | FR-EXBOT-073, SRS states.md |
-| AC-03 | Hedge close fail — LP not touched (A1) | bot_safe_close triggered | HL short close fails after 3 retries | `close_operations.state='residual_hl_liability'`; `bots.status='safe_mode'` và `bots.lifecycle_state='safe_mode'`; LP NOT closed; admin notification **E-EXBOT-018**: "Bot safe close failed: HL hedge could not be closed after 3 attempts. Manual intervention required. Bot held at residual_hl_liability." | UC A1, US-EXBOT-009 AC-009-2 |
+| AC-03 | Hedge close fail — LP not touched (A1) | bot_safe_close triggered | HL short close fails after 3 retries | `close_operations.state='residual_hl_liability'`; `bots.status='safe_mode'` và `bots.lifecycle_state='safe_mode'`; LP NOT closed; admin notification E-EXBOT-018 | UC A1, US-EXBOT-009 AC-009-2 |
 | AC-04 | LP close revert — retry 3x then escalate (A2) | Hedge closed successfully | vault call reverts | Retry up to 3 times; after 3rd failure → escalate to admin, hold at `lp_closed` pending | UC A2, FR-EXBOT-073 |
 | AC-05 | fulfillRequest pending (A3) | `close_operations.state='redemption_queued'` | Operator has not yet called fulfillRequest | Request stays enqueued (not lost); `bots.status='closing'`; user funds safe on-chain | US-EXBOT-009 AC-009-4 |
 | AC-06 | 3rd trigger in 7 days (A4) | Bot đã có 2 bot_safe_close events trong 7 ngày | 3rd trigger condition met | Close flow executes normally; admin notification sent concurrently; bots.status='closed' after fulfillRequest | UC A4, US-EXBOT-009 AC-009-3 |
@@ -330,29 +330,26 @@ Các actor đã được xác định rõ. Step 2 đã được cập nhật ch�
 
 | ID | Mức ưu tiên | Loại vấn đề | Tham chiếu nguồn | Nội dung vấn đề | Đáp án | Trạng thái | Nguồn cập nhật |
 |---|---|---|---|---|---|---|---|
-| Q1 | Major | CROSS_SOURCE_CONFLICT | FR-EXBOT-073 step 4 vs UC step 5 | LP close method conflict: FR-EXBOT-073 step 4 nói "Call `BnzaExVault.redeem(tokenId)`" trong khi UC step 5 nói "Call `vault.executeStrategy(RedeemStrategyV1, user, botId, params)`". | **`vault.executeStrategy(RedeemStrategyV1, user, botId, params)` là đúng.** FR-EXBOT-073 step 4 đã được sửa: LP close qua BnzaExPositionManager, fees routed via LpFeeOps, PositionClosed event emitted. | ✅ Answered | docs/BA/qc-notes-temp.md — Q1 UC-EXBOT-bot-safe-close |
-| Q2 | Major | OUTDATED_CONTENT | US-EXBOT-012 AC-012-1 | US-EXBOT-012 AC-012-1 vẫn nói "BnzaExVault.vaultClose is called, USDC parked into uninvested_balances" — đây là park/redeploy feature đã bị drop theo HLD 2026-06-18. | **AC-012-1 đã được cập nhật:** bỏ dòng vaultClose/park, thêm `vault.executeStrategy(RedeemStrategyV1)` + `RedemptionQueue.createRequest` + `fulfillRequest`. | ✅ Answered | docs/BA/qc-notes-temp.md — Q2 UC-EXBOT-bot-safe-close |
-| Q3 | Major | MISSING_INFO | UC §3 (preconditions) | UC §3 preconditions chỉ nói "Trigger condition met" nhưng không specify rằng bot phải có `bots.status IN ('active','safe_mode','paused')` (không phải 'closed'). | **Trigger chỉ hợp lệ khi `bots.status NOT IN ('closed', 'closing')`.** Reject được enforce ở DB level bởi UNIQUE constraint trên `close_operations.idempotency_key` (FR-EXBOT-072). UC §2 Preconditions đã được update. | ✅ Answered | docs/BA/qc-notes-temp.md — Q3 UC-EXBOT-bot-safe-close |
-| Q5 | Medium | MISSING_INFO | UC A1, US-EXBOT-009 AC-009-2 | UC A1 nói "admin escalation notification sent" nhưng không specify nội dung message. Không có E-* code cho residual_hl_liability scenario. | **Thêm E-EXBOT-018:** "Bot safe close failed: HL hedge could not be closed after 3 attempts. Manual intervention required. Bot held at residual_hl_liability." — internal alert. UC A1 và message-list.md đã được update. | ✅ Answered | docs/BA/qc-notes-temp.md — Q5 UC-EXBOT-bot-safe-close |
-| Q6 | Medium | MISSING_INFO | UC §4 A3 vs US-EXBOT-009 AC-009-4 | AC-009-4 nói "bots.status remains 'closing' until fulfillRequest completes" nhưng không có document nào nói rõ khi nào `bots.status='closing'` được set. | **Set tại step 1** — ngay khi trigger fires và `close_operations` row được tạo. `lifecycle_state='lp_closing'` set đồng thời. Giữ đến step 11 khi `fulfillRequest` hoàn tất → chuyển sang `'closed'`. UC step 1 đã được update. | ✅ Answered | docs/BA/qc-notes-temp.md — Q6 UC-EXBOT-bot-safe-close |
-| Q7 | Medium | MISSING_INFO | UC §3 step 2 vs FR-EXBOT-092 | Step 2 nói "acquire UserLockDO lease" — UserLockDO là Cloudflare Durable Object, không tồn tại trong ExBot architecture (FR-EXBOT-092 chỉ định Redis Redlock via ElastiCache). Không có document nào xác nhận UserLockDO có apply cho Close Worker. | **UC 2026-07-04 đã cập nhật:** Step 2 now correctly says "acquire User Lock (Redis Redlock via ElastiCache) lease". UserLockDO đã được thay hoàn toàn bằng Redis Redlock trong ExBot. | ✅ Answered (2026-07-04) | UC changelog 2026-07-04: "replace UserLockDO with User Lock (Redis Redlock via ElastiCache)" |
-| Q8 | Medium | INTERNAL_INCONSISTENCY | FR-EXBOT-073 vs SRS states.md | FR-EXBOT-073 step 3 nói "stop cancelled" nhưng close_operations states table (states.md) không có `stop_canceled` state. | **`stop cancelled` là action, không phải state riêng.** `closeShortReduceOnlyIoc` và `replaceStopProtected(size=0)` đều là actions trong step 2 (`hedge_close_pending`). `close_operations.state` chỉ advance lên `hedge_closed` sau khi reconcile confirm HL size = 0 AND stop đã cancel. FR-EXBOT-073 đã được update. | ✅ Answered | docs/BA/qc-notes-temp.md — Q8 UC-EXBOT-bot-safe-close |
-| Q11 | Minor | UNCLEAR_INFO | US-EXBOT-009 AC-EXBOT-009-2 | AC-009-2 nói "bots.status transitions to 'safe_mode'" sau hedge fail nhưng không specify `bots.lifecycle_state`. | **Cả hai đều chuyển sang `'safe_mode'`** — `lifecycle_state` và `status` có cùng giá trị per `states.md`. AC-009-2 đã được update để ghi rõ `lifecycle_state='safe_mode'`. | ✅ Answered | docs/BA/qc-notes-temp.md — Q11 UC-EXBOT-bot-safe-close |
-| Q4 | Medium | MISSING_INFO | UC §1, SRS flows.md F-05, FR-EXBOT-073 | UC §1 đặt "Close Worker" trong danh sách Actors, nhưng Close Worker KHÔNG phải actor — nó là **architecture component** (ExBot Lambda). Trigger mechanism đã rõ: 5 trigger conditions đến từ các workers khác (deep-audit, hedge-sync, partial_repair) HOẶC admin API (`POST /api/exbot/close`). Không có dedicated `bot_safe_close` queue trong 11 queues (FR-EXBOT-010). Test design cho duplicate scenario dựa trên UNIQUE constraint `close_operations.idempotency_key`, không cần biết trigger mechanism cụ thể. | ✅ Answered | QC Lead — phân tích nội bộ |
+| Q1 | Major | CROSS_SOURCE_CONFLICT | FR-EXBOT-073 step 4 vs UC step 5 | LP close method conflict | **`vault.executeStrategy(RedeemStrategyV1, user, botId, params)` là đúng.** FR-EXBOT-073 step 4 đã được sửa: LP close qua BnzaExPositionManager, fees routed via LpFeeOps, PositionClosed event emitted. | ✅ Answered | docs/BA/qc-notes-temp.md — Q1 UC-EXBOT-bot-safe-close |
+| Q2 | Major | OUTDATED_CONTENT | US-EXBOT-012 AC-012-1 | US-EXBOT-012 AC-012-1 park/redeploy đã bị drop | AC-012-1 đã được cập nhật: bỏ dòng vaultClose/park, thêm `vault.executeStrategy(RedeemStrategyV1)` + `RedemptionQueue.createRequest` + `fulfillRequest`. | ✅ Answered | docs/BA/qc-notes-temp.md — Q2 UC-EXBOT-bot-safe-close |
+| Q3 | Major | MISSING_INFO | UC §3 (preconditions) | bots.status prerequisite cho trigger | Trigger chỉ hợp lệ khi `bots.status NOT IN ('closed', 'closing')`. Reject được enforce ở DB level bởi UNIQUE constraint trên `close_operations.idempotency_key` (FR-EXBOT-072). UC §2 Preconditions đã được update. | ✅ Answered | docs/BA/qc-notes-temp.md — Q3 UC-EXBOT-bot-safe-close |
+| Q5 | Medium | MISSING_INFO | UC A1, US-EXBOT-009 AC-009-2 | Message content cho admin escalation notification | Thêm E-EXBOT-018: "Bot safe close failed: HL hedge could not be closed after 3 attempts. Manual intervention required. Bot held at residual_hl_liability." — internal alert. UC A1 và message-list.md đã được update. | ✅ Answered | docs/BA/qc-notes-temp.md — Q5 UC-EXBOT-bot-safe-close |
+| Q6 | Medium | MISSING_INFO | UC §4 A3 vs US-EXBOT-009 AC-009-4 | Khi nào `bots.status='closing'` được set | Set tại **step 1** — ngay khi trigger fires và `close_operations` row được tạo. `lifecycle_state='lp_closing'` set đồng thời. Giữ đến step 11 khi `fulfillRequest` hoàn tất → chuyển sang `'closed'`. UC step 1 đã được update. | ✅ Answered | docs/BA/qc-notes-temp.md — Q6 UC-EXBOT-bot-safe-close |
+| Q7 | Medium | MISSING_INFO | UC §3 step 2 vs FR-EXBOT-092 | Step 2 nói "acquire UserLockDO lease" — UserLockDO là Cloudflare Durable Object, không tồn tại trong ExBot architecture (FR-EXBOT-092 chỉ định Redis Redlock via ElastiCache). | **UC 2026-07-04 đã cập nhật:** Step 2 correctly says "acquire User Lock (Redis Redlock via ElastiCache) lease". UserLockDO đã được thay hoàn toàn bằng Redis Redlock trong ExBot. | ✅ Answered (2026-07-04) | UC changelog 2026-07-04 |
+| Q8 | Medium | INTERNAL_INCONSISTENCY | FR-EXBOT-073 vs SRS states.md | "stop cancelled" là action hay state | `stop cancelled` là **action**, không phải state riêng. `closeShortReduceOnlyIoc` và `replaceStopProtected(size=0)` đều là actions trong step 2 (`hedge_close_pending`). `close_operations.state` chỉ advance lên `hedge_closed` sau khi reconcile confirm HL size = 0 AND stop đã cancel. FR-EXBOT-073 đã được update. | ✅ Answered | docs/BA/qc-notes-temp.md — Q8 UC-EXBOT-bot-safe-close |
+| Q11 | Minor | UNCLEAR_INFO | US-EXBOT-009 AC-EXBOT-009-2 | `bots.lifecycle_state` khi vào safe_mode | Cả hai đều chuyển sang `'safe_mode'` — `lifecycle_state` và `status` có cùng giá trị per `states.md`. AC-009-2 đã được update để ghi rõ `lifecycle_state='safe_mode'`. | ✅ Answered | docs/BA/qc-notes-temp.md — Q11 UC-EXBOT-bot-safe-close |
 
 #### 10.1.2 Câu hỏi còn mở
 
-| Q4 | Medium | MISSING_INFO | UC §1, SRS flows.md F-05, FR-EXBOT-073 | UC §1 liệt kê "ExBot System Operator (Close Worker)" là Primary Actor. Tuy nhiên, từ UC §3 và FR-EXBOT-073, Close Worker không tự quyết định trigger — nó chỉ thực thi flow khi được gọi. 5 trigger conditions thực tế đến từ: (1) deep-audit worker, (2) hedge-sync worker, (3) partial_repair worker, (4) light-check/hedge-stopped, HOẶC (5) admin qua `POST /api/exbot/close`. Không có dedicated `bot_safe_close` queue trong 11 queues (FR-EXBOT-010). Vậy "Close Worker" trong UC §1 là **architecture component (ExBot Lambda)** hay **actor**? | Nếu Close Worker là architecture chứ không phải actor, thì UC §1 Actor list cần được cập nhật để phản ánh đúng. Trigger mechanism cần được ghi rõ trong UC. | BA | ⏳ Pending |
-
-#### 10.1.2 Câu hỏi còn mở
-
-*(Không có câu hỏi nào đang chờ — tất cả đã được trả lời hoặc deferred)*
+| ID | Mức ưu tiên | Loại vấn đề | Tham chiếu nguồn | Nội dung vấn đề / câu hỏi cần xác nhận | Vì sao quan trọng | Owner đề xuất | Trạng thái |
+|---|---|---|---|---|---|---|---|---|
+| Q4 | Medium | MISSING_INFO | UC §1, SRS flows.md F-05, FR-EXBOT-073 | UC §1 liệt kê "ExBot System Operator (Close Worker)" là Primary Actor. Tuy nhiên, từ UC §3 và FR-EXBOT-073, Close Worker không tự quyết định trigger — nó chỉ thực thi flow khi được gọi. 5 trigger conditions thực tế đến từ: (1) deep-audit worker, (2) hedge-sync worker, (3) partial_repair worker, (4) light-check/hedge-stopped, HOẶC (5) admin qua `POST /api/exbot/close`. Không có dedicated `bot_safe_close` queue trong 11 queues (FR-EXBOT-010). Vậy "Close Worker" trong UC §1 là **architecture component (ExBot Lambda)** hay **actor**? BA xác nhận lại role của Close Worker trong UC. | Nếu Close Worker là architecture chứ không phải actor, thì UC §1 Actor list cần được cập nhật để phản ánh đúng. Trigger mechanism cần được ghi rõ trong UC. | BA | ⏳ Pending |
+| Q9 | Medium | MISSING_INFO | FR-EXBOT-072, UC §3 | FR-EXBOT-072 nói "idempotency_key UNIQUE enforced" và "trigger_reason populated" nhưng không có document nào định nghĩa format/value cụ thể. | Nếu không biết format, không thể verify UNIQUE constraint hoạt động đúng trong test. BA cần bổ sung: (1) format/value của `idempotency_key` (ví dụ: `{botId}:{kind}:{trigger_timestamp}`), (2) format/value của `trigger_reason` (ví dụ: enum values: `circuit_breaker_exhausted`, `margin_critical`, `3_stops_7d`, `partial_repair_exhausted`, `admin_force_close`). | BA | ⏳ Pending |
 
 #### 10.1.3 Câu hỏi Deferred
 
 | ID | Mức ưu tiên | Loại vấn đề | Tham chiếu nguồn | Nội dung | Lý do Defer | Owner |
 |---|---|---|---|---|---|---|
-| Q9 | Minor | MISSING_INFO | FR-EXBOT-072, UC §3 | FR-EXBOT-072 nói "idempotency_key UNIQUE enforced" và "trigger_reason populated" nhưng không có document nào định nghĩa format/value cụ thể. | FR-EXBOT-072 đã nói rõ các field này tồn tại và được enforce. Không cần exact format để design test cơ bản. | QC Lead |
 | Q10 | Minor | OUTDATED_CONTENT | SRS flows.md F-05, UC Figure 1 | flows.md F-05 và UC Figure 1 (Mermaid diagram) đều simplified — không reflect executeStrategy, hedge close step, idempotency_key, hay state progression chi tiết. UC diagram chỉ có 2 bước (Trigger → Operator fulfillRequest). | Diagram là visual aid, không phải source of truth. UC step-by-step và FR-EXBOT-073 đã mô tả đầy đủ. Không ảnh hưởng test design vì step-by-step đã rõ. | BA |
 
 ### 10.2 Dependency cần theo dõi
@@ -374,7 +371,9 @@ Các actor đã được xác định rõ. Step 2 đã được cập nhật ch�
 |---|---|---|---|
 | v1 | 2026-06-30 | QC UC Read Agent | Tạo báo cáo audited lần đầu |
 | v2 | 2026-07-02 | QC Agent | Cập nhật từ BA responses (Q1, Q2, Q3, Q5, Q6, Q8, Q11): LP close method confirmed, AC-012-1 updated, bot status prerequisite clarified, E-EXBOT-018 added, status timing clarified, stop cancelled clarified as action, lifecycle_state clarified. Score improved: 56/100 → 85/100. Verdict: Not Ready → Ready. |
-| v3 | 2026-07-06 | QC Agent | Re-audit after BA document update (2026-07-04): **Q7 RESOLVED** — UC Step 2 updated from "UserLockDO" to "User Lock (Redis Redlock via ElastiCache)" per FR-EXBOT-092. **Q4 REMOVED** — Close Worker is architecture (ExBot Lambda), not actor; trigger mechanism already defined in FR-EXBOT-073 (5 conditions from other workers + admin API). No dedicated bot_safe_close queue in FR-EXBOT-010. Score stays 85/100. Verdict: Ready. All 11 questions: 9 answered, 2 deferred (Q9, Q10). |
+| v3 | 2026-07-07 | QC Agent | Re-audit sau BA update 2026-07-04: **Q7 RESOLVED** — UC Step 2 updated UserLockDO → Redis Redlock via ElastiCache. **Q4 OPEN** — Close Worker role cần BA xác nhận. Score stays 85/100. Verdict: Ready. |
+| v3.1 | 2026-07-07 | QC Agent | Fix file structure — Q4 giữ ở Open Questions (không phải Answered). File structure corrected. |
+| v3.2 | 2026-07-07 | QC Agent | **Q9 RE-OPENED** — Q9 chuyển từ Deferred sang Open (Pending BA). Priority bumped from Minor → Medium. Lý do: format cụ thể của `idempotency_key` và `trigger_reason` cần thiết để verify UNIQUE constraint hoạt động đúng trong test design. BA cần bổ sung format/value cụ thể. |
 
 ---
 
@@ -382,20 +381,21 @@ Các actor đã được xác định rõ. Step 2 đã được cập nhật ch�
 
 | Area | Max | Score | Status | Summary |
 |---:|---:|---:|---|---|
-| 1. Function/Operation & Data Object Inventory | 20 | 18 | ✅ Good | All major issues resolved. Q9 deferred (format detail, not blocking). |
-| 2. Data Object / State Attributes, BR & Messages | 25 | 23 | ✅ Good | Q5 (E-EXBOT-018), Q6 (status timing), Q8 (stop cancelled), Q11 (lifecycle_state), **Q7 (Redis Redlock clarification)** đã được giải quyết. |
+| 1. Function/Operation & Data Object Inventory | 20 | 18 | ✅ Good | All major issues resolved. **Q9 OPEN (Medium)** — format cụ thể của `idempotency_key` và `trigger_reason` cần BA bổ sung. |
+| 2. Data Object / State Attributes, BR & Messages | 25 | 23 | ✅ Good | Q5 (E-EXBOT-018), Q6 (status timing), Q8 (stop cancelled), Q11 (lifecycle_state), **Q7 (Redis Redlock clarification)** đã được giải quyết. **Q9 OPEN** — format fields cần BA xác nhận. |
 | 3. Functional Logic & Workflow Decomposition | 25 | 23 | ✅ Good | Q1 (LP close), Q2 (AC outdated), Q6 (status timing), Q7 (lock mechanism) đã được giải quyết. |
-| 4. Functional Integration & Data Consistency | 15 | 11 | ✅ Good | Multiple missing details đã được confirm. Q9 deferred (format detail, not blocking). |
-| 5. UC / Spec Documentation Quality | 15 | 12 | ✅ Good | Q1, Q2, Q8 major conflicts đã được fix. Q3-Q7, Q11 đã được clarify. Q10 diagram gaps remain deferred. |
+| 4. Functional Integration & Data Consistency | 15 | 11 | ✅ Good | Multiple missing details đã được confirm. **Q9 OPEN** — format fields cần BA xác nhận. OQ-EXBOT-08 (ABI) remains open pending zen. |
+| 5. UC / Spec Documentation Quality | 15 | 12 | ✅ Good | Q1, Q2, Q8 major conflicts đã được fix. Q3-Q7, Q11 đã được clarify. Q4 OPEN — BA cần xác nhận Close Worker role. Q10 diagram gaps deferred. |
 | **Total** | **100** | **85** | **Ready** | |
 
 **Verdict: Ready (85/100)**
 
 Issues resolved in v3:
-- **Q7: RESOLVED** — UC 2026-07-04 updated Step 2: "UserLockDO lease" → "User Lock (Redis Redlock via ElastiCache) lease". Redis Redlock replaces Cloudflare Durable Object throughout the ExBot architecture per FR-EXBOT-092. No remaining references to UserLockDO in UC documents.
+- **Q7: RESOLVED** — UC 2026-07-04 Step 2 updated: UserLockDO → Redis Redlock via ElastiCache. No remaining references to UserLockDO in UC documents.
 
 Open items (pending BA response):
-- **Q4: OPEN** — UC §1 lists "Close Worker" as Primary Actor, but Close Worker does not self-initiate triggers. 5 actual trigger conditions come from other workers (deep-audit, hedge-sync, partial_repair) OR admin API. No dedicated bot_safe_close queue in FR-EXBOT-010. BA to confirm: is "Close Worker" an **architecture component (ExBot Lambda)** or an **actor**?
+- **Q4: OPEN (Medium)** — UC §1 lists "Close Worker" as Primary Actor, but Close Worker does not self-initiate triggers. BA to confirm: is "Close Worker" an **architecture component (ExBot Lambda)** or an **actor**?
+- **Q9: OPEN (Medium)** — FR-EXBOT-072 nói "idempotency_key UNIQUE enforced" và "trigger_reason populated" nhưng không định nghĩa format/value cụ thể. BA cần bổ sung: (1) format của `idempotency_key` (ví dụ: `{botId}:{kind}:{trigger_timestamp}`), (2) enum values của `trigger_reason` (`circuit_breaker_exhausted`, `margin_critical`, `3_stops_7d`, `partial_repair_exhausted`, `admin_force_close`).
 
 Diagram gaps (already deferred, no test impact):
 - Q10: UC Figure 1 và flows.md F-05 simplified diagrams — step-by-step description in UC §3 và FR-EXBOT-073 đã đầy đủ, diagrams chỉ là visual aid

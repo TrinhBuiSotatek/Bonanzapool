@@ -1,8 +1,9 @@
 # Test Scenarios — UC-EXBOT-bot-safe-close System-Initiated Safe Close
 
-> **Source:** UC-EXBOT-bot-safe-close_bot-safe-close_audited_20260702_v2.md
+> **Source:** UC-EXBOT-bot-safe-close_bot-safe-close_audited_20260707_v3.md
 > **Generated:** 2026-07-02
-> **Domain/Architecture:** ExBot Worker (Cloudflare Workers) + Hyperliquid + BnzaExVault (on-chain) + RedemptionQueue (on-chain) + Durable Objects (UserLockDO). No UI — logic-only / backend pipeline.
+> **Updated:** 2026-07-07 (v3: **Q9 RE-OPENED (Medium — CẦN CONFIRM TỪ BA)**, Q4 open (CẦN CONFIRM TỪ BA))
+> **Domain/Architecture:** ExBot Lambda + Hyperliquid + BnzaExVault (on-chain) + RedemptionQueue (on-chain) + Redis Redlock via ElastiCache (User Lock). No UI — logic-only / backend pipeline.
 
 ---
 
@@ -13,7 +14,7 @@
 **UC Reference:** UC-EXBOT-bot-safe-close
 **Req-ID:** FR-EXBOT-073, FR-EXBOT-070, US-EXBOT-009 AC-009-1, SRS states.md
 **Test Type:** End-to-End
-**Description:** Given a bot with `bots.status IN ('active', 'safe_mode')` and a valid trigger condition met (e.g., circuit breaker exhausted, margin critical irrecoverable, 3 stops in 7 days, partial_repair exhausted, or admin force-close), when Close Worker initiates bot_safe_close, then HL short is fully closed (size=0 confirmed via reconcile), LP position is closed via `vault.executeStrategy(RedeemStrategyV1, user, botId, params)`, `RedemptionQueue.createRequest` enqueues HL portion payout, Operator calls `fulfillRequest` FIFO on-chain, `bots.status='closed'`, `bots.lifecycle_state='closed'`, and investor is notified: "Bot safely closed. Funds have been returned to your wallet."
+**Description:** Given a bot with `bots.status IN ('active', 'safe_mode')` and a valid trigger condition met (circuit breaker exhausted, margin critical irrecoverable, 3 stops in 7 days, partial_repair exhausted, or admin force-close), when ExBot Lambda initiates bot_safe_close, then HL short is fully closed (size=0 confirmed via reconcile), LP position is closed via `vault.executeStrategy(RedeemStrategyV1, user, botId, params)`, `RedemptionQueue.createRequest` enqueues HL portion payout, Operator calls `fulfillRequest` FIFO on-chain, `bots.status='closed'`, `bots.lifecycle_state='closed'`, and investor is notified: "Bot safely closed. Funds have been returned to your wallet."
 **Test Focus:** Happy path
 
 ---
@@ -23,7 +24,7 @@
 **UC Reference:** UC-EXBOT-bot-safe-close
 **Req-ID:** FR-EXBOT-073, SRS states.md close_operations
 **Test Type:** Data/State
-**Description:** Given a bot_safe_close trigger is accepted, when Close Worker executes the close flow, then `close_operations.state` must progress sequentially through all valid states in order: `requested` → `hedge_close_pending` → `hedge_closed` → `lp_closed` → `redemption_queued` → `done` — no state may be skipped or reached out of order.
+**Description:** Given a bot_safe_close trigger is accepted, when ExBot Lambda executes the close flow, then `close_operations.state` must progress sequentially through all valid states in order: `requested` → `hedge_close_pending` → `hedge_closed` → `lp_closed` → `redemption_queued` → `done` — no state may be skipped or reached out of order.
 **Test Focus:** State transition
 
 ---
@@ -33,7 +34,7 @@
 **UC Reference:** UC-EXBOT-bot-safe-close
 **Req-ID:** SRS states.md, FR-EXBOT-015, UC §3 Q6 update
 **Test Type:** Data/State
-**Description:** Given bot_safe_close is triggered, when Close Worker starts operation (step 1), then `bots.lifecycle_state` transitions to `lp_closing` immediately and `bots.status` transitions to `closing` simultaneously — these states persist until step 11 when `fulfillRequest` completes, then both transition to `closed`.
+**Description:** Given bot_safe_close is triggered, when ExBot Lambda starts operation, then `bots.lifecycle_state` transitions to `lp_closing` immediately and `bots.status` transitions to `closing` simultaneously — these states persist until `fulfillRequest` completes, then both transition to `closed`.
 **Test Focus:** State transition
 
 ---
@@ -43,7 +44,8 @@
 **UC Reference:** UC-EXBOT-bot-safe-close
 **Req-ID:** FR-EXBOT-072, SRS erd.md, Q3 update
 **Test Type:** Functional
-**Description:** Given a bot with `bots.status='closed'`, when a new bot_safe_close trigger arrives (from any of the 5 trigger sources), then the system must reject the trigger and return E-EXBOT-012: "Bot {id} is already closed. No action needed." — no new close_operations row must be created.
+**Description:** Given a bot with `bots.status='closed'`, when a new bot_safe_close trigger arrives from any of the 5 trigger sources, then the system must reject the trigger and return E-EXBOT-012: "Bot {id} is already closed. No action needed." — no new close_operations row must be created.
+**Expected Result Note:** ⚠️ Liên quan đến **Q4 (CẦN CONFIRM TỪ BA)** — xác nhận "Close Worker" là architecture component (ExBot Lambda), không phải actor. Trigger mechanism (5 conditions) cần được ghi rõ trong UC §1. Tuy nhiên, rejection behavior (UNIQUE constraint) không phụ thuộc vào Q4 answer.
 **Test Focus:** Error/Exception
 
 ---
@@ -54,6 +56,7 @@
 **Req-ID:** FR-EXBOT-072, FR-EXBOT-070, Q3 update
 **Test Type:** Functional
 **Description:** Given a bot with an active close_operations row (bot_safe_close in progress, `bots.status='closing'`), when a duplicate bot_safe_close trigger arrives for the same bot, then the system must reject the duplicate via UNIQUE constraint on `close_operations.idempotency_key` — exactly one close_operations row must exist, no double settlement.
+**Expected Result Note:** ⚠️ Liên quan đến **Q4 (CẦN CONFIRM TỪ BA)** — xác nhận "Close Worker" là architecture component (ExBot Lambda). Trigger mechanism (5 conditions từ workers khác + admin API) cần được ghi rõ trong UC §1. Tuy nhiên, UNIQUE constraint behavior không phụ thuộc vào Q4 answer.
 **Test Focus:** Idempotency/Concurrency
 
 ---
@@ -63,7 +66,7 @@
 **UC Reference:** UC-EXBOT-bot-safe-close
 **Req-ID:** UC A1, FR-EXBOT-073, US-EXBOT-009 AC-009-2, message-list.md E-EXBOT-018, Q5/Q11 update
 **Test Type:** Functional
-**Description:** Given bot_safe_close is triggered and hedge close begins, when `closeShortReduceOnlyIoc` fails after 3 retries (e.g., HL API error, insufficient margin), then `close_operations.state` must be set to `residual_hl_liability`, `bots.status` and `bots.lifecycle_state` must both be set to `safe_mode`, LP position must NOT be closed, and admin notification E-EXBOT-018 must be sent: "Bot safe close failed: HL hedge could not be closed after 3 attempts. Manual intervention required. Bot held at residual_hl_liability."
+**Description:** Given bot_safe_close is triggered and hedge close begins, when `closeShortReduceOnlyIoc` fails after 3 retries, then `close_operations.state` must be set to `residual_hl_liability`, `bots.status` and `bots.lifecycle_state` must both be set to `safe_mode`, LP position must NOT be closed, and admin notification E-EXBOT-018 must be sent: "Bot safe close failed: HL hedge could not be closed after 3 attempts. Manual intervention required. Bot held at residual_hl_liability."
 **Test Focus:** Error/Exception
 
 ---
@@ -73,7 +76,7 @@
 **UC Reference:** UC-EXBOT-bot-safe-close
 **Req-ID:** UC A2, FR-EXBOT-073
 **Test Type:** Functional
-**Description:** Given hedge has been successfully closed (`hedge_legs.last_known_hl_short_size=0`), when `vault.executeStrategy(RedeemStrategyV1, user, botId, params)` call reverts (e.g., contract error, invalid params), then the system must retry up to 3 times, and after the 3rd failure must escalate to admin and hold at `close_operations.state='lp_closed'` pending manual resolution.
+**Description:** Given hedge has been successfully closed (`hedge_legs.last_known_hl_short_size=0`), when `vault.executeStrategy(RedeemStrategyV1, user, botId, params)` call reverts, then the system must retry up to 3 times, and after the 3rd failure must escalate to admin and hold at `close_operations.state='lp_closed'` pending manual resolution.
 **Test Focus:** Error/Exception
 
 ---
@@ -93,7 +96,7 @@
 **UC Reference:** UC-EXBOT-bot-safe-close
 **Req-ID:** FR-EXBOT-070, UC A3
 **Test Type:** Functional
-**Description:** Given `close_operations.state='redemption_queued'` and `fulfillRequest` is called, when `fulfillRequest` fails (e.g., operator insufficient balance, on-chain revert), then the request must stay enqueued in the FIFO queue (not dropped or lost), and Operator must be able to retry the fulfillRequest call.
+**Description:** Given `close_operations.state='redemption_queued'` and `fulfillRequest` is called, when `fulfillRequest` fails, then the request must stay enqueued in the FIFO queue (not dropped or lost), and Operator must be able to retry the fulfillRequest call.
 **Test Focus:** Error/Exception
 
 ---
@@ -113,7 +116,7 @@
 **UC Reference:** UC-EXBOT-bot-safe-close
 **Req-ID:** FR-EXBOT-021, FR-EXBOT-022, NFR-EXBOT-008
 **Test Type:** Functional
-**Description:** Given a bot with an existing HL short position (actualShortEth > 0), when Close Worker computes delta for full hedge close, then the computation must use BigDecimal (not float/Number) with formula `delta = 0 - actualShortEth` — precision loss from floating-point arithmetic must be avoided.
+**Description:** Given a bot with an existing HL short position (actualShortEth > 0), when ExBot Lambda computes delta for full hedge close, then the computation must use BigDecimal (not float/Number) with formula `delta = 0 - actualShortEth` — precision loss from floating-point arithmetic must be avoided.
 **Test Focus:** Boundary
 
 ---
@@ -133,7 +136,7 @@
 **UC Reference:** UC-EXBOT-bot-safe-close
 **Req-ID:** FR-EXBOT-025, FR-EXBOT-073, Q8 update
 **Test Type:** Functional
-**Description:** Given hedge close order has been submitted, when Close Worker reconciles by fetching clearinghouseState, then `close_operations.state` must only advance to `hedge_closed` if BOTH conditions are confirmed: (1) HL short size = 0 AND (2) stop has been cancelled. If either condition is not met, the state must not advance.
+**Description:** Given hedge close order has been submitted, when ExBot Lambda reconciles by fetching clearinghouseState, then `close_operations.state` must only advance to `hedge_closed` if BOTH conditions are confirmed: (1) HL short size = 0 AND (2) stop has been cancelled. If either condition is not met, the state must not advance.
 **Test Focus:** State transition
 
 ---
@@ -143,7 +146,7 @@
 **UC Reference:** UC-EXBOT-bot-safe-close
 **Req-ID:** FR-EXBOT-073, Q1 update
 **Test Type:** Integration
-**Description:** Given hedge is confirmed closed (`hedge_closed`), when Close Worker calls `vault.executeStrategy(RedeemStrategyV1, user, botId, params)` to close LP position, then BnzaExPositionManager must process the strategy, earned fees must be routed via LpFeeOps (op fee + perf fee), principal must be returned in pair currency, and PositionClosed event must be emitted. Close Worker must only advance `close_operations.state` to `lp_closed` after PositionClosed event is received.
+**Description:** Given hedge is confirmed closed (`hedge_closed`), when ExBot Lambda calls `vault.executeStrategy(RedeemStrategyV1, user, botId, params)` to close LP position, then BnzaExPositionManager must process the strategy, earned fees must be routed via LpFeeOps (op fee + perf fee), principal must be returned in pair currency, and PositionClosed event must be emitted. ExBot Lambda must only advance `close_operations.state` to `lp_closed` after PositionClosed event is received.
 **Test Focus:** Integration
 
 ---
@@ -153,7 +156,7 @@
 **UC Reference:** UC-EXBOT-bot-safe-close
 **Req-ID:** FR-EXBOT-073, UC step 8-9
 **Test Type:** Integration
-**Description:** Given LP is confirmed closed (`lp_closed`), when Close Worker calls `RedemptionQueue.createRequest(user, botId, tokenId, hlPortionId)`, then the request must be enqueued on-chain, RequestCreated event must be emitted, and `close_operations.state` must advance to `redemption_queued`.
+**Description:** Given LP is confirmed closed (`lp_closed`), when ExBot Lambda calls `RedemptionQueue.createRequest(user, botId, tokenId, hlPortionId)`, then the request must be enqueued on-chain, RequestCreated event must be emitted, and `close_operations.state` must advance to `redemption_queued`.
 **Test Focus:** Integration
 
 ---
@@ -183,7 +186,7 @@
 **UC Reference:** UC-EXBOT-bot-safe-close
 **Req-ID:** US-EXBOT-012, FR-EXBOT-090, Q2 update
 **Test Type:** Functional
-**Description:** Given an admin (zen) calls POST /api/exbot/close with a valid botId and reason, when the request is forwarded via OperatorFacade through CF service binding to ExBot Worker, then bot_safe_close must be initiated: `bots.status='closing'`, hedge → LP → RedemptionQueue flow executes, and investor is notified: "Your ExBot was administratively closed. USDC is available for withdrawal."
+**Description:** Given an admin (zen) calls POST /api/exbot/close with a valid botId and reason, when the request is forwarded via OperatorFacade through API Gateway + HMAC Lambda Authorizer to ExBot Lambda, then bot_safe_close must be initiated: `bots.status='closing'`, hedge → LP → RedemptionQueue flow executes, and investor is notified: "Your ExBot was administratively closed. USDC is available for withdrawal."
 **Test Focus:** Happy path
 
 ---
@@ -193,7 +196,7 @@
 **UC Reference:** UC-EXBOT-bot-safe-close
 **Req-ID:** US-EXBOT-012 AC-012-2
 **Test Type:** Functional
-**Description:** Given an admin initiates force-close on a bot with `bots.status='safe_mode'`, when the system processes the close, then it must proceed with bot_safe_close using the existing hedge state (not requiring re-opening hedge). If hedge cannot close due to irrecoverable state, `residual_hl_liability` must be recorded and admin notified of outstanding liability.
+**Description:** Given an admin initiates force-close on a bot with `bots.status='safe_mode'`, when the system processes the close, then it must proceed with bot_safe_close using the existing hedge state. If hedge cannot close due to irrecoverable state, `residual_hl_liability` must be recorded and admin notified of outstanding liability.
 **Test Focus:** Alternative flow
 
 ---
@@ -203,7 +206,7 @@
 **UC Reference:** UC-EXBOT-bot-safe-close
 **Req-ID:** US-EXBOT-012 AC-012-4, message-list.md E-EXBOT-012
 **Test Type:** Functional
-**Description:** Given a bot with `lifecycle_state='closed'`, when an admin attempts to force-close it via POST /api/exbot/close, then the system must return E-EXBOT-012: "Bot {id} is already closed. No action needed." and no close_operations row must be created.
+**Description:** Given a bot with `lifecycle_state='closed'`, when an admin attempts to Force-close it via POST /api/exbot/close, then the system must return E-EXBOT-012: "Bot {id} is already closed. No action needed." and no close_operations row must be created.
 **Test Focus:** Error/Exception
 
 ---
@@ -243,17 +246,18 @@
 **UC Reference:** UC-EXBOT-bot-safe-close
 **Req-ID:** FR-EXBOT-040, FR-EXBOT-073
 **Test Type:** Functional
-**Description:** Given a bot with `circuit_breakers.state='open'` (circuit breaker is open), when bot_safe_close is triggered (e.g., via 3rd stop condition or admin force-close), then the close operation must succeed — circuit breaker suppresses hedge-sync but does NOT block close operation.
+**Description:** Given a bot with `circuit_breakers.state='open'` (circuit breaker is open), when bot_safe_close is triggered, then the close operation must succeed — circuit breaker suppresses hedge-sync but does NOT block close operation.
 **Test Focus:** Alternative flow
 
 ---
 
 ### Scenario ID: TS_UC-EXBOT-bot-safe-close_025
-**Scenario Title:** Duplicate trigger via queue redelivery is rejected (queue idempotency)
+**Scenario Title:** Duplicate trigger via redelivery is rejected (idempotency)
 **UC Reference:** UC-EXBOT-bot-safe-close
-**Req-ID:** FR-EXBOT-070, SRS erd.md
+**Req-ID:** FR-EXBOT-070, SRS erd.md, **Q4 CẦN CONFIRM TỪ BA**
 **Test Type:** Idempotency/Concurrency
-**Description:** Given bot_safe_close trigger message is delivered via queue and processed successfully, when the same message is redelivered by the queue (e.g., consumer ack failure, worker crash before ack), then the system must reject the duplicate via UNIQUE constraint on `close_operations.idempotency_key` — the operation must not be double-applied.
+**Description:** Given bot_safe_close trigger is delivered and processed, when the same trigger is redelivered (e.g., consumer ack failure, worker crash before ack), then the system must reject the duplicate via UNIQUE constraint on `close_operations.idempotency_key` — the operation must not be double-applied.
+**Expected Result Note:** ⚠️ Liên quan đến **Q4 (CẦN CONFIRM TỪ BA)** — "Close Worker" là ExBot Lambda (architecture component). Trigger mechanism cần BA xác nhận trong UC §1. Tuy nhiên, UNIQUE constraint idempotency không phụ thuộc vào Q4 answer.
 **Test Focus:** Idempotency/Concurrency
 
 ---
@@ -291,9 +295,10 @@
 ### Scenario ID: TS_UC-EXBOT-bot-safe-close_029
 **Scenario Title:** Each of 5 trigger conditions creates close_operations with correct trigger_reason populated
 **UC Reference:** UC-EXBOT-bot-safe-close
-**Req-ID:** FR-EXBOT-072, FR-EXBOT-073
-**Test Type:** Functional
+**Req-ID:** FR-EXBOT-072, FR-EXBOT-073, **Q9 CẦN CONFIRM TỪ BA**, **Q4 CẦN CONFIRM TỪ BA**
+**Test Type:** Boundary
 **Description:** Given a valid bot (not closed/closing) and each of the 5 trigger conditions is met individually: (1) circuit breaker exhausted, (2) margin critical irrecoverable, (3) 3 stops in 7 days, (4) partial_repair exhausted, (5) admin force-close, when trigger fires in each case, then a close_operations row must be created with `kind='bot_safe_close'` and `trigger_reason` populated matching the specific trigger type — enabling traceable audit trail.
+**Expected Result Note:** ⚠️ Liên quan đến **Q9 (CẦN CONFIRM TỪ BA)** — format cụ thể của `trigger_reason` enum values chưa được định nghĩa. BA cần xác nhận: `circuit_breaker_exhausted`, `margin_critical`, `3_stops_7d`, `partial_repair_exhausted`, `admin_force_close`. Ngoài ra, liên quan đến **Q4 (CẦN CONFIRM TỪ BA)** — xác nhận "Close Worker" là architecture component (ExBot Lambda). 5 trigger conditions đến từ: deep-audit worker, hedge-sync worker, partial_repair worker, light-check/hedge-stopped, HOẶC admin API (`POST /api/exbot/close`). Không có dedicated `bot_safe_close` queue trong 11 queues (FR-EXBOT-010).
 **Test Focus:** Boundary
 
 ---
@@ -313,7 +318,7 @@
 **UC Reference:** UC-EXBOT-bot-safe-close
 **Req-ID:** US-EXBOT-012 AC-012-1
 **Test Type:** Acceptance
-**Description:** Given an admin force-close completes successfully (fulfillRequest has been called), when the system sends investor notification, then the investor must receive the message: "Your ExBot was administratively closed. USDC is available for withdrawal." — this is distinct from the happy-path user-initiated close message.
+**Description:** Given an admin force-close completes successfully (fulfillRequest has been called), when the system sends investor notification, then the investor must receive the message: "Your ExBot was administratively closed. USDC is available for withdrawal." — this is distinct from the happy-path close message.
 **Test Focus:** Acceptance
 
 ---
@@ -322,7 +327,7 @@
 **Scenario Title:** HL agent key with key_status='active' is required for hedge close signing
 **UC Reference:** UC-EXBOT-bot-safe-close
 **Req-ID:** FR-EXBOT-080
-**Test Type:** Functional
+**Test Type:** Boundary
 **Description:** Given bot_safe_close is triggered and requires HL signing for `closeShortReduceOnlyIoc`, when the signing operation is attempted, then HL agent key must have `key_status='active'` — the operation must fail if the key is not active.
 **Test Focus:** Boundary
 
@@ -342,7 +347,7 @@
 **Scenario Title:** LP close must not be attempted before hedge_closed is confirmed
 **UC Reference:** UC-EXBOT-bot-safe-close
 **Req-ID:** FR-EXBOT-073
-**Test Type:** Functional
+**Test Type:** State transition
 **Description:** Given bot_safe_close is in progress but hedge has not yet been confirmed closed, when LP close operation (`vault.executeStrategy`) is attempted prematurely, then the system must prevent LP close — LP close must only proceed after `hedge_closed` is confirmed. This hedge-first invariant must be enforced.
 **Test Focus:** State transition
 
@@ -353,7 +358,7 @@
 **UC Reference:** UC-EXBOT-bot-safe-close
 **Req-ID:** FR-EXBOT-024, FR-EXBOT-073
 **Test Type:** Idempotency/Concurrency
-**Description:** Given `closeShortReduceOnlyIoc` is submitted with deterministic cloid (keccak256("bnza:{botId}:{attemptId}:{stage}:{version}")), when the same order is resubmitted with the same cloid (e.g., network retry), then HL must deduplicate — exactly one HL order must be created, no double-apply of the close.
+**Description:** Given `closeShortReduceOnlyIoc` is submitted with deterministic cloid (keccak256("bnza:{botId}:{attemptId}:{stage}:{version}")), when the same order is resubmitted with the same cloid, then HL must deduplicate — exactly one HL order must be created, no double-apply of the close.
 **Test Focus:** Idempotency/Concurrency
 
 ---
@@ -362,8 +367,8 @@
 
 | Scenario Area | Reason | Recommended Action |
 |---|---|---|
-| UserLockDO TTL expiry during hedge close (Q7 pending Tech Lead) | UserLockDO requirement for Close Worker not confirmed by Tech Lead | Wait for Q7 answer from Tech Lead |
-| Close Worker trigger mechanism: queue vs direct call (Q4 pending Tech Lead) | Trigger mechanism architecture decision pending Tech Lead | Wait for Q4 answer; test idempotency already covered |
+| Close Worker role clarification: actor vs architecture (**Q4 — CẦN CONFIRM TỪ BA**) | UC §1 lists "Close Worker" as Primary Actor, but evidence suggests it is an architecture component (ExBot Lambda). BA to confirm role definition and update UC §1 if needed. Trigger mechanism (5 conditions from other workers + admin API) documented but not yet confirmed in UC. | **Chờ Q4 answer từ BA** |
+| `idempotency_key` và `trigger_reason` format (**Q9 — CẦN CONFIRM TỪ BA**) | FR-EXBOT-072 nói "idempotency_key UNIQUE enforced" và "trigger_reason populated" nhưng không định nghĩa format/value cụ thể. BA cần bổ sung: (1) format của `idempotency_key` (ví dụ: `{botId}:{kind}:{trigger_timestamp}`), (2) enum values của `trigger_reason` (`circuit_breaker_exhausted`, `margin_critical`, `3_stops_7d`, `partial_repair_exhausted`, `admin_force_close`). | **Chờ Q9 answer từ BA** |
 | BnzaExVault Solidity contract internal logic | zen develops; SOTATEK integrates via ABI | Integration tests depend on ABI confirmation (OQ-EXBOT-08) |
 | RedemptionQueue contract internal logic (fulfillRequest ABI) | zen develops; SOTATEK integrates via ABI | Integration tests depend on ABI confirmation (OQ-EXBOT-08) |
 | SPEC §19.5 INV-STOP protocol implementation details | Pending HL confirmation on stop placement behavior (OQ-EXBOT-02) | Wait for OQ-EXBOT-02 answer |
@@ -379,11 +384,11 @@
 
 | Test Type | Count |
 |---|---:|
-| Happy path | 8 (TS_001, TS_002, TS_003, TS_012, TS_018, TS_023, TS_030, TS_031) |
-| Alternative flow | 5 (TS_008, TS_010, TS_019, TS_021, TS_024, TS_033) |
+| Happy path | 7 (TS_001, TS_002, TS_003, TS_012, TS_018, TS_023, TS_030, TS_031) |
+| Alternative flow | 6 (TS_008, TS_010, TS_019, TS_021, TS_024, TS_033) |
 | Error/Exception | 6 (TS_004, TS_006, TS_007, TS_009, TS_026, TS_027) |
-| State transition | 5 (TS_002, TS_003, TS_013, TS_017, TS_022, TS_028, TS_034) |
-| Integration | 5 (TS_014, TS_015, TS_016) |
+| State transition | 7 (TS_002, TS_003, TS_013, TS_017, TS_022, TS_028, TS_034) |
+| Integration | 3 (TS_014, TS_015, TS_016) |
 | Idempotency/Concurrency | 3 (TS_005, TS_025, TS_035) |
 | Boundary | 3 (TS_011, TS_029, TS_032) |
 | Acceptance | 2 (TS_030, TS_031) |

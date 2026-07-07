@@ -14,6 +14,7 @@
 | ID | Ưu tiên | Ref | Question | Evidence in Docs | Why It Matters | Owner | Status |
 |----|----------|-----|----------|------------------|----------------|-------|--------|
 | Q4 | Medium | UC §1, SRS flows.md F-05, FR-EXBOT-073 | UC §1 liệt kê "ExBot System Operator (Close Worker)" là Primary Actor. Tuy nhiên, từ UC §3 và FR-EXBOT-073, Close Worker không tự quyết định trigger — nó chỉ thực thi flow khi được gọi. 5 trigger conditions thực tế đến từ: (1) deep-audit worker, (2) hedge-sync worker, (3) partial_repair worker, (4) light-check/hedge-stopped, HOẶC (5) admin qua `POST /api/exbot/close`. Không có dedicated `bot_safe_close` queue trong 11 queues (FR-EXBOT-010). Vậy "Close Worker" trong UC §1 là **architecture component (ExBot Lambda)** hay **actor**? BA xác nhận lại role của Close Worker trong UC. | UC §1: "Primary: ExBot System Operator (Close Worker)"<br>UC §3 Step 1: "Close Worker: acquire User Lock..."<br>FR-EXBOT-073: 5 trigger conditions<br>FR-EXBOT-010: 11 queues — không có bot_safe_close queue | Nếu Close Worker là architecture chứ không phải actor, thì UC §1 Actor list cần được cập nhật để phản ánh đúng. Trigger mechanism cần được ghi rõ trong UC. | BA | ⏳ Pending |
+| Q9 | Medium | FR-EXBOT-072, UC §3 | FR-EXBOT-072 nói "idempotency_key UNIQUE enforced" và "trigger_reason populated" nhưng không có document nào định nghĩa format/value cụ thể. | FR-EXBOT-072: "idempotency_key UNIQUE enforced", "trigger_reason populated"<br>UC §3: Preconditions<br>SRS erd.md: close_operations table | Nếu không biết format, không thể verify UNIQUE constraint hoạt động đúng trong test. BA cần bổ sung: (1) format/value của `idempotency_key` (ví dụ: `{botId}:{kind}:{trigger_timestamp}`), (2) format/value của `trigger_reason` (ví dụ: enum values: `circuit_breaker_exhausted`, `margin_critical`, `3_stops_7d`, `partial_repair_exhausted`, `admin_force_close`). | BA | ⏳ Pending |
 
 ---
 
@@ -38,7 +39,6 @@
 
 | ID | Ưu tiên | Ref | Question | Reason for Deferral | Owner |
 |----|----------|-----|----------|---------------------|-------|
-| Q9 | Minor | FR-EXBOT-072, UC §3 | FR-EXBOT-072 nói "idempotency_key UNIQUE enforced" và "trigger_reason populated" nhưng không định nghĩa format/value cụ thể. | FR-EXBOT-072 đã nói rõ các field này tồn tại và được enforce. Không cần exact format để design test cơ bản — chỉ cần verify UNIQUE constraint hoạt động. | QC Lead |
 | Q10 | Minor | SRS flows.md F-05, UC Figure 1 | flows.md F-05 và UC Figure 1 (Mermaid diagram) đều simplified — không reflect executeStrategy, hedge close step, idempotency_key, hay state progression chi tiết. UC diagram chỉ có 2 bước (Trigger → Operator fulfillRequest). | Diagram là visual aid, không phải source of truth. UC step-by-step và FR-EXBOT-073 đã mô tả đầy đủ. Không ảnh hưởng test design vì step-by-step đã rõ. | BA |
 
 ---
@@ -47,9 +47,9 @@
 
 | Status | Count |
 |--------|-------|
-| Open (Pending BA) | 1 (Q4) |
+| Open (Pending BA) | 2 (Q4, Q9) |
 | Answered | 8 (Q1, Q2, Q3, Q5, Q6, Q7, Q8, Q11) |
-| Deferred | 2 (Q9, Q10) |
+| Deferred | 1 (Q10) |
 | **Total** | **11** |
 
 ---
