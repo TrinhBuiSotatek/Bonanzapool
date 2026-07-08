@@ -120,7 +120,8 @@ def parse_md_files(paths: Iterable[str]) -> list[Item]:
                     continue
 
                 if not stripped.startswith("|"):
-                    in_table = False
+                    if stripped:  # non-empty, non-pipe line resets table context
+                        in_table = False
                     continue
 
                 if TABLE_HEADER_RE.match(stripped):
@@ -132,10 +133,12 @@ def parse_md_files(paths: Iterable[str]) -> list[Item]:
                 if in_table and TC_ROW_RE.match(stripped):
                     cells = split_table_row(stripped)
                     row_dict = dict(zip(table_columns, cells))
+                    # Support both short ("Title") and full ("Test Title/Summary of test cases") column names
+                    title_val = row_dict.get("Title") or row_dict.get("Test Title/Summary of test cases", "")
                     items.append(
                         TestCase(
                             tc_id=row_dict.get("TC ID", "").strip(),
-                            title=clean_title(row_dict.get("Title", "")),
+                            title=clean_title(title_val),
                             pre_conditions=unescape_md(row_dict.get("Pre-conditions", "")),
                             test_steps=unescape_md(row_dict.get("Test Steps", "")),
                             expected_result=unescape_md(row_dict.get("Expected Result", "")),
