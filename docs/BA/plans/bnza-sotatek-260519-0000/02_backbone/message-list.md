@@ -2,10 +2,14 @@
 type: message-list
 status: draft
 created: 2026-06-02
-updated: 2026-07-03
+updated: 2026-07-09
 module: bnza-backbone
 owner: "@hien.duong"
 changelog:
+  - "2026-07-09 | manual | register E-EXBOT-029: status='error' UI display message (uc-monitor-status A7)"
+  - "2026-07-09 | manual | register E-EXBOT-028: LP mint on-chain tx reverted/timeout → lifecycle_state='error', no funds moved"
+  - "2026-07-08 | /ba-do | register E-EXBOT-026 (HL order rejection) and E-EXBOT-027 (KMS provisioning failure)"
+  - "2026-07-07 | /ba-content-audit | fix W-07aed5/W-ab41b6/W-3ac998/W-6e9b17/W-aa9912: register MSG-ERR-101 (IB dup wallet), MSG-SUC-102, MSG-ERR-102..04 (PF on-chain); align MSG-SUC-63/65/66 text + screen refs to v0.9.0; sync PF MSG text with fee-distribution §6 canonical"
   - "2026-07-03 | manual | add MSG-ERR-100 for concurrent rotation block (EF-08); add {bot_list} format spec to MSG-WRN-03"
   - "2026-07-03 | manual | update MSG-ERR-96 and MSG-WRN-03 to reflect client rotation decisions"
   - "2026-07-02 | /ba-start | add E-ADM-026/027/028 for SIWE and 2FA authentication errors"
@@ -286,6 +290,12 @@ changelog:
 | MSG-ERR-98 | ERR | attribution-history (SCR-ADM-23) | "Bot Config ID must be a positive integer." |
 | MSG-ERR-99 | ERR | attribution-history (SCR-ADM-23) | "Position ID must be a valid numeric token ID." |
 | MSG-ERR-100 | ERR | whitelabel (SCR-ADM-02) | "A master wallet rotation is already in progress on this chain. Please wait for it to complete before initiating a new rotation." |
+| MSG-ERR-101 | ERR | ib (SCR-ADM-16) | "This wallet address is already registered as an IB account." |
+| MSG-SUC-102 | SUC | fee-distribution (SCR-ADM-06) | "Distribution triggered successfully." |
+| MSG-ERR-102 | ERR | fee-distribution (SCR-ADM-06) | "Distribution failed. Transaction reverted. Retry next cycle." |
+| MSG-ERR-103 | ERR | fee-distribution (SCR-ADM-06) | "Points must be between 1 and 30." |
+| MSG-ERR-104 | ERR | fee-distribution (SCR-ADM-06) | "Maximum 5 active recipients reached. Deactivate an existing recipient first." |
+| MSG-ERR-105 | ERR | fee-distribution (SCR-ADM-06) | "Monthly allowance cap reached. Distribution disabled until next cycle." |
 | MSG-INF-70 | INF | dashboard (SCR-ADM-01) | "Dashboard data updates every 30s." |
 | MSG-INF-71 | INF | escalations (SCR-ADM-21) | "This escalation has already been acknowledged." |
 | MSG-INF-97 | INF | reports debug bar (SCR-ADM-07) | `"Last request: {endpoint path with params}"` |
@@ -303,12 +313,12 @@ changelog:
 | MSG-SUC-59 | SUC | system-settings (SCR-ADM-09) | "Settings saved." |
 | MSG-SUC-60 | SUC | system-settings (SCR-ADM-09) | "Emergency stop executed. All bots halted." |
 | MSG-SUC-61 | SUC | users (SCR-ADM-17) | "Wallet added to blacklist." |
-| MSG-SUC-62 | SUC | fee-distribution (SCR-ADM-04) | "Recipient saved." |
-| MSG-SUC-63 | SUC | fee-distribution (SCR-ADM-04) | "Recipient deleted." |
+| MSG-SUC-62 | SUC | fee-distribution (SCR-ADM-06) | "Recipient saved." |
+| MSG-SUC-63 | SUC | fee-distribution (SCR-ADM-06) | "Recipient deactivated." |
 | MSG-SUC-64 | SUC | bot (SCR-ADM-20) | [Deprecated — superseded by MSG-SUC-74] |
-| MSG-SUC-65 | SUC | ib (SCR-ADM-07) | "IB partner saved." |
-| MSG-SUC-66 | SUC | ib (SCR-ADM-07) | "IB partner status updated." |
-| MSG-SUC-67 | SUC | ib (SCR-ADM-07) | "IB partner deleted." |
+| MSG-SUC-65 | SUC | ib (SCR-ADM-16) | "IB account created." |
+| MSG-SUC-66 | SUC | ib (SCR-ADM-16) | "IB account status updated." |
+| MSG-SUC-67 | SUC | ib (SCR-ADM-16) | [Deprecated — superseded by deactivation flow] |
 | MSG-SUC-68 | SUC | wl-monitor (SCR-ADM-18) | "Retry queued." |
 | MSG-SUC-69 | SUC | wl-monitor (SCR-ADM-18) | "Force-normalize initiated." |
 | MSG-SUC-70 | SUC | users (SCR-ADM-17) | "Wallet removed from blacklist." |
@@ -381,6 +391,10 @@ changelog:
 | E-EXBOT-022 | `lifecycle_state='closed'` after bot_safe_close — close complete, funds returned | "Bot safely closed. Funds have been returned to your wallet." | 200 |
 | E-EXBOT-023 | No bot record found for user — `GET /api/exbot/status` returns 404 | "No active bot found for this account." | 404 |
 | E-EXBOT-024 | user_redeem hedge close failed — `close_operations.state='residual_hl_liability'` | "User redemption hedge close failed. Manual intervention required." | — (internal alert) |
+| E-EXBOT-026 | HL rejects IOC order at bot-start hedge open | "Hedge order rejected by Hyperliquid. Bot entered Safe Mode." | — (internal alert) |
+| E-EXBOT-027 | Key-provision failed after max 3 retries (KMS or HL approveAgent) | "Key-provision failed for user {wallet_address} after 3 retries. Manual re-trigger required via admin panel." | — (internal alert) |
+| E-EXBOT-028 | LP mint on-chain tx reverted or timed out at bot-start — `bots.lifecycle_state='error'`; no funds moved | "Bot startup failed: LP mint transaction did not complete. No funds were moved. Please try again or contact support." | 502 |
+| E-EXBOT-029 | `bots.status='error'` — bot requires admin intervention; displayed on status screen | "Bot encountered a critical error. Admin intervention required. You may close the bot via emergency close." | 200 |
 | Symbol not found | Symbol removed from Hyperliquid | "Symbol not found" (chart) | User can search another symbol |
 
 ---

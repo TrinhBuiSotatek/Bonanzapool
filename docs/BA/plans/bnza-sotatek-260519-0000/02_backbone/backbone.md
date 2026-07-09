@@ -2,16 +2,29 @@
 type: backbone
 status: in-review
 created: 2026-05-20
-updated: "2026-06-26"
+updated: "2026-07-08"
 owner: "@hien.duong"
 engagement_mode: formal
 lang: en
 priority: P0
 tags: []
-version: "0.7.0"
+version: "0.9.0"
 links:
-  - ../../01_intake/intake.md
+  - ../01_intake/intake.md
 changelog:
+  - "2026-07-08 | manual | bump updated date per PR review"
+  - "2026-07-07 | /ba-start backbone | absorb pf_spec_v1.0, ib_spec_v1.4, ib_spec_v1.5, ib_portal_spec_v1.7, ib_splitter_spec_v1.0, admin_ui_spec_common_v1.2, admin_ui_spec_top_v1.2: PTL-IB Portal added, ACT-08 IB Partner added, FM-ADM-02 upgraded to on-chain PF, FM-ADM-03 upgraded to multi-group IB, FM-IBP and FM-PF feature maps added, auth row for IB Portal added, fee model PF row updated, source traceability updated"
+  - "2026-07-02 | manual | resolve OQ-ADM-027 in FM-ADM-14 description"
+  - "2026-07-02 | /ba-impact | GAP-FRD-01: rewrite FM-ADM-01 description — remove obsolete wl_partners fields, align to wl_codes/wl_members/wl_master_wallets canonical model"
+  - "2026-07-02 | /ba-start intake | absorb auth_spec_v1.1 + admin_ui_spec_top/common v1.1: §8.1 BNZA-ADMIN auth row updated (SIWE+2FA+JWT replaces X-Wallet-Address); PTL-02 Portal Matrix auth layer updated; §11 source traceability updated"
+  - "2026-07-01 | manual | update OQ-ADM-041 and FM-ADM-13: change priority to P1 and mark as deferred pending client confirmation pre-launch"
+  - "2026-07-01 | manual | key-provision arc update: FM-XB-02 (11 queues), FM-XB-05 (KMS Signing Lambda), FM-XB-06 (4 endpoints), add FM-XB-09/10/11, Phase 0 Gate NV-3, D1 note, PTL-04 queue count"
+  - "2026-06-30 | manual | fix frontmatter links depth: ../../01_intake → ../01_intake"
+  - "2026-06-30 | manual | resolve OQ-ADM-030 and OQ-ADM-031 in FM-ADM-15: specify role gate viewer+ and API endpoint GET /api/admin/tokens/attribution-history"
+  - "2026-06-30 | manual | update FM-ADM-06: remove user activity from reports scope, split fee collection breakdown, and integrate bot API for performance"
+  - "2026-06-30 | manual | remove deactivate WL partner reference in permissions matrix and feature map"
+  - "2026-07-01 | manual | key-provision arc update: FM-XB-02 (11 queues), FM-XB-05 (KMS Signing Lambda), FM-XB-06 (4 endpoints), add FM-XB-09/10/11, Phase 0 Gate NV-3, D1 note, PTL-04 queue count"
+  - "2026-06-30 | manual | P2 OQ scope fix: reroute FM-ADM-13 ACK role gate from OQ-ADM-031 → OQ-ADM-041"
   - "2026-06-26 | manual | update backlog item 1 to reflect that rotation-trigger endpoint is implemented"
   - "2026-06-18 | /ba-do backbone-fix | §5.2: add FM-ADM-13/14/15 (post-launch backlog screens); update FM-ADM-01 (wl_payout_failures removal note), FM-ADM-05 (UNION revenue logic), FM-ADM-06 (raw USDC display model), FM-ADM-10 (deep reorg alert); §8.10.8: expand backlog items 7-9"
   - "2026-06-18 | /ba-do hld-decisions | §5.4 FM-XB-07/08: drop park/redeploy, update states; §8.7: strategy dispatch pattern + PositionManager NFT custody + emergencyTransfer Operator-only; §8.9.2 Phase 0: remove multiSig; §8.9.6: update bot_safe_close rule"
@@ -26,12 +39,12 @@ changelog:
   - "2026-06-01 | manual | add §8.8 WL+MLM System Architecture: inline 3-layer structure, money flow, terminology, rank/title tables, title differential method, distribution pipeline — BA doc self-contained"
   - 2026-06-01 | manual | consolidate PTL-07 (WL Mobile) into PTL-01 (BNZA-MOBILE) as single WL Mobile module; remove PTL-07 row; rewrite FM-MOB feature map (remove EXBOT/Margin, add Reward/Claim/Community/SIWE); update permissions, auth model, dependencies
   - 2026-06-01 | manual | add 2-line delivery structure; add WL+MLM modules (wl-admin PTL-06, wl-mobile PTL-07); add ACT-07 WL Operator Admin; update portal matrix, permissions, feature map, dependency table
-  - "2026-06-01 | manual | absorb WL_SPEC §7B/§7C: add 3 BNZA→WL API streams to dependency table; updated: 2026-06-01"
+  - "2026-06-01 | manual | absorb WL_SPEC §7B/§7C: add 3 BNZA→WL API streams to dependency table; updated: "2026-07-08"
   - "2026-05-27 | manual | meeting 2026-05-27: revised §7 priority (EXBOT removed from Tier 0, MLM-first, June 2 date); flagged 10k bot scale as under review"
   - "2026-05-26 | manual | update from SPEC v5.2.5 + ECOSYSTEM_OVERVIEW v2.0: added §8.7 EXBOT contract architecture (BnzaExVault Option C), Phase 0 gate note in §5.4 FM-XB"
   - "2026-05-26 | manual | sync client-docs: updated §8.2 fee model with PF ratio split (0.2970075 vs 0.2985 per convert_to_usdc); added Router v2.2.2 breaking changes note"
   - "2026-05-21 | manual | codebase audit: corrected tech stacks, portal matrix versions, deployment topology, added §8.7 Codebase Maturity Assessment, updated OQ status"
-  - "2026-05-20 | /ba-start | resolved OQ-1: Monorepo, updated §8.4 deployment topology"
+  - "2026-05-20 | /ba-start | resolved OQ-INTAKE-001: Monorepo, updated §8.4 deployment topology"
   - 2026-05-20 | /ba-start | initial backbone from intake
 ---
 # BNZA Ecosystem — SOTATEK Scope: Requirements Backbone
@@ -66,6 +79,7 @@ changelog:
 | ACT-05 | Trader | Perpetuals trader on the EX platform (Hyperliquid) | Wallet connect (direct Hyperliquid, no OPERATOR) |
 | ACT-06 | OPERATOR (System) | Backend automation — cron jobs, relayers, queue consumers | Internal (no user auth, system-level) |
 | ACT-07 | WL Operator Admin | WL operations team — monitors/operates daily reward distribution, manages referral tree, handles incidents | SSO (Cloudflare Access) + 2FA (TOTP) |
+| ACT-08 | IB Partner | Introducing Broker referral agent, manages recipient wallets (groups) and views downline/rewards on the IB portal | SIWE + 2FA TOTP + JWT |
 
 ---
 
@@ -74,25 +88,27 @@ changelog:
 | Portal ID | Domain | Project | Tech Stack (verified 2026-05-21) | Hosting | Auth Layer |
 |-----------|--------|---------|------------|---------|------------|
 | PTL-01 **[OOS — Helix scope]** | wl.bnza.io (TBD) | WL Mobile | Vite + React 19 + TS 5.9 + Zustand + Tailwind 4 + shadcn/ui + Reown AppKit + PWA | CF Pages | SIWE/JWT (24h) |
-| PTL-02 | ops.bnza.io | BNZA-ADMIN | React 19.2 + Vite 8.0 + TS 5.9 + Tailwind 4.2 + shadcn/ui + React Router 7.14 + TanStack Query 5.100 | CF Pages | Wallet + CF Access + RBAC |
+| PTL-02 | ops.bnza.io | BNZA-ADMIN | React 19.2 + Vite 8.0 + TS 5.9 + Tailwind 4.2 + shadcn/ui + React Router 7.14 + TanStack Query 5.100 | CF Pages | CF Access (outer) + SIWE + 2FA TOTP + JWT; RBAC |
 | PTL-03 | ex.bnza.io | BNZA-EX | React 18.3 + Vite 6.0 + JavaScript (no TS) + Wagmi 3.6 + @nktkas/hyperliquid 0.32 | CF Pages | Wallet (direct HL) |
-| PTL-04 | api.bnza.io/exbot | BNZA-EXBOT Infra | CF Workers (standalone `apps/bnza-exbot/`) + D1 (ExBot schema) + 8 Queues + DO (3: HLRateLimitDO, UserLockDO, MarketDataDO) | CF Workers | Internal (service binding from OPERATOR) |
+| PTL-04 | api.bnza.io/exbot | BNZA-EXBOT Infra | CF Workers (standalone `apps/bnza-exbot/`) + D1 (ExBot schema) + 11 Queues + DO (3: HLRateLimitDO, UserLockDO, MarketDataDO) | CF Workers | Internal (service binding from OPERATOR) |
 | PTL-05 | pool.bnza.io | BNZA-POOL Steps 7-8 | Next.js 16.2 + React 19.2 + TS 5.9 + Tailwind 4 + shadcn/ui + Wagmi 2.19 + TanStack Query 5.94 | Vercel | Wallet |
 | PTL-06 **[OOS — Helix scope]** | wl-admin.bnza.io (TBD) | WL Admin System (bnza-wl-admin) | CF Pages (frontend) + CF Workers (backend/cron) + CF D1 (25 tables) + CF Queues | CF Pages + CF Workers | SSO (CF Access) + 2FA (TOTP mandatory); roles: Super / Operator / Read-only |
+| PTL-IB | ib.bnza.io | IB Portal | React 19 + Vite 8.0 + TS 5.9 + Tailwind 4.2 + shadcn/ui (same stack as PTL-02) | CF Pages | SIWE + 2FA TOTP + JWT |
 
 ---
 
 ## 3. Permissions Matrix — Cross-Project (Actor × Portal Access)
 
-| Actor | PTL-01 WL MOBILE **[OOS]** | PTL-02 ADMIN | PTL-03 EX | PTL-04 EXBOT Infra | PTL-05 POOL | PTL-06 WL Admin **[OOS]** |
-|-------|:---:|:---:|:---:|:---:|:---:|:---:|
-| ACT-01 End User | — | — | Full | — | Full | — |
-| ACT-02 WL Partner | View earnings | — | — | — | — | — |
-| ACT-03 WL End User **[OOS — Helix scope]** | Full | — | — | — | — | — |
-| ACT-04 Admin (zen) | — | Full | — | Config | Full | — |
-| ACT-05 Trader | — | — | Full | — | — | — |
-| ACT-06 OPERATOR | — | — | — | Full (system) | — | — |
-| ACT-07 WL Operator Admin **[OOS — Helix scope]** | — | — | — | — | — | Full |
+| Actor | PTL-01 WL MOBILE **[OOS]** | PTL-02 ADMIN | PTL-03 EX | PTL-04 EXBOT Infra | PTL-05 POOL | PTL-06 WL Admin **[OOS]** | PTL-IB IB Portal |
+|-------|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| ACT-01 End User | — | — | Full | — | Full | — | — |
+| ACT-02 WL Partner | View earnings | — | — | — | — | — | — |
+| ACT-03 WL End User **[OOS — Helix scope]** | Full | — | — | — | — | — | — |
+| ACT-04 Admin (zen) | — | Full | — | Config | Full | — | — |
+| ACT-05 Trader | — | — | Full | — | — | — | — |
+| ACT-06 OPERATOR | — | — | — | Full (system) | — | — | — |
+| ACT-07 WL Operator Admin **[OOS — Helix scope]** | — | — | — | — | — | Full | — |
+| ACT-08 IB Partner | — | — | — | — | — | — | Full |
 
 **Legend**: Full = all features; Config = API management endpoints only; View earnings = read-only dashboard; — = no access
 
@@ -120,7 +136,7 @@ changelog:
 
 | Action | ACT-04 Admin (zen) |
 |--------|:---:|
-| WL Partner onboarding (create/edit/deactivate) | ✅ |
+| WL Partner onboarding (create/edit/suspend/resume) | ✅ |
 | WL Partner earnings tracking | ✅ |
 | WL Payout history & remittance trigger | ✅ |
 | PF Distribution dashboard (70% user / 30% BNZA) | ✅ |
@@ -147,14 +163,13 @@ changelog:
 
 | Action | ACT-06 OPERATOR (System) | ACT-04 Admin |
 |--------|:---:|:---:|
-| Queue processing (bot-scan, light-check, hedge-sync, reconcile, deep-audit, price-near-stop-audit, partial_repair, user_redeem, notification, metrics-rollup) | ✅ | — |
+| Queue processing (bot-scan, light-check, hedge-sync, reconcile, deep-audit, price-near-stop-audit, partial_repair, user_redeem, notification, metrics-rollup, key-provision) | ✅ | — |
 | Cron execution (deep-audit) | ✅ | — |
 | D1 read/write (ExBot tables) | ✅ | — |
 | Durable Object management (HLRateLimitDO, UserLockDO, MarketDataDO) | ✅ | — |
 | API: start bot (via Operator facade) | — | ✅ |
 | API: status bot (via Operator facade) | — | ✅ |
 | API: close bot (via Operator facade) | — | ✅ |
-| API: agent-key management | — | ✅ |
 | API: margin adjustment | — | ✅ |
 | Hyperliquid adapter calls | ✅ | — |
 
@@ -193,6 +208,20 @@ changelog:
 | Manage Admins & Auth (invite/role/policy) | ✅ | — | — |
 
 **Legend**: Super = all features; Operator = distribution ops + tree + refill, no settings; Read-only = view only
+
+### 4.8 IB Partner Portal (PTL-IB)
+
+| Action | ACT-08 IB Partner |
+|--------|:---:|
+| Connect via SIWE + 2FA setup & validation | ✅ |
+| View Dashboard KPIs (rewards, TVL, recent distributions) | ✅ |
+| View User Management list and detail modal | ✅ |
+| Reassign downline user to a different group | ✅ |
+| Configure default group (mandatory setup wizard) | ✅ |
+| Create/Edit/Archive Group (payout recipe, labels, % share) | ✅ |
+| View Revenue trend graph and breakdowns (By group/recipient/user) | ✅ |
+| Dynamically generate and view referral link QR codes | ✅ |
+| Claim unclaimed USDC on-chain from IBSplitter | ✅ |
 
 ---
 
@@ -250,7 +279,7 @@ changelog:
 
 | Sub-module | Description | Priority | Effort |
 |------------|-------------|----------|--------|
-| FM-ADM-01: WL Partner Onboarding + Member + Master Wallet Management | Create/edit/deactivate WL partner records: name, logo (CF R2), referral code (auto 8-char or manual), deposit tier (1k/5k/10k), main wallet, languages, status. View partner earnings summary + payout history. **Thêm mới (WL_SPEC v1)**: (a) wl_members lifecycle — register member (wallet + wl_code), two-phase leave (pending_unset → unset confirmed → left), rejoin (membership_epoch++); (b) wl_master_wallets per chain — địa chỉ nhận net thay WL pool, rotation two-phase (unset old → set new on-chain); (c) wl_codes.status suspend/resume — dừng toàn bộ delivery cho WL. **Removed (v1.7.6):** `wl_payout_failures` table UI đã bị xóa khỏi scope — failure-queue screen không còn trong BNZA-ADMIN; failure handling chuyển sang GC cron (§8.10.8 backlog item 7). | P0 | 1.5w |
+| FM-ADM-01: WL Partner Onboarding + Member + Master Wallet Management | Manages `wl_codes` (create/suspend/resume, rotate api_key), `wl_members` lifecycle (register, two-phase leave, rejoin — membership_epoch++), and `wl_master_wallets` per chain (register, two-phase rotation). `wl_partners` table is obsolete/superseded by `wl_codes` (migration 0028). **Removed (v1.7.6):** `wl_payout_failures` table UI removed from scope — failure handling moved to GC cron (§8.10.8 backlog item 7). | P0 | 1.5w |
 
 > **[EXPANDED SCOPE — WL_SPEC_SOTATEK_EN_v1.0 §6, §9.2, §9.3]**
 > Client spec cũ (WL_SPEC.md §1): chỉ nói "WL code issuance + WL pool wallet registration" — không có member lifecycle.
@@ -271,15 +300,12 @@ changelog:
 > **wl_master_wallets**: bookkeeping-only endpoints; on-chain rotation (★ F-3) is Layer B cron, not these endpoints.
 > **api_key vs secret**: `POST /codes` returns `api_key` (public identifier, `wlk_` prefix). HMAC secret is NEVER stored in D1 — BNZA places it in `WL_API_SECRETS` Workers Secret out of band. FE never handles the secret.
 
-| FM-ADM-02: PF Distribution Config | Off-chain tracking và config UI cho PF recipients. **Scope giảm so với trước**: PF on-chain vẫn về `pfCollector` single EOA (0xa5B8...C969) — không có BnzaSplitter contract interaction. UI chỉ manage `fee_distributions` table (ai nhận bao nhiêu, off-chain config) và display PF collection history. | P0 | 0.5w |
+| FM-ADM-02: PF Distribution Config (NEW — pf_spec_v1.0) | Configuration and automated payout of Performance Fee (PF) via on-chain contract. Configures allocated points (1–30) and scopes per recipient on the ops `/pf` page, and sets operators of `PFDistributor`. | P1 | 0.5w |
 
-> **[SCOPE REDUCTION — WL_SPEC_SOTATEK_EN_v1.0 §1.2 vs WL_SPEC.md cũ §5]**
-> Client spec cũ định nghĩa BnzaSplitter contract — on-chain immediate distribution tới 10 recipients.
-> Spec mới loại BnzaSplitter khỏi v1. BNZA tự handle PF distribution off-chain trong v1.
-> FM-ADM-02 không cần: gọi BnzaSplitter setters, trigger on-chain distribution, manage groupId.
-> FM-ADM-02 chỉ cần: manage fee_distributions rows (wallet + share + is_remainder) + display history.
+> **[SCOPE UPGRADE — pf_spec_v1.0_EN.md]**
+> Replaced the v1 off-chain config model with a full on-chain batch distribution system via the `PFDistributor` contract on OP and Base. Accumulated USDC in the `pfCollector` EOA is distributed daily at 13:00 JST to configured recipients (max 5) based on allocated points (1-30). SOTATEK implements the deployment, daily aggregation batch script, and the configuration UI page.
 
-| FM-ADM-10: WL Bot Lifecycle Monitor | Monitor screen cho `wl_activation_status` backlog: pending_set SLA, failed_set queue, needs_repair alerts, rotation in progress, wl_unattributed_events SLA breach. Admin actions: retry set, force-normalize (two-phase: unset confirmed + on-chain==0 read → NULL). Trigger setBotWlMaster/unsetBotWlMaster via OPERATOR API. **Deep reorg rule:** if chain reorganization depth > 5 blocks, OPERATOR does NOT auto-correct — emits `block_hash` divergence alert; admin must handle manually (no automated recovery path in v1). | P1 | 0.5w |
+| FM-ADM-10: WL Bot Lifecycle Monitor *(alias: Activation-status Monitor)* | Provides counts of bots stuck in WL activation state transitions (`pending_set`, `failed_set`, `needs_repair` due to on-chain wallet address mismatch), enabling admins to detect connectivity failures and trigger retry or force-normalize. Monitor screen for `wl_activation_status` backlog: pending_set SLA, failed_set queue, needs_repair alerts, rotation in progress, wl_unattributed_events SLA breach. Admin actions: retry set, force-normalize (two-phase: unset confirmed + on-chain==0 read → NULL). Trigger setBotWlMaster/unsetBotWlMaster via OPERATOR API. **Deep reorg rule:** if chain reorganization depth > 5 blocks, OPERATOR does NOT auto-correct — emits `block_hash` divergence alert; admin must handle manually (no automated recovery path in v1). | P1 | 0.5w |
 
 > **[NEW FEATURE — WL_SPEC_SOTATEK_EN_v1.0 §5.1.1, §5.1.2, §6.3, §11]**
 > Spec mới định nghĩa 6-state WL bot activation machine:
@@ -289,18 +315,51 @@ changelog:
 > "Force-normalize" là two-phase: không thể chỉ set DB=NULL nếu on-chain wlMaster còn set —
 > user stop sau đó sẽ vẫn gửi net đến master (sai intent).
 > Downstream khi /ba-impact: bnza-admin FRD cần FM-ADM-10 section + SRS cần 1 screen mới.
-| FM-ADM-03: IB Management | Replace mockIBs with real D1 data (ib_partners table). CRUD: name, wallet, commission_rate, status. | P1 | 0.5w |
-| FM-ADM-04: Bot Type Config | Complete partial impl: deposit tiers, cooldown range (10–180 min), EXBOT strategy params (hedge_ratio/leverage/stop_safety_factor — zen provides values). | P1 | 0.5w |
-| FM-ADM-05: Dashboard | Real metrics: active bot count, total AUM, daily revenue, total users, EXBOT count. From OPERATOR `/api/admin/stats` (KV-cached, 5 min TTL). **Revenue logic (v1.7.6):** overall daily revenue = UNION of `fee_collections` (LP/EXBOT bots) + `wl_bot_payouts` (WL bots, adds opFee/PF columns from migration 0026); NULL opFee/PF = reconciliation pending; 0 = dust threshold. | P2 | 0.5w |
-| FM-ADM-06: Reports | Real-data reports: fee collection, bot performance, user activity, WL OpFee/PF Breakdown per-WL aggregated. Date-range queries. **Display model (v1.7.6):** payout/ledger views display raw on-chain USDC amounts (not virtual USD estimates) — sourced from `wl_bot_payouts.opfee_usdc` + `pf_usdc` columns (migration 0026). Fee Collection Report columns: bot_id, bot_type, wl_code, gross_fee_usd, opfee_usd (treasury deduction), pf_usd (pfCollector deduction), net_usd. | P2 | 0.5w |
+
+| FM-ADM-03: IB Partner Management (NEW — ib_spec_v1.4 & ib_spec_v1.5) | Introducing Broker (IB) management (ops.bnza.io `/ib` Codes and Members tabs) to manage IB accounts, user referral bindings, group codes `{main}-G{n}`, and config operators of the `IBSplitter` contract. | P1 | 0.5w |
+
+> **[DATA MODEL REWRITE — ib_spec_v1.4_EN.md & ib_spec_v1.5_EN.md]**
+> The flat `commission_rate` field is replaced by `ib_groups` + `ib_group_wallets` + per-group `group_code` + `is_default` tables. Distribution is bps-based per recipient per group, executed on-chain via `IBSplitter` within the same transaction as collect (compound prohibited). v1.4 is retained as historical comparison reference for transition to v1.5.
+
+| FM-ADM-04: Bot Type Config | Complete partial impl: deposit tiers, cooldown range (10–180 min), EXBOT strategy params (hedge_ratio/leverage/stop_safety_factor). Excludes `deposit_tiers_usd` for `LPBOT` configuration completely. | P1 | 0.5w |
+| FM-ADM-05: Dashboard *(alias: Overall Revenue Dashboard)* | Provides a full ecosystem revenue picture by automatically UNIONing PF collected from both regular bots and WL partner bots. TVL calculated on-chain, AUM, users, EXBOT count, daily revenue. TVL data from `tvl_history` lightweight log table. Right guide panel removed (3-region layout), iPad & laptop responsiveness. | P2 | 0.5w |
+| FM-ADM-06: Reports *(alias: Fee Collection Report & Overall Revenue Dashboard)* | Provides reports: fee collection, bot performance, WL OpFee/PF Breakdown. Date-range queries. Sourced from `wl_bot_payouts.opfee_usdc` + `pf_usdc` (raw USDC amounts). TVL trend graph removed (uses `tvl_history`). | P2 | 0.5w |
 | FM-ADM-07: TOKEN Mgmt | Burn/supply/vesting/treasury/builder-fee (keep mock, BNZA Token contract NOT in SOTATEK scope). | P3 | — |
-| FM-ADM-08: System Settings | Manage system_config key-value pairs (global_bot_enabled, access_mode, max_bots_per_user, safe_mode, exbot_enabled, etc.). Show current value + last modified. | P2 | 0.5w |
+| FM-ADM-08: System Settings | Manage system_config key-value pairs (global_bot_enabled, access_mode, max_bots_per_user, safe_mode, exbot_enabled, etc., including `min_range_width_percent` limit $\ge 0.1\%$ to prevent gas drain). | P2 | 0.5w |
 | FM-ADM-09: Relayer Monitor | Relayer status: wallet address, ETH balance, last tx hash + timestamp, health (balance > threshold). | P2 | 0.5w |
 | FM-ADM-11: User Management | View and manage all registered users: wallet address, role (viewer/admin/super_admin), registration date, linked bots count. Read-only list with RBAC-based action controls (super_admin only for block/unblock). | P1 | — |
 | FM-ADM-12: Audit Log Viewer | Paginated, filterable read-only viewer for all audit log entries (NFR-ADM-005). Filters: date range (max 90 days), module, action, actor. Detail drawer shows old/new values. Append-only — no edit/delete. | P0 | 0.5w |
-| FM-ADM-13: Escalations Dashboard | Provides admin visibility into WL SLA violations by surfacing `wl_escalations` records (migration 0029) that have been unresolved for > 24h. Escalation kinds covered: `failed_set`, `needs_repair`, `hold_sla`, `manual_reconcile_sla`, `unattributed_sla`, `master_not_configured`. Admin and above can acknowledge open escalations to clear the alert queue. Role gate for ACK action: `admin+` *(TBD — OQ-ADM-031)*. | P2 | 0.5w |
-| FM-ADM-14: Holds / Corrections Review | Allows admin to monitor `wl_holds` records (migration 0026) generated by chain reorgs or corrections, ensuring zero-loss WL reconciliation. Displays hold reason, raw USDC amount, affected bot/WL, and Helix ACK status. Helix performs the financial ACK via its own `/api/wl/ledger/ack` endpoint (external). BNZA admin write action (e.g., mark-acknowledged): *(TBD — OQ-ADM-032)*; provisionally read-only. | P2 | 0.5w |
-| FM-ADM-15: Attribution History Viewer | Provides a read-only audit trail of per-bot WL attribution intervals from `wl_token_attribution_history` (migration 0026). Shows which WL partner, membership epoch, and master wallet each bot was attributed to for a given block range. Used for reconciliation and dispute resolution between BNZA and Helix. Role gate: `viewer+` *(TBD — OQ-ADM-031)*. Admin API endpoint: *(TBD — OQ-ADM-030)*. | P2 | 0.5w |
+| FM-ADM-13: Escalations Dashboard | Provides admin visibility into WL SLA violations by surfacing `wl_escalations` records (migration 0029) that have been unresolved for > 24h. Escalation kinds covered: `failed_set`, `needs_repair`, `hold_sla`, `manual_reconcile_sla`, `unattributed_sla`, `master_not_configured`. Admin and above can acknowledge open escalations to clear the alert queue. Role gate for ACK action: `admin+` (both `admin` and `super_admin` roles have acknowledge permission; viewers are read-only). | P1 | 0.5w |
+| FM-ADM-14: Holds / Corrections Review | Allows admin to monitor `wl_holds` records (migration 0026) generated by chain reorgs or corrections, ensuring zero-loss WL reconciliation. Displays hold reason, raw USDC amount, affected bot/WL, and Helix ACK status. Helix performs the financial ACK via its own `/api/wl/ledger/ack` endpoint (external). BNZA admin write action (e.g., mark-acknowledged): read-only on frontend (status overrides resolved on DB/runbook level, OQ-ADM-027 resolved). | P2 | 0.5w |
+| FM-ADM-15: Attribution History Viewer | Provides a read-only audit trail of per-bot WL attribution intervals from `wl_token_attribution_history` (migration 0026). Shows which WL partner, membership epoch, and master wallet each bot was attributed to for a given block range. Used for reconciliation and dispute resolution between BNZA and Helix. Role gate: `viewer+` (viewer, admin, super_admin can all view). Admin API endpoint: `GET /api/admin/tokens/attribution-history`. | P2 | 0.5w |
+
+### 5.2B IB Partner Portal (PTL-IB) — (Priority: P1 — Post-WL)
+
+**Actor**: ACT-08 (IB Partner) | **Role**: Self-manage referral groups, recipients, and view downline statistics & rewards
+**Folder**: `03_modules/ib/`
+
+| Sub-module | Description | Priority | Effort |
+|------------|-------------|----------|--------|
+| FM-IBP-01: Dashboard | Displays rewards KPI cards (Your rewards / Group rewards / TVL), dynamic referral-link QR codes, and recent distributions (9 columns). TVL is direct on-chain read. | P1 | 0.5w |
+| FM-IBP-02: User Management | View downline users list with active status and group detail. Allows reassigning users to different groups (15/page pagination). | P1 | 0.5w |
+| FM-IBP-03: Group Management | Create, edit, and archive groups. Mandatory initial-setup wizard on first login to create the default group. Recipe supports max 10 wallets, allocation in % (1 bps precision). | P1 | 0.5w |
+| FM-IBP-04: Revenue & Breakdowns | Displays rewards trend graph and breakdowns (By group / By recipient / By user) with filters and pagination. | P1 | 0.5w |
+| FM-IBP-05: IBSplitter Integration | Integrates with `IBSplitter` contract to execute on-chain immediate Net splitting by bps, and claim unclaimed USDC. | P1 | 0.5w |
+
+---
+
+### 5.2C PF Distribution System (PTL-02/PF) — (Priority: P1 — Post-WL)
+
+**Actor**: ACT-04 (Admin/zen) for config UI | ACT-06 (OPERATOR) for daily batch
+**Folder**: `03_modules/pf/`
+
+| Sub-module | Description | Priority | Effort |
+|------------|-------------|----------|--------|
+| FM-PF-01: Ops PF Configuration UI | Admin CRUD PF recipients on ops `/pf` page. Max 5 active recipients. Configures label, wallet, allocated points (1-30), and channel scopes (normal/WL/IB). Blocklist validation. | P1 | 0.5w |
+| FM-PF-02: Daily Aggregation Batch | Batch cron running daily at 13:00 JST. Scans USDC transfers to `pfCollector`, aggregates by channel (WL/IB/normal), fallbacks unattributed >72h. Verification of `processedBatch(batchId)` to prevent double-pay. | P1 | 0.5w |
+| FM-PF-03: PFDistributor Integration | Integrates with `PFDistributor` contract (UUPS) on OP and Base. Pulls USDC from treasury monthly allowance monthly cap, distributes to recipients in a single transaction. | P1 | 0.5w |
+
+---
 
 ### 5.3 BNZA-EX (Priority: P2 — Non-blocking)
 
@@ -315,17 +374,20 @@ changelog:
 | Sub-module | Description | Priority | Effort |
 |------------|-------------|----------|--------|
 | FM-XB-01: D1 Schema | 5 primary tables (bots, bot_runtime_state, hedge_legs, hl_agent_keys, queue_idempotency); optimistic concurrency via state_version guard | P0 | 0.5w |
-| FM-XB-02: Queue Topology | 10 queues: bot-scan, light-check, hedge-sync, reconcile, deep-audit, price-near-stop-audit, partial_repair, user_redeem (highest priority, SLA 5 min), notification, metrics-rollup | P0 | 1w |
+| FM-XB-02: Queue Topology | 11 queues: bot-scan, light-check, hedge-sync, reconcile, deep-audit, price-near-stop-audit, partial_repair, user_redeem (highest priority, SLA 5 min), notification, metrics-rollup, key-provision (deposit-triggered, chain indexer → KMS key gen → HL approveAgent → bot-start) | P0 | 1w |
 | FM-XB-03: Durable Objects | HLRateLimitDO (sliding-window, 800 weight/min budget), UserLockDO (lease-based 90s TTL, 1-user mutex), MarketDataDO (sqrtPriceX96/tick cache) | P0 | 0.5w |
 | FM-XB-04: Cron Jobs | `*/360 * * * *` deep-audit + hourly metrics-rollup + 6h stop-integrity scan | P1 | 0.5w |
-| FM-XB-05: HL Adapter | Rate limit (1,200 wt/min, BNZA budget 800), cloid deterministic generation, nested error parser, delta-only adjustShortDelta, post-order reconcile, agent key decrypt | P1 | 1w |
-| FM-XB-06: API Endpoints (Operator Facade) | `/api/exbot/*` proxy: start, status, close, agent-key, margin — OPERATOR forwards to ExBot Worker via service binding; ExBot NOT public | P1 | 1w |
+| FM-XB-05: HL Adapter | Rate limit (1,200 wt/min, BNZA budget 800), cloid deterministic generation, nested error parser, delta-only adjustShortDelta, post-order reconcile, agent key signing via KMS Signing Lambda | P1 | 1w |
+| FM-XB-06: API Endpoints (Operator Facade) | `/api/exbot/*` proxy: start, status, close, margin — OPERATOR forwards to ExBot Worker via service binding; ExBot NOT public | P1 | 1w |
 | FM-XB-07: Lifecycle State Machine | 18 states: idle→preflight→lp_opening→lp_opened→hedge_pre_open→hedge_post_confirmed→stop_placing→stop_verified→active; runtime: hedge_stopped_cooldown, lp_rebalancing, lp_closing, closed, safe_mode, error; PAUSED=status-level only. Note: `cooldown` and `parked` lifecycle states removed (park/redeploy feature dropped per client HLD decision 2026-06-18) | P0 | 1w |
 | FM-XB-08: Close/Redeem Operations | Two systems: (A) user_redeem = LP-first instant redemption (on-chain guarantee, hedge close SLA 5 min); (B) bot_safe_close = hedge-first, USDC returned to user via RedemptionQueue FIFO fulfill (park/redeploy loop dropped per HLD 2026-06-18); close_operations idempotency ledger prevents double settlement | P0 | 0.5w |
+| FM-XB-09: Key-Provision Worker | Deposit-triggered KMS key generation pipeline: chain indexer (Fargate) detects on-chain deposit → enqueues key-provision job → worker generates master key + agent key entirely inside AWS KMS (private keys never leave HSM) → registers agent key with HL via `approveAgent` → sets `hl_agent_keys.key_status='active'` → enqueues bot-start | P0 | 1w |
+| FM-XB-10: Chain Indexer (Fargate) | Always-on ECS Fargate task watching on-chain deposit events for BnzaExVault; producer for key-provision queue; in-scope as part of ExBot infrastructure | P0 | 0.5w |
+| FM-XB-11: AWS KMS Integration + Signing Lambda | AWS KMS HSM custody for all private keys (master key + agent key per user); Signing Lambda holds `kms:Sign` IAM role; all HL order signing routed through Signing Lambda — no key material ever reaches CF Workers; replaces prior agent key decrypt path | P0 | 1w |
 
-> **EXBOT Phase 0 Gate (blocks Phase A start)**: Prerequisites per SPEC v5.2.6 §0.3 — (1) zen approves SPEC v5.2.6; (2) BnzaExVault deployed, Base + OP addresses/operator finalized (2 sets) — multiSig no longer required for emergencyTransfer (Operator-only when paused, per HLD 2026-06-18); (3) HL agent key encryption method confirmed; (4) WL stability gate — 7 consecutive days post-launch with zero SAFE_MODE + no major incident. Before all 4 met: SOTATEK prepares D1 schema + Queue skeleton only — no HL integration.
+> **EXBOT Phase 0 Gate (blocks Phase A start)**: Prerequisites per SPEC v5.2.6 §0.3 — (1) zen approves SPEC v5.2.6; (2) BnzaExVault deployed, Base + OP addresses/operator finalized (2 sets) — multiSig no longer required for emergencyTransfer (Operator-only when paused, per HLD 2026-06-18); (3) AWS KMS key custody verified: master key + agent key generation pipeline confirmed end-to-end (key-provision worker → KMS → HL approveAgent); (4) WL stability gate — 7 consecutive days post-launch with zero SAFE_MODE + no major incident. Before all 4 met: SOTATEK prepares D1 schema + Queue skeleton only — no HL integration.
 
-> **D1 Architecture (2 DBs)**: `control_db` (users, bot_registry, shard_registry, hl_agent_keys) + `state_db_shard_xx` (bots, positions, hedge_legs, bot_runtime_state, circuit_breakers, rebalance_attempts, lp_operations, close_operations, queue_idempotency, funding_daily_metrics, hourly/daily_bot_metrics). Phase A: 1 shard; Phase B: 4; Phase C: 16 (deferred). R2 archive + Analytics Engine: Phase B+.
+> **D1 Architecture (2 DBs)**: `control_db` (users, bot_registry, shard_registry, hl_agent_keys — stores key metadata + key_status only; private keys generated and retained in AWS KMS HSM, never stored in D1) + `state_db_shard_xx` (bots, positions, hedge_legs, bot_runtime_state, circuit_breakers, rebalance_attempts, lp_operations, close_operations, queue_idempotency, funding_daily_metrics, hourly/daily_bot_metrics). Phase A: 1 shard; Phase B: 4; Phase C: 16 (deferred). R2 archive + Analytics Engine: Phase B+.
 
 ### 5.5 BNZA-POOL Steps 7-8 (Priority: P1 — Post-WL)
 
@@ -383,6 +445,10 @@ changelog:
 | MOBILE → Router/LPBot | Bot start/stop (user wallet TX, zapMint/stop) | On-chain (user wallet signs) | No (existing) |
 | ADMIN → OPERATOR | WL, PF, IB, Bot config, TOKEN endpoints | REST API (admin role) | Yes |
 | ADMIN → OPERATOR | WL bot lifecycle: setBotWlMaster, unsetBotWlMaster, wl_activation_status transitions, wl_members CRUD, wl_master_wallets CRUD | REST API (admin role) + on-chain tx via OPERATOR Relayer | Yes |
+| IB Portal (PTL-IB) → OPERATOR | Downline users, groups, user assignments, rewards, SIWE auth | REST API (SIWE/JWT) | Yes |
+| IB Portal (PTL-IB) → IBSplitter (on-chain) | Read TVL/LP valuation, fetch distribution events | Web3 read / RPC | Yes |
+| ADMIN (PTL-02) → PFDistributor (on-chain) | Configure operators, monitor unclaimed balances | Web3 read/write / RPC | Yes |
+| OPERATOR (cron) → PFDistributor (on-chain) | Execute daily 13:00 JST batch payout transaction | Web3 transaction / RPC | Yes |
 
 > **[NEW DEPENDENCY — WL_SPEC_SOTATEK_EN_v1.0 §5.1, §6.3, §9.1–§9.3]**
 > Trước: BNZA-ADMIN chỉ quản lý static WL partner config (wl_codes, wl_pool_wallets).
@@ -393,13 +459,13 @@ changelog:
 >   pending_set / active / failed_set / pending_unset / needs_repair.
 | ADMIN → EXBOT Infra | EXBOT management endpoints | Via OPERATOR API | Partial |
 | EXBOT Infra → OPERATOR | OPERATOR proxies `/api/exbot/*` into ExBot Worker via service binding + internal token | CF service binding (Worker-to-Worker) | Yes |
-| EXBOT Infra → zen | Interface specs (D1 schema, Queue topology, API contracts) | Documentation | **Blocker** (OQ-2) |
+| EXBOT Infra → zen | Interface specs (D1 schema, Queue topology, API contracts) | Documentation | **Blocker** (OQ-INTAKE-002) |
 | EXBOT Infra → Hyperliquid | Trading API (testnet first) | External API | Yes |
 | **ExBot → WL (future)** | **ExBot replaces/extends LPBot as WL bot engine** | **TBD — integration point Line 1 × Line 2** | **Future milestone** |
 | POOL Step 7 → OPERATOR | `bot-positions` API (multi-bot data) | REST API | Yes |
 | POOL Step 8 → OPERATOR | plan_specs APIs (version, history, current) | REST API (new endpoints) | Yes |
 | POOL Step 8 → ADMIN | Bot plan version management UI, force-stop | Simultaneous deploy | Yes |
-| EX → TradingView | Charting library license | License procurement | **Blocker** (OQ-3 resolved: zen funds) |
+| EX → TradingView | Charting library license | License procurement | **Blocker** (OQ-INTAKE-003 resolved: zen funds) |
 | EX → Hyperliquid | Market data feed | External API (direct) | No |
 
 ---
@@ -420,16 +486,18 @@ changelog:
 ### Line 1 — Tier 1 (Post-WL launch)
 
 5. **BNZA-OPERATOR WL Backend** — FM-OPW-05/06 (WlNetSent scanner, reconcilers)
-6. **BNZA-ADMIN** — FM-ADM-03/04 (IB Mgmt, Bot Type Config)
+6. **BNZA-ADMIN** — FM-ADM-03/04 (IB Partner Mgmt, Bot Type Config)
 7. **POOL Step 7** — FM-PL-01 (Multi-Bot)
+8. **IB Partner Portal** — FM-IBP-01 to FM-IBP-05 (Self-service portal + IBSplitter deployment)
+9. **PF Distribution System** — FM-PF-01 to FM-PF-03 (Ops PF UI + Aggregation Batch + PFDistributor deployment)
 
 > **OOS (Helix scope):** FM-WLA-06/07 (WL Admin multi-tenant + reconciliation), FM-MOB-06/07/09/10 (WL Mobile community + branding + settings + PWA)
 
 ### Line 1 — Tier 2 (Enhancement)
 
-8. **POOL Step 8** — FM-PL-02 (plan_specs Version)
-9. **BNZA-ADMIN** — FM-ADM-05/06/08/09 (Dashboard, Reports, Settings, Relayer)
-10. **EX** — FM-EX-01/02/03 (TradingView)
+10. **POOL Step 8** — FM-PL-02 (plan_specs Version)
+11. **BNZA-ADMIN** — FM-ADM-05/06/08/09 (Dashboard, Reports, Settings, Relayer)
+12. **EX** — FM-EX-01/02/03 (TradingView chart integration)
 
 > **OOS (Helix scope):** FM-MOB-11 (WL Mobile i18n)
 
@@ -452,12 +520,13 @@ changelog:
 
 | Layer | Mechanism | Applies to |
 |---|---|---|
-| Primary | `X-Wallet-Address` header (no signature) | POOL, BNZA-ADMIN → OPERATOR |
-| BNZA-ADMIN | Cloudflare Access (zen@bnza.io) second layer + wallet connect | PTL-02 only |
-| BNZA-ADMIN RBAC | `admin_wallets` table + `/api/me` role check (super_admin / admin / viewer) | PTL-02 endpoints |
+| Primary | `X-Wallet-Address` header (no signature) | POOL → OPERATOR (**⚠️ abolished for BNZA-ADMIN per auth_spec_v1.1**) |
+| BNZA-ADMIN | Cloudflare Access (zen@bnza.io) outer gate (CF level, unchanged) + **SIWE + 2FA TOTP + JWT** (replaces X-Wallet-Address; auth_spec_v1.1). New tables: `auth_nonces`, `admin_2fa`, `admin_2fa_recovery`, `admin_sessions`. Session: 24h sliding / 7d absolute cap. 2FA mandatory in production (RFC 6238 TOTP). Shared BNZA ecosystem auth foundation (adopted by ib.bnza.io). | PTL-02 only |
+| BNZA-ADMIN RBAC | `admin_wallets` table + `/api/me` role check (super_admin / admin / viewer). RBAC guard functions unchanged — only auth entry point replaced. | PTL-02 endpoints |
 | WL-ADMIN | SSO (Cloudflare Access) + 2FA (TOTP mandatory); roles: Super / Operator / Read-only | PTL-06 only |
 | WL Mobile | SIWE (Sign-In with Ethereum) → 24h JWT; tenant resolved by subdomain + signature domain | PTL-01 → PTL-06 Backend |
 | WL post-record (bot start/stop) | HMAC-SHA256 (§7.2 scheme); Helix server → BNZA OPERATOR; server-to-server (CORS N/A); starter wallet passed explicitly by Helix server; anti-spoofing: tx_hash + NPM ownerOf + BotStarted/ZapMintFor event decode (§4.4 finalized v1.1) | `/api/bot-configs/atomic-start`, `/api/bot-configs/:id/stop` (WL path only) |
+| IB Portal | **SIWE + 2FA TOTP + JWT** (24h sliding / 7d absolute cap) — same auth foundation as BNZA-ADMIN (auth_spec_v1.1 shared ecosystem auth). No Cloudflare Access gate. Single role (IB partner). | PTL-IB (ib.bnza.io) |
 | Direct | Wallet connect → Hyperliquid API | PTL-03 only (no OPERATOR) |
 
 ### 8.2 Fee Model (Router v2.2.2)
@@ -466,11 +535,10 @@ changelog:
 |---|---|---|---|
 | Swap fee | 0.5% | Protocol | MOBILE (display), ADMIN (reports) |
 | opFee | 0.5% | Treasury (0x2455...3A0a) | ADMIN (reports) |
-| Performance Fee (PF) | 30% of earnings | pfCollector EOA (0xa5B8...C969) — single account, no on-chain Splitter in v1 | ADMIN (PF Distribution off-chain config) |
+| Performance Fee (PF) | 30% of earnings | pfCollector EOA (0xa5B8...C969); distributed daily via PFDistributor contract | ADMIN (PF Distribution System on-chain) |
 
-> **[SCOPE CHANGE — WL_SPEC_SOTATEK_EN_v1.0 §1.2]**
-> BnzaSplitter removed từ v1. PF distribution off-chain là concern của BNZA (FM-ADM-02).
-> Tất cả module-level artifacts derive từ backbone này — /ba-impact sẽ sync FM-ADM-02 từ note này.
+> **[SCOPE UPGRADE — pf_spec_v1.0_EN.md]**
+> Replaced the v1 off-chain config model with a full on-chain batch distribution system via the `PFDistributor` contract on OP and Base. Accumulated USDC in the `pfCollector` EOA is distributed daily at 13:00 JST to configured recipients.
 | PF Ratio — convert_to_usdc=1 | 0.2970075 of earnings | User receives USDC | POOL (stop flow), MOBILE (earnings display) |
 | PF Ratio — convert_to_usdc=0 | 0.2985 of earnings | User receives native tokens | POOL (stop flow), MOBILE (earnings display) |
 | WL Split | 70% partner / 30% BNZA | WL partner wallets | ADMIN (WL Mgmt), MOBILE (earnings display) |
@@ -503,6 +571,7 @@ changelog:
 | EX | CF Pages | `wrangler pages deploy dist/` | Monorepo (packages/ex) |
 | EXBOT Infra | CF Workers | `wrangler deploy` (`apps/bnza-exbot/` — standalone Worker) | Monorepo (apps/bnza-exbot) |
 | POOL Steps 7-8 | Vercel | Push to `main` (auto-deploy) | Existing repo (separate — not in SOTATEK monorepo) |
+| IB Portal | CF Pages | `wrangler pages deploy dist/` | Monorepo (apps/bnza-ib) |
 
 ### 8.5 Shared Design Language
 
@@ -514,7 +583,7 @@ changelog:
 | i18n | 5 languages (en/ja/zh/ko/vi) | MOBILE, POOL |
 | Wallet | Reown AppKit | MOBILE, ADMIN, POOL |
 
-### 8.6 Testing Standards (per LD — resolved OQ-7)
+### 8.6 Testing Standards (per LD — resolved OQ-INTAKE-007)
 
 | Project | Unit Tests | E2E Tests | Integration Tests |
 |---|---|---|---|
@@ -828,10 +897,10 @@ WL ops team "Helix" logs into WL-ADMIN (PTL-06) to run daily MLM operations
 
 | OQ | Status | Impact on Backbone | Action |
 |---|---|---|---|
-| OQ-1: Monorepo strategy | **Resolved: Monorepo** | Deployment topology updated (§8.4 — monorepo branch strategy) | Done |
-| OQ-2: EXBOT interface specs | Hold (escalate zen) | **Blocker** for FM-XB-01→06 detailed requirements | Escalate immediately; start with known patterns from Queue v2 |
-| OQ-6: PF WL remittance flow | **Resolved** | FM-ADM-02 is off-chain config only. fee_distributions records BNZA's internal PF allocation. WL 70/30 split is Helix's concern — not SOTATEK/BNZA-ADMIN scope (BR-ADM-020). Real API live as of 2026-06-12. | Resolved via uc-pf-distribution.md 2026-06-04; confirmed real API 2026-06-12 |
-| OQ-8: Staging environment | Hold | Affects deployment guide; non-blocking for development | Staging domains defined in deployment guide but not confirmed |
+| OQ-INTAKE-001: Monorepo strategy | **Resolved: Monorepo** | Deployment topology updated (§8.4 — monorepo branch strategy) | Done |
+| OQ-INTAKE-002: EXBOT interface specs | Hold (escalate zen) | **Blocker** for FM-XB-01→06 detailed requirements | Escalate immediately; start with known patterns from Queue v2 |
+| OQ-INTAKE-006: PF WL remittance flow | **Resolved** | FM-ADM-02 is off-chain config only. fee_distributions records BNZA's internal PF allocation. WL 70/30 split is Helix's concern — not SOTATEK/BNZA-ADMIN scope (BR-ADM-020). Real API live as of 2026-06-12. | Resolved via uc-pf-distribution.md 2026-06-04; confirmed real API 2026-06-12 |
+| OQ-INTAKE-008: Staging environment | Hold | Affects deployment guide; non-blocking for development | Staging domains defined in deployment guide but not confirmed |
 
 ---
 
@@ -1062,7 +1131,7 @@ From WL_HANDOVER_EN.md §B — settled decisions, not re-open items:
 2. **Complete FRD cho BNZA-OPERATOR WL Backend** — `03_modules/operator/frd-wl.md` (DONE ✅)
 3. **Emit FRD cho BNZA-MOBILE** — WL gate + LP Bot status (Line 1, P0)
 4. **Emit FRD cho BNZA-ADMIN** — WL Mgmt + PF Distribution (Line 1, P0)
-5. **Escalate OQ-2** — Ask zen for EXBOT interface specs (Line 2 blocker)
+5. **Escalate OQ-INTAKE-002** — Ask zen for EXBOT interface specs (Line 2 blocker)
 
 > **Note:** `wl-admin` (PTL-06) and `wl-mobile` (PTL-01) FRD generation is Helix responsibility — not Sotatek. All files in those modules are kept as reference only (`status: out-of-scope`).
 
@@ -1108,9 +1177,15 @@ From WL_HANDOVER_EN.md §B — settled decisions, not re-open items:
 | Scale requirements | Queue v2 SPEC §1.2 + Roadmap M3 | §8.3 Scale Requirements |
 | Deployment topology | Deployment Guide + codebase audit 2026-05-21 | §8.4 Deployment Topology |
 | Design language | Module SPECs (UI sections) | §8.5 Shared Design Language |
-| Testing standards | Intake §7 (OQ-7 resolved) | §8.6 Testing Standards |
+| Testing standards | Intake §7 (OQ-INTAKE-007 resolved) | §8.6 Testing Standards |
 | EXBOT contract architecture | SPEC v5.2.1 Option C decision | §8.7 EXBOT Contract Architecture |
 | WL+MLM system architecture | WL_SPECv1.7.6_EN.md (all layers); Layer B/C = Helix-owned OOS, kept as reference | §8.8 WL+MLM System Architecture |
 | OQs | Intake §10 (inherited hold items) | §9 Inherited Open Questions |
 | EXBOT strategy SPEC (zen-approved, source of truth for Module 4) | **SPEC_v5.2.6_EN.md** — client-provided external file, NOT in repo. Local path at time of writing: `/Users/hienduong/Downloads/SPEC_v5.2.6_EN.md`. Repo only has v5.2.5 at `docs/bnza-exbot/docs/SPEC_v5.2.5.md`. Key content absorbed inline in §8.9. | §8.9 (formulas, NV items, behavioral rules, Phase 0 conditions) |
 | WL API surface: admin plane vs Helix plane, auth separation, wl_codes/wl_members/wl_master_wallets state machines, api_key/secret separation, v1.7.6 opFee/PF scanner capture, post-launch backlog | **WL_ADMIN_API_GUIDE_EN.md** (absorbed 2026-06-16) + **WL_SPECv1.7.6_EN.md** §3.7.1 (absorbed 2026-06-16) + **WL_SPEC_TO_v1.7.6_DELTA_EN.md** §1/§4/§6 (absorbed 2026-06-16) + **WL_HANDOVER_EN.md** §A/§B/§C (absorbed 2026-06-16). Note: WL_SPEC_TO_v1.7.5_DELTA_EN.md content was applied manually Jun 04 (backbone sync WL_SPEC_SOTATEK_EN_v1.0/v1.1); now formally logged. WL_API_CONNECTION_GUIDE_EN.md is Helix-facing only — no SOTATEK admin impact; logged in intake §13. | §8.10 WL API Surface |
+| Auth model (BNZA-ADMIN & IB Portal) | auth_spec_v1.1_EN.md (SOTATEK client spec, absorbed 2026-07-02) | §8.1 Authentication Model |
+| Admin UI TOP page + common design spec (v1.2) | admin_ui_spec_top_v1.2_EN.md + admin_ui_spec_common_v1.2_EN.md (absorbed 2026-07-06) | §5.2 FM-ADM-05/06, §8.5 Shared Design Language |
+| IB Core Spec (v1.4 & v1.5) | ib_spec_v1.4_EN.md + ib_spec_v1.5_EN.md (absorbed 2026-07-06 / 2026-07-07) | §5.2 FM-ADM-03, §5.2B IB Partner Portal |
+| IB Partner Portal Spec (v1.7) | ib_portal_spec_v1.7_EN.md (absorbed 2026-07-06) | §5.2B IB Partner Portal |
+| IBSplitter Contract Spec (v1.0) | ib_splitter_spec_v1.0_EN.md (absorbed 2026-07-06) | §5.2B FM-IBP-05 IBSplitter Integration |
+| Performance Fee (PF) Spec (v1.0) | pf_spec_v1.0_EN.md (absorbed 2026-07-06) | §5.2 FM-ADM-02, §5.2B IB Partner Portal, §5.2C PF Distribution System |

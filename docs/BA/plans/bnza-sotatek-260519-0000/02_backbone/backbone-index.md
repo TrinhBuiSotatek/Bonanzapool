@@ -2,8 +2,12 @@
 type: backbone-index
 status: draft
 created: 2026-06-08
-updated: 2026-06-17
+updated: "2026-07-08"
 owner: "@hien.duong"
+changelog:
+  - "2026-07-08 | manual | bump updated date per PR review"
+  - "2026-07-02 | manual | update §8.1 Auth Model with SIWE+2FA+JWT specifications for BNZA-ADMIN"
+  - "2026-06-30 | manual | resolve OQ-ADM-030 and OQ-ADM-031: update §5.2 to include FM-ADM-13, 14, 15 and change ID range to FM-ADM-01→15"
 name: backbone-index
 description: Navigator index for bnza-sotatek-260519-0000 backbone — section anchors, trace IDs, module/feature hints
 source_artifact: plans/bnza-sotatek-260519-0000/02_backbone/backbone.md
@@ -32,18 +36,18 @@ coverage_summary: Actors, Portal Matrix, Permissions, Feature Map (PTL-01–06),
 | §4.4 | Permissions — EXBOT Infra (PTL-04) | ACT-06, ACT-04 | operator | OPERATOR system actions; admin: force-stop, wrangler tail |
 | §5.0 | Feature Map — WL Admin (PTL-06) | FM-WLA-01→07 | wl-admin | OOS (Helix scope). Distribution pipeline, reward engine, RewardDistributor, reconciliation. |
 | §5.0B | Feature Map — WL Mobile (PTL-01) | FM-MOB-01→11 | wl-mobile | OOS (Helix scope). SIWE auth, reward display, claim, bot ops, community, multi-tenant. |
-| §5.2 | Feature Map — BNZA-ADMIN (PTL-02) | FM-ADM-01→12 | bnza-admin | P0 WL launch critical. WL partner onboarding (FM-ADM-01), PF config (FM-ADM-02), WL bot monitor (FM-ADM-10), audit log viewer (FM-ADM-12), IB (FM-ADM-03), bot type config (FM-ADM-04), dashboard (FM-ADM-05), reports (FM-ADM-06), user management (FM-ADM-11). |
+| §5.2 | Feature Map — BNZA-ADMIN (PTL-02) | FM-ADM-01→15 | bnza-admin | P0 WL launch critical. WL partner onboarding (FM-ADM-01), PF config (FM-ADM-02), WL bot monitor (FM-ADM-10), audit log viewer (FM-ADM-12), IB (FM-ADM-03), bot type config (FM-ADM-04), dashboard (FM-ADM-05), reports (FM-ADM-06), user management (FM-ADM-11), Escalations (FM-ADM-13), Holds/Corrections (FM-ADM-14), Attribution History (FM-ADM-15). |
 | §5.3 | Feature Map — BNZA-EX (PTL-03) | FM-EX-01→06 | bnza-ex | P2 non-blocking. Hyperliquid integration, PnL display, margin deposit (CCTP), leaderboard. |
 | §5.4 | Feature Map — EXBOT Infra (PTL-04) | FM-XB-01→08 | operator / exbot | P0 WL launch critical. Bot lifecycle API, fee collection, access control, queue v2, relayer, EXBOT endpoints (FM-XB-06/08 deferred post-WL). |
 | §5.5 | Feature Map — BNZA-POOL (PTL-05) | FM-POOL-01→09 | bnza-pool | P1 post-WL. Steps 7–8. ZapMint UI, position management, earnings display, rebalance, stop. |
 | §6 | Cross-Project Dependency Graph | — | All | OPERATOR → POOL, ADMIN; ADMIN → OPERATOR (WL lifecycle); EXBOT → OPERATOR; WL Admin → OPERATOR |
 | §7 | Priority Ordering | — | All | Line 1 Tier 0: WL+MLM core (M1 June 2); Tier 1: post-WL; Tier 2: enhancements. Line 2: ExBot (deferred). |
-| §8.1 | Auth Model | — | All | Wallet connect (POOL/ADMIN), SIWE/JWT (WL Mobile), CF Access (ADMIN/WL Admin), internal system (OPERATOR) |
+| §8.1 | Auth Model | — | All | POOL: X-Wallet-Address header. BNZA-ADMIN: CF Access (outer) + SIWE+2FA+JWT (auth_spec_v1.1, replaces X-Wallet-Address). WL Mobile: SIWE/JWT. WL Admin: CF Access+2FA. OPERATOR: internal. |
 | §8.2 | Fee Model | — | operator, bnza-pool | Router v2.2.2: swap fee 0.5%, opFee 0.5%, PF 30% of earnings. WL split: 70% master, 30% BNZA. |
 | §8.3 | Scale Requirements | — | operator | 10k bots, 3h daily collect SLO (UTC 00:01–03:00), 50 relayers, 60s lock timeout |
 | §8.4 | Deployment Topology | — | All | CF Workers (OPERATOR), CF Pages (ADMIN/EX/POOL), Vercel (POOL alt), D1 (22 migrations), Queues (3), DO (2 active) |
 | §8.5 | Shared Design Language | — | All | shadcn/ui, Tailwind 4, React 19, TypeScript 5.9 |
-| §8.6 | Testing Standards | — | All | Resolved OQ-7: unit + integration per module; E2E for critical paths |
+| §8.6 | Testing Standards | — | All | Resolved OQ-INTAKE-007: unit + integration per module; E2E for critical paths |
 | §8.7 | EXBOT Contract Architecture | — | exbot | BnzaExVault Option C selected. Phase 0 gate conditions (4 conditions, not yet met). |
 | §8.8 | WL+MLM System Architecture | FM-WLA, FM-ADM-01/10 | wl-admin, bnza-admin | wlMaster mapping, net/principal split, WlNetSent event, member lifecycle, money flow (§8.8.3) |
 | §10 | Recommended Next Steps | — | All | FRD order, remaining commands |

@@ -3,10 +3,13 @@ type: use-case
 module: exbot
 status: draft
 created: 2026-06-12
-updated: 2026-07-07
+updated: 2026-07-08
 owner: "@hienduong"
 linked_stories: [US-EXBOT-001]
 changelog:
+  - 2026-07-09 | manual | P1 fix: register E-EXBOT-028 for LP mint failure (A4); cite E-EXBOT-005/006 in A5/A6
+  - 2026-07-09 | manual | P2 fix: remove builder fee from Preconditions — runtime check in preflight step 2, not a pre-assumed condition
+  - 2026-07-08 | /ba-do | I-13: add FR-EXBOT-003/011/081/091 to FR Trace §7; I-11: A7/A10 error state → safe_mode; I-12: register E-EXBOT-026
   - 2026-07-07 | manual | flow change: trigger→user-initiated (POST /api/exbot/start); add vault balance preflight check; rewrite Trigger/Actors/Preconditions/Steps 1-2/A3
   - 2026-07-04 | arc-migration | replace Cloudflare primitives with AWS equivalents (D1→Aurora PostgreSQL, ExBot Worker→ExBot Lambda, BR-EXBOT-010 annotation standalone Worker→standalone Lambda)
   - 2026-06-29 | manual | flow change: trigger→system (deposit+key-provision); remove agent key approval precondition; rewrite step 3 (key_status check); remove A3/A9; add Signing Lambda to actors
@@ -31,7 +34,6 @@ User-initiated: USDC Investor calls `POST /api/exbot/start` via POOL UI after co
 - Key-provision has completed: `hl_agent_keys.key_status='active'` for this user
 - User has no existing ExBot with `status IN ('active','paused','closing','safe_mode','error')`
 - User has HL account with isolated margin balance ≥ required × 2.0
-- Builder fee (5bps) confirmed on HL
 - Native gas: User wallet holds sufficient ETH/native token for vault tx gas
 
 ## 3. Main Success Scenario
@@ -51,13 +53,13 @@ User-initiated: USDC Investor calls `POST /api/exbot/start` via POOL UI after co
 - **A1 (one-bot policy fail):** Step 2 — reject with "You already have an active ExBot."
 - **A2 (margin insufficient):** Step 2 — block with margin amount details
 - **A3 (no vault deposit):** Step 2 — block with E-EXBOT-025 "No confirmed deposit found. Please complete an on-chain deposit before starting the bot."
-- **A4 (LP mint fails):** Step 4 — enter `error` state, return funds
-- **A5 (builder fee not confirmed):** Step 2 — block with "Builder fee (5bps) must be confirmed on HL before starting."
-- **A6 (LP mint simulation fail):** Step 2 — block with simulation error details; no vault call made.
-- **A7 (HL unreachable):** Step 4 or 6 — enter `error` state; return "HL service unavailable, please retry."
+- **A4 (LP mint fails):** Step 4 — enter `error` state (E-EXBOT-028); no funds moved; admin intervention required
+- **A5 (builder fee not confirmed):** Step 2 — block with E-EXBOT-005
+- **A6 (LP mint simulation fail):** Step 2 — block with E-EXBOT-006; no vault call made.
+- **A7 (HL unreachable):** Step 4 or 6 — enter `safe_mode`; alert operator; auto-recovery per FR-EXBOT-050 (retry when HL responsive + 3 reconciles succeed; if irrecoverable → bot_safe_close).
 - **A8 (stop placement fail):** Step 9 — enter `safe_mode`; HL short open but stop not confirmed; alert operator; auto-recovery per FR-EXBOT-050 (retry when HL responsive + 3 reconciles succeed; if irrecoverable → bot_safe_close).
 - **A9 (key not yet provisioned):** Step 2 — block with E-EXBOT-017 "Bot cannot start: agent key not yet provisioned. Please wait for deposit processing to complete."
-- **A10 (HL order rejection):** Step 6 — HL rejects IOC order; enter `error` state; return HL rejection reason.
+- **A10 (HL order rejection):** Step 6 — HL rejects IOC order; enter `safe_mode` (E-EXBOT-026); alert operator; auto-recovery per FR-EXBOT-050 (retry when HL responsive + 3 reconciles succeed; if irrecoverable → bot_safe_close).
 - **A11 (reconcile mismatch):** Step 7 — actual size deviates > threshold; enqueue `partial_repair`; alert operator. *(threshold = `drift_threshold` = `lp_value_usd × 3%`; pending OQ-EXBOT-11)*
 
 ## 5. Postconditions
@@ -76,6 +78,6 @@ User-initiated: USDC Investor calls `POST /api/exbot/start` via POOL UI after co
 > See **F-03a: Auto Key-Provision on Deposit** and **F-03b: User-Triggered Bot Start** in [`srs/flows.md`](../srs/flows.md) — F-03a covers on-chain deposit → chain indexer (Fargate) → key-provision worker (AWS KMS) → HL approveAgent. F-03b covers user API call → preflight → LP mint → hedge open (Signing Lambda) → stop place → active.
 
 ## 7. FR Trace
-FR-EXBOT-001, FR-EXBOT-002, FR-EXBOT-004, FR-EXBOT-020, FR-EXBOT-030, FR-EXBOT-031
+FR-EXBOT-001, FR-EXBOT-002, FR-EXBOT-003, FR-EXBOT-004, FR-EXBOT-011, FR-EXBOT-020, FR-EXBOT-030, FR-EXBOT-031, FR-EXBOT-081, FR-EXBOT-091
 
 Note: frd.md uses implementation grouping numbers; srs/spec.md is canonical. Trace here always refers srs/spec.md.

@@ -3,7 +3,7 @@ type: frd
 module: exbot
 status: draft
 created: 2026-06-12
-updated: 2026-07-04
+updated: 2026-07-08
 owner: "@hienduong"
 version: 0.1.0
 sources:
@@ -11,6 +11,7 @@ sources:
   - Google Doc: EXBOT System & Smart Contract Overview (Daniel, June 2026)
   - Google Sheet: BNZA ExBot Feature Tracker
 changelog:
+  - 2026-07-08 | /ba-do | I-18: sync FR-EXBOT-001 preflight from 5 to 6 checks — add vault balance check (E-EXBOT-025) as check #2, renumber #2-5 → #3-6
   - 2026-07-04 | arc-migration | replace Cloudflare primitives with AWS equivalents; sync queue count to 11 in spec.md
   - 2026-06-29 | manual | flow change: ACT-I role; §3 scope (KMS, deposit watcher, key-provision, 11 queues); FR-081 KMS rewrite; FR-010 queue 11; FR-100 endpoints; NFR-006; Phase0 gate NV-3; IC-EXBOT-005
   - 2026-06-24 | /ba-do | remove §7 Open Questions — 8 OQs migrated to SRS §9 (OQ-EXBOT-01..08); SRS is source of truth
@@ -83,12 +84,13 @@ links:
 
 Before starting an ExBot, the system MUST run preflight checks in this order:
 1. One-bot policy: `SELECT count(*) FROM bot_registry WHERE user_id=? AND bot_type='ex' AND status IN ('active','paused','closing','safe_mode','error')` — if result > 0, reject start
-2. HL margin sufficiency: expected post-deposit margin balance ≥ `required_margin × preflight_buffer (2.0x)`
+2. Vault balance check: `BnzaExVault` balance > 0 for this user — if no confirmed deposit, block with E-EXBOT-025 "No confirmed deposit found. Please complete an on-chain deposit before starting the bot."
+3. HL margin sufficiency: expected post-deposit margin balance ≥ `required_margin × preflight_buffer (2.0x)`
    - `required_margin = (lpEthAmount × hedgeRatio × hlOraclePrice) / leverage`
    - If insufficient: block start, display "Required HL margin: $X (with 100% buffer). Current: $Y. Please deposit $Z to HL."
-3. `hl_agent_keys.key_status='active'` for this user (provisioned automatically by key-provision worker on deposit — if not active, block with E-EXBOT-017)
-4. Builder fee approval confirmed (5bps)
-5. LP mint simulation passes (slippage within tolerance)
+4. `hl_agent_keys.key_status='active'` for this user (provisioned automatically by key-provision worker on deposit — if not active, block with E-EXBOT-017)
+5. Builder fee approval confirmed (5bps)
+6. LP mint simulation passes (slippage within tolerance)
 
 On any check failure: return specific error, do not create bot record.
 

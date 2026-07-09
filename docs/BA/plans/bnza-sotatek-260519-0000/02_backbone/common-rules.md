@@ -2,10 +2,14 @@
 type: common-rules
 status: draft
 created: 2026-06-02
-updated: 2026-06-26
+updated: 2026-07-07
 owner: "@hien.duong"
 changelog:
-  - "2026-06-26 | manual | split master wallet column into Current Address and Incoming Address columns, update BR-ADM-038"
+  - "2026-07-07 | /ba-do impact-update | annotate BR-ADM-015..020 as [RETAINED - pre-v0.9.0]; reference PFDistributor v0.9.0 model (BR-ADM-080..087 in bnza-admin srs/spec.md)"
+  - "2026-07-02 | manual | register business rules BR-ADM-069 through BR-ADM-073 for audit logging, escalations, reconciler and lazy-stop master wallet deactivation"
+  - "2026-07-02 | /ba-start | Register BR-ADM-065 through BR-ADM-068 for v1.1 design/dashboard specs"
+  - "2026-06-29 | manual | rename incoming address to new address in BR-ADM-038"
+  - "2026-06-26 | manual | split master wallet column into Current Address and New Address columns, update BR-ADM-038"
   - "2026-06-26 | manual | update BR-ADM-009–012 to clarify member lifecycle transitions, disabled UI state on Confirm Leave, and joined_at immutability on rejoin"
   - "2026-06-24 | manual | sync with state-machine & reconciler updates (BR-ADM-056, 057-064)"
   - "2026-06-17 | /ba-do propagation | update frontmatter"
@@ -105,12 +109,12 @@ changelog:
 | BR-ADM-012 | On rejoin, `joined_at` remains the immutable initial join time; system records the rejoin time in `rejoined_at` and increments `membership_epoch` by 1. | FRD §1.8 |
 | BR-ADM-013 | One master wallet per WL per chain. Rotation is two-phase; bot delivery suspended during rotation. | FRD §1.8 |
 | BR-ADM-014 | Suspend (`wl_codes.status='suspended'`) pauses all net delivery; OPERATOR cron moves bots to `pending_unset`. | FRD §1.8 |
-| BR-ADM-015 | Exactly one `fee_distributions` row must have `is_remainder=true`. | FRD §2.4 |
-| BR-ADM-016 | Sum of all non-remainder `share_ratio` values must be < 1.0. | FRD §2.4 |
-| BR-ADM-017 | Maximum 10 `fee_distributions` entries. | FRD §2.4 |
-| BR-ADM-018 | `fee_distributions` is off-chain config only — no on-chain tx triggered. PF flows to `pfCollector` single EOA. | FRD §2.4 |
-| BR-ADM-019 | Audit log entry created on every create/update/delete to `fee_distributions`. | FRD §2.4 |
-| BR-ADM-020 | `fee_distributions` records BNZA's internal off-chain tracking of PF allocation (separate from WL split). | FRD §2.4 |
+| BR-ADM-015 | **[RETAINED - pre-v0.9.0]** Exactly one `fee_distributions` row must have `is_remainder=true`. *(Superseded by PFDistributor on-chain model; see BR-ADM-080..087 in bnza-admin srs/spec.md)* | FRD §2.4 |
+| BR-ADM-016 | **[RETAINED - pre-v0.9.0]** Sum of all non-remainder `share_ratio` values must be < 1.0. *(Superseded; v0.9.0 uses points-based proportional split — no remainder concept)* | FRD §2.4 |
+| BR-ADM-017 | **[RETAINED - pre-v0.9.0]** Maximum 10 `fee_distributions` entries. *(Superseded; v0.9.0 max 5 active `pf_recipients`)* | FRD §2.4 |
+| BR-ADM-018 | **[RETAINED - pre-v0.9.0]** `fee_distributions` is off-chain config only — no on-chain tx triggered. PF flows to `pfCollector` single EOA. *(Superseded; v0.9.0 PFDistributor contract is on-chain on OP+Base with daily 13:00 JST cron)* | FRD §2.4 |
+| BR-ADM-019 | **[RETAINED - pre-v0.9.0]** Audit log entry created on every create/update/delete to `fee_distributions`. *(Still applies; v0.9.0 equivalent: BR-ADM-081 in bnza-admin srs/spec.md — audit on every `pf_recipients` mutation)* | FRD §2.4 |
+| BR-ADM-020 | **[RETAINED - pre-v0.9.0]** `fee_distributions` records BNZA's internal off-chain tracking of PF allocation (separate from WL split). *(Superseded; v0.9.0 uses `pf_recipients` with channel_scope to separate normal/WL/IB allocations)* | FRD §2.4 |
 | BR-ADM-021 | EXBOT config fields (`hedge_ratio`, `leverage`, `stop_safety_factor`) are interface-only — zen provides values. | FRD §3.4 |
 | BR-ADM-022 | `cooldown_range_min` must be between 10 and 180 minutes. | FRD §3.4 |
 | BR-ADM-023 | Per-WL bot type selection: current default is EXBOT for all WL partners. | FRD §3.4 |
@@ -128,12 +132,12 @@ changelog:
 | BR-ADM-035 | The [View] detail drawer shows the entity's old value and new value at the time of the operation. | FRD §12.3 |
 | BR-ADM-036 | Form actions [Cancel] and [Save Partner] are mandatory implementation details for the WL Partner creation/edit UI, and `wl_code` is a required input field, regardless of WBS omission. | FRD §1.4 |
 | BR-ADM-037 | WL Member list and forms must include standard UI elements (e.g., list filters, `wl_code`, `wallet address`, [Register Member], [Save/Cancel]) as required implementation details, even if omitted from WBS. | FRD §1.5 |
-| BR-ADM-038 | WL Master Wallet list and forms must explicitly include 'Created Date', list filters, 'wl_code', 'current address', 'incoming address', 'reason note', and standard action buttons (e.g., [Register master wallet], [Suspend/Resume WL], [Save/Cancel]) as required implementation details, regardless of WBS omission. | FRD §1.6 |
+| BR-ADM-038 | WL Master Wallet list and forms must explicitly include 'Created Date', list filters, 'wl_code', 'current address', 'new address', and standard action buttons (e.g., [Register master wallet], [Save/Cancel]) as required implementation details, regardless of WBS omission. | FRD §1.6 |
 | BR-ADM-039 | User Compensation (Bot lifecycle): If a bot generates net profit while in `pending_set` or `failed_set`, the on-chain `wlMaster` is 0x0. If the user manually stops the bot during this period, 100% of the net profit routes to the user instead of the partner. Smart contract handles race conditions: if System Unset runs before User Stop → `wlMaster=0` (profit to user); if User Stop runs before System Unset → `wlMaster!=0` (profit to partner). | FRD §10.4 |
 | BR-ADM-040 | Admin can force-stop any bot regardless of owner wallet — no ownership check on Stop action. | FRD §3.5.3 |
 | BR-ADM-041 | Force-stop requires non-empty reason string; submitted via POST body `{ reason: string }`. | FRD §3.5.3 |
 | BR-ADM-042 | Force-stop side effect: all active `bot_positions` for the stopped bot are closed with `close_reason='force_stopped'` atomically server-side. | FRD §3.5.3 |
-| BR-ADM-043 | When admin initiates suspend or resume of a WL, the FE must show a confirmation dialog with a mandatory reason field (free text, minimum 10 characters). The reason is submitted in the request body `{action: "suspend"\|"resume", reason: string}` and stored in the audit log. | FRD §1.10 |
+| BR-ADM-043 | When admin initiates suspend of a WL, the FE must show a confirmation dialog with a mandatory reason field (free text, 10-255 characters). The reason is submitted in the request body `{status: "suspended", reason: string}` and stored directly in `wl_codes.suspend_reason` in D1 (cleared to NULL upon resume) and recorded in the audit log. Resume does not require a reason field. | FRD §1.10 |
 | BR-ADM-044 | `wl_codes` must be created before members can be registered for a WL. The `wl_code` field in `wl_members` is a FK to `wl_codes.wl_code`. | FRD §1.10 |
 | BR-ADM-045 | `wl_codes.api_key` (public, `wlk_` prefix) is returned by GET `/api/wl-admin/codes`. The HMAC secret is never stored in D1 and never returned by any API endpoint — it is placed in `WL_API_SECRETS` Workers Secret out-of-band by ops. | FRD §1.10 |
 | BR-ADM-046 | User Management is read-only: admins can view but not create or delete end-user accounts via the admin panel. Role changes (if needed) are handled via OPERATOR API directly. | FRD §11.3 |
@@ -155,6 +159,37 @@ changelog:
 | BR-ADM-062 | Atomic Activation and History Open (H-2): Setting a bot's activation status to `active` and opening its Whitelabel attribution history (recording the `valid_from_block` as the transaction submission block) must be performed atomically in a single database transaction. | FRD §10.4 |
 | BR-ADM-063 | Single Open Attribution Interval Constraint (K-4): To prevent database unique constraint violations on `idx_wl_attribution_one_open_per_bot` (which enforces a maximum of one open attribution interval per bot), any existing open interval for a bot must be closed by setting its `valid_to_block` before opening a new half-open interval `[valid_from_block, valid_to_block)`. | FRD §10.4 |
 | BR-ADM-064 | Unset Retry Behavior: Unlike bot activation (`pending_set`), the bot deactivation / unset process (`pending_unset`) does not have a "failed" state. On-chain transaction failures or timeouts during the unset phase are logged as escalations and retried indefinitely until they succeed. | FRD §10.4 |
+| BR-ADM-065 | User classification logic: A user is WL group if `bot_configs.wl_code` is non-null; IB if `users.referred_by` is non-null; Normal otherwise. | FRD §5.3 |
+| BR-ADM-066 | POOL monitor table must cap displayed rows at 100 and enforce 15 items per page pagination. | FRD §5.3 |
+| BR-ADM-067 | Wallet click opens User Info Modal. Wallet copy button must change state to checkmark (✓) for 2 seconds upon successful clipboard write. | FRD §5.3 |
+| BR-ADM-068 | Relayer alert threshold is 0.001 ETH per wallet. Low balance displays a low-balance warning indicator in the header band. | FRD §5.3 |
+| BR-ADM-069 | The `admin_audit_log` table ONLY records manual write operations performed on the BNZA Admin site (e.g. WL onboarding, fee distribution config changes, settings updates). System logs or cron executions are recorded in `bot_operations`, and partner API activities in `wl_*`. | FRD §12.3 |
+| BR-ADM-070 | The Acknowledge (Ack) action requires the `admin+` role (both `admin` and `super_admin`). Acknowledgment is strictly a marker indicating that the event has been "seen/triaged," and does not grant or imply any executive/write execution rights. | FRD §13.3 |
+| BR-ADM-071 | The `wl_escalations` table is an append-only audit trail. Deleting records from this table is strictly prohibited. The escalation lifecycle is managed entirely via the `status` field. The UI default filter displays `open` and `acked` states, while resolved states are collapsed/hidden. | FRD §13.3 |
+| BR-ADM-072 | Faulty payouts with reason `needs_manual_reconcile` must be resolved manually by `super_admin` by directly updating the database after verifying the transaction state on-chain according to the manual runbook. No manual reconciliation actions or buttons are exposed on the frontend UI. | FRD §14.3 |
+| BR-ADM-073 | Deactivate Master Wallet (Option 2 — Lazy Stop): Deactivating a master wallet (`status='inactive'`) is strictly a database-level guard. It instantly blocks new bot registrations and fee payouts for that wallet/chain. It does NOT trigger immediate on-chain unset transactions; active bots will be unset asynchronously by the B2 Reconciler later. Operational Note: Active, planned master wallet changes must use the Rotation flow instead of manual deactivation to handle the on-chain `pending_unset` process correctly. | FRD §1.10 |
+| BR-ADM-074 | Rotation is blocked at the API level if the Whitelabel partner status is `suspended` (`wl_codes.status='suspended'`). The system returns HTTP 403 and displays `MSG-ERR-96`. | FR-ADM-017 |
+| BR-ADM-075 | Concurrent master wallet rotations on the same chain for the same Whitelabel partner are blocked. If `wl_master_wallets.status='rotation_in_progress'`, the system rejects a new rotation initiation. | FR-ADM-017 |
+| BR-ADM-076 | During master wallet rotation, bots in transient/error states (`pending_set`, `failed_set`, `needs_repair`) and bots in `leaving` or `force_normalize` states are skipped; they are not moved to `pending_unset(reason=master_rotation)`. The skipped bot list is surfaced to the admin via `MSG-WRN-03`. | FR-ADM-017 |
+| BR-ADM-077 | When a skipped `failed_set` or `needs_repair` bot is later repaired (e.g., via retry-set), the repair flow must read the live active master address from `wl_master_wallets` at repair time. It must never use a snapshot address captured before the rotation. | FR-ADM-017 |
+| BR-ADM-078 | [RETAINED - pre-v0.9.0] `fee_distributions` off-chain config: exactly one `is_remainder=true` row required; sum of non-remainder share_ratio < 1.0; max 10 entries. Superseded by BR-ADM-082/083/084 for the PFDistributor model. | FRD §2.4 legacy |
+| BR-ADM-079 | [RETAINED - pre-v0.9.0] `fee_distributions` audit log: audit entry created on every create/update/delete. Superseded by BR-ADM-081 for the PFDistributor model. | FRD §2.4 legacy |
+| BR-ADM-080 | **PF Distribution Triggers**: Daily cron runs automatically at 13:00 JST to call `PFDistributor.distribute()` on OP and Base. Manual trigger from Admin UI (emergency fallback for `super_admin` only) recalculates nothing, dispatches the immutable pending list, and is blocked if: (1) no active recipients exist, (2) monthly allowance cap exceeded, (3) treasury USDC insufficient, or (4) previous batch still pending/failed. | FRD §2.6 |
+| BR-ADM-081 | Audit log entry created on every create/update/deactivate action on `pf_recipients`. | FRD §2.6 |
+| BR-ADM-082 | Maximum 5 active recipients in `pf_recipients` at any time. | FRD §2.6 |
+| BR-ADM-083 | Each recipient's allocation points must be in the range 1–30 (integer). Proportional share = `points / sum_of_all_active_points`. | FRD §2.6 |
+| BR-ADM-084 | Monthly allowance cap is contract-level enforcement. When the cumulative distributed amount in the current calendar month reaches the cap, the cron skips and the manual trigger is blocked. | FRD §2.6 |
+| BR-ADM-085 | Each distribution attempt writes a record to `pf_batches` (chain, tx_hash, total_distributed_usd, status). A failed on-chain call results in `status=failed`; retry occurs on the next scheduled cycle. | FRD §2.6 |
+| BR-ADM-086 | `channel_scope` on a recipient determines which PF source pool funds it: `normal` = standard bot PF, `WL` = WL partner bot PF, `IB` = IB-attributed PF. The daily aggregation cron (FM-PF-02) scans USDC transfers to `pfCollector`, categorises each transfer by origin channel, and passes channel-segregated amounts to PFDistributor. A recipient only participates in distribution from its configured channel's pool. If no active recipient covers a given channel, that channel's accumulated amount remains in pfCollector to roll over to the next cycle. | FRD §2.6 |
+| BR-ADM-087 | **Small Amount Carry-Forward & Deactivation/Deletion**: If a recipient's payable is $< $1.00, the amount carries forward. Carry balance is updated only upon `paid` batch confirmation. Deactivating a recipient freezes their carry balance; deleting forfeits it to BNZA. In both cases, the channel scope continues to collect fees and redistributes among remaining active recipients. Deactivation has zero impact on user bot operations. | FRD §2.6 |
+| BR-ADM-088 | IB group wallet configuration (`ib_groups`, `ib_group_wallets`) is self-service by the IB Partner via PTL-IB. Admin UI has read-only access; no create/edit of groups or group wallets from BNZA-ADMIN. | FRD §4.7 |
+| BR-ADM-089 | **IB Account Deactivation & Reactivation**: Deactivating an IB account (`ib_accounts.status=inactive`) immediately blocks the IB Partner's PTL-IB access (SIWE blocked) and stops `IBSplitter` routing for their group wallets. Reactivation (`status=active`) restores Portal access and resumes `IBSplitter` routing. Existing D1 configuration (`ib_groups`, `ib_group_wallets`) and user assignments (`ib_user_assignments`) are retained. Deactivation has zero impact on running user bots, fee collection, or Whitelabel net splits. | FRD §4.7 |
+| BR-ADM-090 | IB account `referral_code` is auto-generated on creation (8-char alphanumeric, uppercase) and is immutable. | FRD §4.7 |
+| BR-ADM-091 | A wallet address may only appear once in `ib_accounts`. Duplicate wallet triggers `MSG-ERR-101`. | FRD §4.7 |
+| BR-ADM-092 | IBSplitter contract on OP+Base reads `ib_group_wallets.bps` for on-chain distribution. Sum of bps across all wallets in a group must equal 10000 (100%) for the group to be in `configured` on-chain status. | FRD §4.7 |
+| BR-ADM-093 | Compound distribution (IBSplitter calling another splitter) is prohibited. | FRD §4.7 |
+| BR-ADM-094 | All create/update/deactivate operations on `ib_accounts` are recorded in the audit log (NFR-ADM-005). | FRD §4.7 |
+
 ---
 
 ## WLA — WL Admin (wl-admin)

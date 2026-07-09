@@ -2,16 +2,21 @@
 type: intake
 status: in-review
 created: 2026-05-19
-updated: 2026-06-26
+updated: "2026-07-08"
 owner: "@hien.duong"
 priority: P0
 tags: []
-version: "0.7.0"
+version: "0.9.0"
 links:
   - 01_intake/plan.md
 engagement_mode: formal
 lang: en
 changelog:
+  - "2026-07-08 | manual | add ib_spec_v1.4 reference and bump date"
+  - "2026-07-06 | /ba-start intake | absorb ib_spec_v1.5, ib_portal_spec_v1.7, ib_splitter_spec_v1.0, pf_spec_v1.0, admin_ui_spec_common_v1.2, admin_ui_spec_top_v1.2: new IB Portal module (ib.bnza.io), PFDistributor on-chain contract scope, IBSplitter deployment scope, IB data model rewrite (groups+bps), tvl_history replaces daily_snapshots, auth row for ib.bnza.io added"
+  - "2026-07-02 | /ba-start intake | absorb admin_ui_spec_common/top/auth_spec v1.1: §3 Module 2 Current State add X-Wallet-Address deprecation note; §3 Module 2 SOTATEK Tasks enrich Dashboard bullet with TOP page spec + add Auth upgrade task (SIWE+2FA+JWT); §4.6 update BNZA-ADMIN auth row (SIWE replaces X-Wallet-Address, ecosystem scope noted); §13 add 3 source docs"
+  - "2026-06-30 | manual | update Module 2 scope: remove user activity from reports scope, split fee collection breakdown, and integrate bot API for performance"
+  - "2026-06-30 | manual | remove deactivate WL partner reference in Module 2 scope description"
   - "2026-06-26 | manual | renumber OQ-ADM-* to match 3-digit zero-padded format"
   - "2026-06-18 | /ba-do audit-v1.7.6 | §3 Module 2: HMAC show-once, UNION revenue, raw USDC display, task F P3 backlog (3 screens); §4.6: BNZA-ADMIN role matrix Viewer/Admin|Operator/Super_Admin"
   - "2026-06-18 | /ba-do hld-decisions | §3 Module 4: update smart contracts list (9 contracts, strategy dispatch, PositionManager); add emergencyTransfer constraint; Phase 0 condition 2 remove multiSig"
@@ -28,8 +33,8 @@ changelog:
   - "2026-05-27 | manual | meeting 2026-05-27: MLM-first strategy (LD-8), EXBOT deferred post-WL, June 2nd go-live scope, scalability risk (Daniel report), mainnet migration risk (Andrew report)"
   - "2026-05-26 | manual | update from ECOSYSTEM_OVERVIEW v2.0 + SPEC v5.2.5: BnzaExVault decision, EXBOT Phase 0 gate (4 conditions), P0-F.0 hotfix list, SPEC version ref corrected"
   - "2026-05-26 | manual | sync client-docs: updated §13 source paths to docs/ prefix; updated Assumption 5 (Router v2.2.2-fix-2 + LPBot v1.2 deployed by zen, Step 6 OOS)"
-  - "2026-05-21 | manual | codebase audit: corrected tech stacks, deployment topology, current state per actual source-code monorepo; resolved OQ-1 deployment paths; added LD-7 monorepo layout"
-  - "2026-05-20 | /ba-start | resolved OQ-1: Monorepo"
+  - "2026-05-21 | manual | codebase audit: corrected tech stacks, deployment topology, current state per actual source-code monorepo; resolved OQ-INTAKE-001 deployment paths; added LD-7 monorepo layout"
+  - "2026-05-20 | /ba-start | resolved OQ-INTAKE-001: Monorepo"
   - 2026-05-20 | /ba-start | added Locked Decisions (LD-1→LD-6) + artifact structure
   - 2026-05-19 | /ba-start | resolved 4/8 OQs, updated intake with resolutions
   - 2026-05-19 | /ba-start | initial intake from existing docs + cross-module brainstorm
@@ -350,21 +355,23 @@ Mobile communicates with 3 distinct systems. Do not confuse them.
 **What BNZA-ADMIN manages**:
 - Bot configs: view all bots, force-stop, plan_specs version management
 - User management: allowed/blocked addresses, RBAC roles
-- WL partner onboarding: create/edit/deactivate WL partner accounts (name, logo, referral code, deposit tier) — this creates the WL partner record; daily operations happen in WL-ADMIN (PTL-06)
+- WL partner onboarding: create/edit/suspend/resume WL partner accounts (name, logo, referral code, deposit tier) — this creates the WL partner record; daily operations happen in WL-ADMIN (PTL-06)
 - WL member lifecycle: register member (wallet + wl_code), initiate two-phase leave (pending → unset confirmed → left), rejoin (epoch++), membership_epoch tracking
 - WL master wallet management per chain: register, rotate (two-phase: unset old → set new on-chain), suspend/resume wl_code
 - WL bot activation state machine monitor: view pending_set SLA / failed_set / needs_repair backlogs; admin actions: retry set, force-normalize (two-phase)
 - PF distribution config: set recipients and shares (off-chain tracking only; PF on-chain still goes to pfCollector EOA single account)
 - IB partner management: introduce broker CRUD
 - System settings: global switches (global_bot_enabled, safe_mode, exbot_enabled, etc.)
-- Relayer monitoring: balance, health status
-- Reports: fee collection, bot performance, user activity
+- Relayer monitoring: relayer wallet list, index, balance, health (stale-data warning if last sync > 30 minutes)
+- Reports: fee collection (splitting opFee, PF for total revenue), bot performance (via bot API)
+- Audit Log Viewer: filter logs by module, action, actor wallet, date range
 - TOKEN management: burn/supply/vesting/treasury/builder-fee (mock OK, P3)
 
 **Current State** (verified from source 2026-05-21):
 - ✅ Real API ⚡ Dev-built: POOL management, User management, Audit logs, Access Control, Auth/RBAC, Bot configs, Bot positions, Rules, Notifications, Fee collections, Fee distributions, Daily snapshots, Relayer wallets, Plan specs, WL Master Wallet Mgmt, PF Distribution
 - ✅ Scaffold complete ⚡ Dev-built: 16 pages registered (dashboard, users, bots, logs, fee-distribution, access, system, builder-fee, burn, supply, vesting, treasury, ib, whitelabel, relayer, reports)
 - ✅ Wallet integration ⚡ Dev-built: @reown/appkit with X-Wallet-Address header
+  **⚠️ To be replaced**: auth_spec_v1.1 mandates SIWE + JWT (see SOTATEK Auth upgrade task below). X-Wallet-Address approach abolished post-implementation.
 - 🟡 Partial ⚡ Dev-built: WL Management (suspend/resume real API; list/CRUD still mock)
 - 🔸 Mock UI ⚡ Dev-built: WL Member Lifecycle, WL Bot Lifecycle Monitor (UI added post-2026-05-21, no real API)
 - 🔸 Mock/incomplete 📋 Spec: TOKEN mgmt, IB mgmt, Dashboard metrics, System Settings, Relayer monitoring, Reports
@@ -379,18 +386,18 @@ Mobile communicates with 3 distinct systems. Do not confuse them.
   > Khi bot stuck, zen cần UI để thấy và trigger recovery (retry/force-normalize two-phase).
   > Không có trong client spec cũ.
 
-- **G: PF Distribution** — Off-chain tracking và config UI cho PF recipients. **Scope giảm so với trước**: PF on-chain vẫn về `pfCollector` single EOA (0xa5B8...C969) — không cần BnzaSplitter contract interaction. UI chỉ manage `fee_distributions` table (ai nhận bao nhiêu, off-chain) và display PF collection history.
-
-  > **[SCOPE CHANGE — WL_SPEC_SOTATEK_EN_v1.0 §1.2 vs WL_SPEC.md cũ §5]**
-  > Client spec cũ định nghĩa BnzaSplitter contract — on-chain immediate distribution tới
-  > tối đa 10 recipients per group. Spec mới loại BnzaSplitter khỏi v1.
-  > BNZA tự handle PF distribution off-chain trong v1. FM-ADM-02 screen không cần
-  > gọi BnzaSplitter setters hay trigger on-chain distribution.
+- **G: PF Distribution** — On-chain batch distribution of accumulated PF revenue to configured partners. **Scope upgraded from off-chain config to full on-chain system per `pf_spec_v1.0_EN.md`**:
+  - **Ops PF page** (ops.bnza.io): recipient configuration — max 5 recipients, each with label + wallet + allocated points (1–30, meaning "n% out of the 30% PF") + applicable scope (normal / WL (all or per-code) / IB (all or per-code)) + status (active/paused). Validation: Σpoints ≤30 per channel; no duplicate wallets; destination blocklist (USDC contract / PFDistributor self / treasury forbidden).
+  - **Aggregation batch** (daily 13:00 JST): on-chain USDC Transfer scan into `pf_income_events` (both OP + Base; 15-min scan, record after 15 confirmations). Attribution join: `wl_bot_payouts` (WL channel) / `ib_collect_events` (IB channel) / `fee_collections` (normal); unresolved rows stay `pending` and re-resolved at batch-close; rows unresolved >72h fixed to `unattributed` (BNZA-attributed). Batch seriality enforced; 3 retries on TX failure; skip procedure requires `processedBatch(batchId)==false` verification first (QA R3).
+  - **PFDistributor contract** (Solidity, UUPS, reusing audited IBSplitter components): Foundry 38/38 green, 100% coverage, Slither triaged. **Division of labor**: contract implementation = BNZA (zen) / verification + production deployment + batch & aggregation + ops screen = SOTATEK (deploy with `initialize(usdc, treasury, owner_=zen_address)`) / owner-key operations (setOperator, treasury approve allowance, post-deploy on-chain verification, rescue) = BNZA (zen). Pull model: treasury approves PFDistributor monthly-cap allowance; distribute() pulls exact batch total per run. No custody in normal operation.
+  - **D1 tables**: `pf_recipients` (config) + `pf_income_events` (on-chain scan) + `pf_payout_batches` + `pf_payouts` + `pf_unclaimed_events`. Carry-forward: `pf_recipients.carry_balance_usd` (updated only at paid confirmation).
 
 - **I: Bot Type Configuration** — Deposit tiers, strategy parameters, limits (complete partial implementation)
-- **D: IB Management** — Replace mockIBs with real data
+- **D: IB Management** — Replace mockIBs with real data. **⚠️ Data model changed significantly in `ib_spec_v1.5_EN.md`** — this is not a simple mock→real connection. Key changes vs earlier model: (1) `ib_groups` + `ib_group_wallets` + per-group `group_code` + `is_default` replace the flat `commission_rate` field; (2) distribution formula is bps-based per recipient per group (`floor(Net × bps / 10000)`), not commission_rate × fees; (3) compound prohibited for IB bots; (4) IBSplitter on-chain contract replaces off-chain distribution tracking — SOTATEK deploys IBSplitter on both OP + Base (`initialize(usdc, router, owner_=zen_address)`); (5) `ib_collect_events` is the canonical source for IB channel attribution (used by PF batch); (6) user binding = automatic group assignment via `group_code` URL param + immutable `users.referred_by`. BNZA ops screen (ops.bnza.io `/ib`) remains 2 tabs (IB Codes + Members) for zen to manage IB accounts; distribution config lives entirely on the IB portal side.
 - **C: TOKEN Management** — burn/supply/vesting/treasury/builder-fee (depends on OPERATOR endpoints)
-- Dashboard, System Settings, Relayer, Reports — real data integration. **Revenue UNION model**: Dashboard/Reports hiển thị daily revenue = UNION của `fee_collections` (LP bot + EXBOT) và `wl_bot_payouts` (WL bots). **Raw USDC display**: payout/ledger views hiển thị raw on-chain amounts từ `wl_bot_payouts.opfee_usdc` + `pf_usdc` (không phải USD estimate; column suffix `_usdc` per audit v1.7.6; xem OQ-ADM-019 trong FRD)
+- **Dashboard (TOP page)** — real data integration per `admin_ui_spec_top_v1.2` + `admin_ui_spec_common_v1.2`: (1) 4 KPI cards: PF Revenue `SUM(pf_usd)` MTD/yesterday/today, opFee `SUM(opfee_usd)` same logic, Users count via `first_connected_at`, TVL current market value via on-chain reads (principal only, no uncollected fees) cached in `tvl_history` table (1 row/day; `daily_snapshots` cron retired); (2) Metric chart: recharts, 4 metrics × period toggle (last 30 days), time series from `fee_collections`/`users`/`tvl_history`; (3) POOL monitor table: `bot_operations` latest 100 cap, newest first, 15/page, 7 cols (Datetime/Type/Wallet/Chain/Status/Amount/Tx), no filter; (4) User Info Modal: wallet-click trigger, joins `users`+`bot_configs`+`fee_collections`, shows classification (Normal/WL group/IB), Bot list, cumulative revenue + PF revenue; (5) Relayer: **header band only** (OP/Base balance, ALERT at ≤0.001 ETH, 150-wallet HD pool). **Layout v1.2**: right guide panel removed on all pages; 3-region layout (header/sidebar/content); iPad portrait–15-inch support mandatory; table pagination 15 rows/page. **Bot-count KPIs relocated (v1.2)**: total/active bot count KPIs and Bot Activity chart moved from TOP to existing Bot Management page (code preserved; not deleted). **Revenue UNION model**: Dashboard/Reports hiển thị daily revenue = UNION của `fee_collections` (LP bot + EXBOT) và `wl_bot_payouts` (WL bots). **Raw USDC display**: payout/ledger views hiển thị raw on-chain amounts từ `wl_bot_payouts.opfee_usdc` + `pf_usdc` (không phải USD estimate; column suffix `_usdc` per audit v1.7.6; xem OQ-ADM-019 trong FRD)
+- System Settings, Relayer monitor, Reports — real data integration (unchanged scope)
+- **Auth upgrade (new — auth_spec_v1.1)**: Replace `X-Wallet-Address` header with SIWE + 2FA TOTP + JWT. New endpoints: `POST /api/auth/nonce`, `POST /api/auth/verify`. New tables: `auth_nonces`, `admin_2fa`, `admin_2fa_recovery`, `admin_sessions`. Session policy: 24h sliding timeout + 7d absolute cap. Frontend: update `operatorFetch` from `X-Wallet-Address` → `Authorization: Bearer <JWT>`. Login UI: 5-step fixed-card flow (connect → sign → twofa → twofa-setup → done), mock `auth-preview` already finalized. 2FA mandatory in production; optional via env flag during dev only. AuthZ (RBAC guard functions, `admin_wallets` table) kept as-is — only AuthN entry point changes.
 - E2E tests (Step 8-7, not started)
 - **F: Post-Launch Backlog (P3)** — 3 màn hình mới, xây sau go-live: (1) **Escalations Dashboard** — monitor `wl_escalations` table (deep reorg alert, block_hash divergence event; maps FM-ADM-13); (2) **Holds & Corrections** — review `wl_holds`, ACK/mark-resolved flow (maps FM-ADM-14); (3) **Attribution History** — read-only viewer cho `wl_token_attribution_history` (maps FM-ADM-15). Không nằm trong sprint hiện tại.
 
@@ -406,7 +413,78 @@ Mobile communicates with 3 distinct systems. Do not confuse them.
 
 ---
 
-### Module 3: BNZA-EX (TradingView Integration — Line 1 Maintain) 📋 Spec / ⚡ Dev-built
+### Module 2B: IB Portal (ib.bnza.io — NEW Line 1) 📋 Spec
+
+**Portal**: PTL-IB — `ib.bnza.io`
+**Primary Actor**: IB Partners (Introducing Brokers issued by zen via BNZA-ADMIN ops screen)
+**BA Folder**: `03_modules/ib/` (new module — no prior artifact)
+**Spec source**: `ib_portal_spec_v1.7_EN.md` + `ib_spec_v1.5_EN.md` (core) + `ib_splitter_spec_v1.0_EN.md`
+
+**Description**: External self-management portal for IB partners. IBs are single-tier referral agents issued by BNZA. The portal lets them manage payout recipient configurations (groups + bps), view downline users, and monitor their revenue distribution results. IBs are referrers, not operators — they have no authority over users' start permission (BNZA restrictions are display-only).
+
+**Relationship to BNZA-ADMIN**: zen creates/manages IB accounts from ops.bnza.io `/ib`. The IB portal is for the partner themselves to self-manage after issuance.
+
+**4-item navigation**:
+1. **Dashboard** — KPI cards (Your rewards / Group rewards / TVL current-value) + referral-link card + recent distributions (9 cols, 5/page, cap 100); TVL = direct on-chain reads (real time, caching OK). No TVL trend graph (card value only).
+2. **User Management** — view + group reassignment only. 2 summary cards (New this month / Active) + 10-col table, 15/page. Clicking a wallet opens User Detail modal.
+3. **Group Management** — create/edit/archive groups (each group = payout recipe + referral link). Edit as modal + archive confirmation modal (states economic consequence). 15/page. Group code is immutable; default group cannot be archived.
+4. **Revenue** — 3 KPI cards (Your rewards / Group rewards / Total distributed) + revenue trend graph (2 metrics × 15/30/90/ALL dropdown) + 3 breakdown tabs (By group / By recipient / By user) + period filter + 15/page.
+
+**Initial-setup wizard** (mandatory on first login): IB must configure the default group (group name + payout recipients) before reaching the dashboard.
+
+**Group mechanics** (`ib_spec_v1.5_EN.md §5.2`):
+- One IB has multiple groups; each group = payout recipe (max 10 recipients) + acquisition channel (`group_code`).
+- Default group `group_code` = IB's main `referral_code`. Additional groups auto-numbered `{main}-G{n}`. Immutable.
+- User connecting via `pool.bnza.io?ref={group_code}` is auto-assigned to that group (binding + group assignment are simultaneous and automatic).
+- Recipient allocation unit: UI = % (up to 2 decimals = 1 bps precision); stored + on-chain = bps. Σbps ≤ 10000. Compound prohibited for IB bots. Distribution currency = USDC (fixed; IB bots enforce `convertToUsdc`).
+
+**On-chain execution** (IBSplitter — `ib_splitter_spec_v1.0_EN.md`):
+- IBSplitter deployed separately on OP (10) and Base (8453). SOTATEK executes production deployment (`initialize(usdc, router, owner_=zen_address)`). zen verifies owner/router/usdc on-chain before setOperator.
+- Within the same TX as collect/close/rebalance: Router sends Net (USDC) to IBSplitter → distributeFor() splits by bps instantly → remainder always to user. No custody (unclaimed is terminal fallback only).
+- Foundry 69/69 green, 100% coverage, invariants fuzz-tested, Slither triaged. Zero pending items.
+
+**Auth**: SIWE + 2FA TOTP + JWT — same auth foundation as BNZA-ADMIN (auth_spec_v1.1); shared ecosystem auth.
+
+**Tech Stack**: React 19 + Tailwind + shadcn/ui (identical to ops.bnza.io per `ib_portal_spec_v1.7_EN.md §10`). QR codes dynamically generated for referral links. Pagination 15/page (groups, users, revenue breakdown); recent distributions 5/page.
+
+**Effort**: TBD (SOTATEK proposal pending)
+
+**Dependencies**:
+- IBSplitter deployed + addresses in `packages/shared-config/src/profiles.ts`
+- `ib_accounts` / `ib_groups` / `ib_group_wallets` / `ib_user_assignments` tables in OPERATOR D1
+- `ib_collect_events` + `ib_distributions` for revenue display
+- auth_spec_v1.1 auth foundation (shared with BNZA-ADMIN)
+
+---
+
+### Module 2C: PF Distribution System (NEW Line 1) 📋 Spec
+
+**Portal**: ops.bnza.io `/pf` page (part of PTL-02) + PFDistributor on-chain contract
+**Primary Actor**: zen (ACT-04) for ops page; OPERATOR (ACT-06) for batch job
+**BA Folder**: `03_modules/pf/` (new module — prior FM-ADM-02 was off-chain config only)
+**Spec source**: `pf_spec_v1.0_EN.md`
+
+**Description**: Full on-chain batch distribution system for accumulated PF (performance fee) revenue. Replaces the v1 "off-chain config" model. The PF collected in `pfCollector` is distributed daily to configured partners via PFDistributor contract. Formula: each recipient receives `PF_received_for_scope × (allocated_points ÷ 30)`.
+
+**Division of labor**: contract implementation = BNZA (zen) / verification (Foundry 38/38 green, 100% coverage, Slither triaged) + **production deployment** + batch + aggregation + ops screen = SOTATEK (deploy with `initialize(usdc, treasury, owner_=zen_address)`) / owner-key operations (setOperator, treasury approve allowance, post-deploy verification, rescue) = BNZA (zen).
+
+**Distribution corpus**: actual USDC received by `pfCollector` (on-chain scan canonical). PF received in pair currencies (~5% in practice) is BNZA-attributed and excluded. The pre-existing balance before the starting block is also BNZA-attributed ("legacy balance").
+
+**Ops PF page** (ops.bnza.io `/pf`):
+- Max 5 recipients. Each row: label (required) + wallet + allocated points (1–30; 0.01pt precision = 1 bps) + applicable scope (normal on/off / WL all or per-code / IB all or per-code) + status (active/paused).
+- Validation: Σpoints ≤30 per channel; no duplicate wallets; destination blocklist (USDC contract, PFDistributor self, treasury); 0-point save blocked.
+- Changes take effect from the next batch. Changes during batch execution (between 13:00 close and payout) do not affect that run.
+
+**Aggregation batch** (daily 13:00 JST):
+- Ingest job: scan USDC `Transfer(to=pfCollector)` on OP + Base every 15 min; record after 15 confirmations; `pf_income_events` UNIQUE(chain_id, tx_hash, log_index).
+- Attribution: join `wl_bot_payouts` (WL channel) / `ib_collect_events` (IB channel, via ib_id→referral_code) / `fee_collections` (normal). Unresolved → `pending`; re-resolved at batch-close; unresolved >72h → `unattributed` (BNZA-attributed).
+- Batch is strictly serial. Failure → 3 retries → ops alert. Skip (abandonment) is owner-approved exception — **must verify `processedBatch(batchId)==false` on-chain first** (QA R3 guard against double-pay).
+- Carry-forward: payable <$1.00 → entire amount to carry_out (dust suppression). Carry canonical source: `pf_recipients.carry_balance_usd` (updated only at paid confirmation).
+
+**PFDistributor contract**: pull model (treasury approves monthly-cap allowance; distribute() pulls exact batch total via transferFrom). No custody in normal operation. Kill switch = set approve to 0.
+
+---
+
 
 **Description**: Hyperliquid perpetuals trading frontend at ex.bnza.io. Needs to integrate TradingView Advanced Charts to replace the current free widget.
 
@@ -622,9 +700,10 @@ Dev progress as of tracker (Google Sheet):
 | Layer | Mechanism | Modules |
 |---|---|---|
 | Primary | X-Wallet-Address header (no signature) | All frontends → OPERATOR |
-| BNZA-ADMIN | Cloudflare Access (zen@bnza.io) + wallet connect + RBAC role check (`/api/me`). Roles: **Viewer** (read-only all) / **Admin\|Operator** (member writes, `wl_members` PATCH, lifecycle ops) / **Super_Admin** (`wl_codes` create/edit + `wl_master_wallets` writes) | PTL-02 only |
+| BNZA-ADMIN | Cloudflare Access (zen@bnza.io) outer gate (CF level, unchanged) + **SIWE signature auth + 2FA TOTP** (replaces X-Wallet-Address, per auth_spec_v1.1) + JWT session (24h sliding / 7d absolute cap) + RBAC. Roles: **Viewer** (read-only all) / **Admin\|Operator** (member writes, `wl_members` PATCH, lifecycle ops) / **Super_Admin** (`wl_codes` create/edit + `wl_master_wallets` writes). **Note**: auth_spec_v1.1 positioned as shared BNZA ecosystem auth foundation — adopted by ib.bnza.io. | PTL-02 only |
 | WL-ADMIN | SSO (Cloudflare Access) + 2FA (TOTP mandatory); roles: Super / Operator / Read-only | PTL-06 only |
 | WL Mobile | SIWE (Sign-In with Ethereum) → 24h JWT; tenant resolved by subdomain + signature domain | PTL-01 only |
+| IB Portal | **SIWE + 2FA TOTP + JWT** (24h sliding / 7d absolute cap) — same auth foundation as BNZA-ADMIN (auth_spec_v1.1 shared ecosystem auth). No Cloudflare Access gate (public-facing partner portal). Roles: IB partner only (single role; no RBAC variants). | PTL-IB (ib.bnza.io) |
 
 ---
 
@@ -689,7 +768,7 @@ Dev progress as of tracker (Google Sheet):
 - Multi-region deployment (Phase 3)
 - Enterprise SLA features
 - Marketing / community engagement
-- **BnzaSplitter on-chain contract** — removed from v1 scope per WL_SPEC_SOTATEK_EN_v1.0 §1.2. PF về pfCollector single EOA trong v1.
+- **BnzaSplitter on-chain contract (WL context)** — removed from v1 WL scope per WL_SPEC_SOTATEK_EN_v1.0 §1.2. PF về pfCollector single EOA. **Note**: IBSplitter (IB context) and PFDistributor are in scope — see Module 2B/2C.
 - **MLM reward computation, referral tree management, RewardDistributor payout (Layer B)** — Helix/WL build, not SOTATEK scope per WL_SPEC_SOTATEK_EN_v1.0 §0 intro. BA docs cho `wl-admin/` và `mobile/` vẫn relevant làm interface context, nhưng implementation Layer B+C là phía Helix.
 
 > **[EXPLICIT SCOPE CLARIFICATION — WL_SPEC_SOTATEK_EN_v1.0 §0, §1.2]**
@@ -703,14 +782,19 @@ Dev progress as of tracker (Google Sheet):
 
 ## 10. Open Questions
 
-- [x] OQ-1: Monorepo strategy — **Resolved: Monorepo.** All SOTATEK modules in a single repo. Decision before the May 24 deadline.
-- [ ] OQ-2: EXBOT interface specs — when will zen provide D1 schema + Queue topology + API contracts? **Hold: unknown, need to escalate and ask zen.** Potential blocker for EXBOT infra.
-- [x] OQ-3: TradingView license — **Resolved: zen/MEGABUCKS funds. SOTATEK can procure if needed. Not blocking.**
-- [x] OQ-4: MOBILE WL gate — **Resolved: Mock first (Phase 1 UI verification). Production invite flow (server-side verify) implemented later when the OPERATOR endpoint is ready.**
-- [x] OQ-5: ADMIN TOKEN management — **Resolved: Keep mock, low priority. Not needed for WL launch.**
-- [x] OQ-6: ADMIN PF distribution — **Resolved: FM-ADM-02 is off-chain config only.** `fee_distributions` table records BNZA's internal PF allocation. The 70%/30% WL split is Helix's distribution concern — not SOTATEK/BNZA-ADMIN scope (BR-ADM-020). Real API live as of 2026-06-12.
-- [x] OQ-7: Testing strategy — **Resolved: Per-module strategy.** MOBILE/ADMIN: unit + E2E (critical flows). EXBOT infra: integration tests (queue, HL API). POOL/EX: unit tests (80%+ coverage).
-- [ ] OQ-8: Staging environment — **Hold: not yet decided.** Noted in backbone.
+- [x] OQ-INTAKE-001: Monorepo strategy — **Resolved: Monorepo.** All SOTATEK modules in a single repo. Decision before the May 24 deadline.
+- [ ] OQ-INTAKE-002: EXBOT interface specs — when will zen provide D1 schema + Queue topology + API contracts? **Hold: unknown, need to escalate and ask zen.** Potential blocker for EXBOT infra.
+- [x] OQ-INTAKE-003: TradingView license — **Resolved: zen/MEGABUCKS funds. SOTATEK can procure if needed. Not blocking.**
+- [x] OQ-INTAKE-004: MOBILE WL gate — **Resolved: Mock first (Phase 1 UI verification). Production invite flow (server-side verify) implemented later when the OPERATOR endpoint is ready.**
+- [x] OQ-INTAKE-005: ADMIN TOKEN management — **Resolved: Keep mock, low priority. Not needed for WL launch.**
+- [x] OQ-INTAKE-006: ADMIN PF distribution — **Resolved (superseded by pf_spec_v1.0).** Original resolution (2026-06-12): FM-ADM-02 was off-chain config only, `fee_distributions` table. **Superseded 2026-07-06**: `pf_spec_v1.0_EN.md` upgrades PF to a full on-chain batch distribution system — PFDistributor contract + daily batch + `pf_income_events` on-chain scan + recipient configuration with allocated points (1–30) + applicable scope per channel. See Module 2C. The WL 70/30 split remains Helix's concern; this OQ referred to BNZA's internal PF revenue distribution to its own partners.
+- [x] OQ-INTAKE-007: Testing strategy — **Resolved: Per-module strategy.** MOBILE/ADMIN: unit + E2E (critical flows). EXBOT infra: integration tests (queue, HL API). POOL/EX: unit tests (80%+ coverage).
+- [ ] OQ-INTAKE-008: Staging environment — **Hold: not yet decided.** Noted in backbone.
+- [ ] OQ-INTAKE-009: IB Portal effort estimate — SOTATEK proposal not yet received. Blocks sprint planning for Module 2B. Escalate alongside OQ-INTAKE-002.
+- [ ] OQ-INTAKE-010: IBSplitter production deployment timing — zen verifies owner/router/usdc on-chain before granting setOperator. What is the target chain-go-live date for IBSplitter on OP + Base? Needed to sequence IB Portal launch.
+- [ ] OQ-INTAKE-011: PFDistributor deployment owner — Contract implementation = BNZA (zen). SOTATEK does production `initialize(usdc, treasury, owner_=zen_address)` call. What is the expected deployment date and treasury allowance top-up schedule?
+- [ ] OQ-INTAKE-012: PF batch skip approval process — Spec requires owner-approved exception for batch skip (verify `processedBatch(batchId)==false` on-chain first). Who is the owner key holder, and what is the approval SLA for an ops alert?
+- [ ] OQ-INTAKE-013: IB Portal initial-setup wizard — First-login wizard is mandatory: IB must configure default group before reaching dashboard. Does SOTATEK build this wizard, or is it pre-seeded by zen via BNZA-ADMIN before portal access is granted?
 
 ---
 
@@ -755,19 +839,22 @@ docs/sotatek/ba/plans/bnza-sotatek-260519-0000/
     ├── admin/
     ├── mobile/
     ├── operator/
-    └── exbot/
+    ├── exbot/
+    ├── ib/                            ← IB Portal (ib.bnza.io — NEW)
+    └── pf/                            ← PF Distribution System (NEW)
 ```
 
 ---
 
 ## 12. Recommended Next Steps
 
-1. **Build backbone** — Requirements backbone from intake (feature map, actor map, module boundaries, priority ordering)
-2. **Escalate OQ-2** — Ask zen for EXBOT interface specs timeline
-3. **Emit FRD per module** — Functional Requirements Document (5 modules)
-4. **Emit User Stories** — Per module, prioritized by WL launch critical path
-5. **Emit SRS** — Selective (MOBILE + ADMIN first, then EXBOT infra, then EX + POOL Steps)
-6. **Wireframe constraints** — For MOBILE (critical, new UI) and ADMIN WL/PF screens
+1. **Build backbone** — Requirements backbone from intake (feature map, actor map, module boundaries, priority ordering); add IB Portal + PF Distribution to portal matrix and feature map
+2. **Escalate OQ-INTAKE-002 + OQ-INTAKE-009** — Ask zen for EXBOT interface specs timeline; request SOTATEK effort estimate for IB Portal (Module 2B)
+3. **Escalate OQ-INTAKE-010 + OQ-INTAKE-011** — IBSplitter production deployment date (OP + Base) and PFDistributor deployment + treasury allowance schedule
+4. **Emit FRD per module** — Functional Requirements Document (7 modules: MOBILE, ADMIN, EX, EXBOT, POOL, IB, PF)
+5. **Emit User Stories** — Per module, prioritized by WL launch critical path
+6. **Emit SRS** — Selective (MOBILE + ADMIN first, then IB Portal + PF Distribution, then EXBOT infra, then EX + POOL Steps)
+7. **Wireframe constraints** — For MOBILE (critical, new UI), ADMIN WL/PF screens, and IB Portal (new external portal)
 
 ---
 
@@ -806,3 +893,12 @@ docs/sotatek/ba/plans/bnza-sotatek-260519-0000/
 | **WL_HANDOVER_EN.md** (`docs/`) | backbone §8.10 §8.10.8 (absorbed 2026-06-16) | Spec-to-code mapping (Section A): `src/api/wl-admin.ts`, `src/cron/wl-lifecycle.ts`, `src/cron/wl-reconciler.ts`, etc. Post-launch backlog (Section B): 6 items BNZA-owned. Deliberate decisions & accepted risks (Section C): 12 design decisions + 3 accepted risks — settled, not to re-open. Triple-AI QA (3 rounds, 13 fixes, converged SHIP). |
 | **WL_ADMIN_API_GUIDE_EN.md** (`docs/`) | backbone §5.2 FM-ADM-01 API detail + backbone §8.10 §8.10.1–§8.10.6 (absorbed 2026-06-16) | Admin plane auth (`X-Wallet-Address`, NOT HMAC); role gates (viewer/operator/super_admin per endpoint); wl_codes state machine (active↔suspended); wl_members state machine (none→active→leaving→left→active, one-wallet-one-WL E-5, optimistic locking); wl_master_wallets (bookkeeping-only); api_key vs HMAC secret separation; full error code table. |
 | **WL_API_CONNECTION_GUIDE_EN.md** (`docs/`) | Not absorbed into backbone (Helix-facing, no SOTATEK admin impact). Logged for traceability. | HMAC-SHA256 signing spec for Helix server-to-server integration: canonical string format, 4 mandatory headers, nonce/timestamp window, endpoint contracts, test vectors, reference client. Audience: QC engineers + Helix FE developers. |
+| **admin_ui_spec_common_v1.1_EN.md** (`docs/admin/`) | intake §3 Module 2 (tech stack confirm, design rules ref) + §4.6 (auth model update context) | Design foundation for all BNZA Admin pages: dark theme tokens, typography (Poppins/tabular-nums), layout (header/sidebar/footer/guide panel), table/card/chart creation rules, responsive breakpoints (desktop-first, 2xl guide panel), i18n (ja/en), state display (loading/error/empty/refreshing), display format rules (USD/percent/datetime/address/ETH). SOTATEK scope = mock → real API only; do not change design. |
+| **admin_ui_spec_top_v1.1_EN.md** (`docs/admin/`) | intake §3 Module 2 SOTATEK Tasks (Dashboard bullet enriched) | TOP page (`/dashboard`) spec: 4 KPI cards (PF Revenue MTD/yesterday/today via `fee_collections`, opFee same, Users via `first_connected_at`, TVL via `daily_snapshots` principal-only), Metric chart (recharts, 4 metrics × period toggle), POOL monitor (`bot_operations` latest 100 cap, 15/page, 7 cols, no filter), User Info Modal (wallet→users/bot_configs/fee_collections join, classification Normal/WL/IB), Relayer header-band-only (150-wallet HD pool, 0.001 ETH alert threshold). 7 SOTATEK real-API tasks. Bottom cards (EX/TOKEN/Relayer panel) abolished in v1.1. |
+| **auth_spec_v1.1_EN.md** (`docs/admin/`) | intake §3 Module 2 Current State (X-Wallet-Address deprecation note) + §3 Module 2 SOTATEK Tasks (Auth upgrade task added) + §4.6 (BNZA-ADMIN auth row updated) | Breaking AuthN change: replace trivially-spoofable X-Wallet-Address header with SIWE signature auth + 2FA TOTP + JWT session (24h sliding / 7d absolute). AuthZ (RBAC guard functions, `admin_wallets` table) kept unchanged — only `accessControl` entry point swapped. New tables: `auth_nonces`, `admin_2fa`, `admin_2fa_recovery`, `admin_sessions`. Login UI: 5-step fixed-card mock (`auth-preview`) already finalized. Permission matrix TBD post-dev. Positioned as shared BNZA ecosystem auth foundation (ib.bnza.io future). |
+| **admin_ui_spec_common_v1.2_EN.md** (`docs/admin/`) | intake §3 Module 2 Current State (v1.2 note) | Increment over v1.1: `tvl_history` table replaces `daily_snapshots` for TVL data source (backfill run required). Layout and design tokens otherwise unchanged. |
+| **admin_ui_spec_top_v1.2_EN.md** (`docs/admin/`) | intake §3 Module 2 SOTATEK Tasks (Dashboard bullet — TVL source + bot-count card relocation) | Increment over v1.1: TVL KPI card now reads from `tvl_history`; bot-count metric moved from TOP to POOL monitor section. |
+| **ib_spec_v1.4_EN.md** & **ib_spec_v1.5_EN.md** (`docs/admin/`) | intake §3 Module 2B (IB Portal full description) + §3 Module 2 (IB ops screen in BNZA-ADMIN) | Complete IB v1.5 data model rewrite: multi-group model (each IB has multiple groups; group = payout recipe + acquisition channel via `group_code`); on-chain distribution via IBSplitter; `ib_groups`, `ib_group_wallets`, `ib_user_assignments`, `ib_access_list` tables; compound prohibited for IB bots; distribution currency USDC fixed. v1.4 is retained as historical comparison reference for transition to v1.5. |
+| **ib_portal_spec_v1.7_EN.md** (`docs/ib/`) | intake §3 Module 2B (full portal spec) | IB self-management portal at ib.bnza.io: 4-page nav (Dashboard / User Management / Group Management / Revenue), initial-setup wizard (mandatory), 15/page pagination, QR referral links, React 19 + Tailwind + shadcn/ui (same stack as ops.bnza.io). |
+| **ib_splitter_spec_v1.0_EN.md** (`docs/ib/`) | intake §3 Module 2B (on-chain execution section) | IBSplitter UUPS Solidity contract: deployed on OP (10) + Base (8453), SOTATEK does production `initialize(usdc, router, owner_=zen_address)`, within-TX distribution via `distributeFor()`, bps formula `floor(Net × bps / 10000)`, dust always to user, Foundry 69/69 green + 100% coverage + Slither triaged. |
+| **pf_spec_v1.0_EN.md** (`docs/pf/`) | intake §3 Module 2C (full PF distribution system) + §10 OQ-INTAKE-006 supersede note | Full on-chain PF batch distribution: PFDistributor (pull model, treasury allowance), daily 13:00 JST batch, `pf_income_events` USDC transfer scan (OP + Base, 15-confirm), 5-recipient max, points-based allocation (1–30), per-channel scope (normal/WL/IB), carry-forward for <$1 dust, Foundry 38/38 green + 100% coverage + Slither triaged. Supersedes FM-ADM-02 off-chain config model. |

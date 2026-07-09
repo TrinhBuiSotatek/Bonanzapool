@@ -3,10 +3,11 @@ type: use-case
 module: exbot
 status: draft
 created: 2026-06-12
-updated: 2026-07-04
+updated: 2026-07-08
 owner: "@hienduong"
 linked_stories: [US-EXBOT-009, US-EXBOT-010, US-EXBOT-012]
 changelog:
+  - 2026-07-08 | /ba-do | Trigger section: replace stale template with 5 conditions from FR-EXBOT-072; step 2: Close Worker → ExBot Lambda
   - 2026-07-04 | arc-migration | replace UserLockDO with User Lock (Redis Redlock via ElastiCache), D1 with Aurora PostgreSQL per FR-EXBOT-092
   - "2026-06-18 | /ba-do hld-decisions | rewrite: drop park/redeploy/re-entry loop; new flow: executeStrategy(RedeemStrategyV1) → RedemptionQueue FIFO → user receives funds"
   - 2026-06-18 | /ba-do | add US-010 (SAFE_MODE/margin critical trigger) and US-012 (admin force-close trigger) to linked_stories
@@ -17,7 +18,12 @@ changelog:
 
 ## Trigger
 
-User navigates to the relevant screen or initiates the described action.
+Any of the following system conditions creates a `close_operations` row and initiates `bot_safe_close` (FR-EXBOT-072):
+1. **Circuit breaker exhausted** — `circuit_breakers.state='open'` and `reset_at` extended 3+ times without probe success
+2. **Margin critical** — `margin_status='critical'` twice in a row leading to SAFE_MODE with no auto-recovery path
+3. **3 stops within 7 days** — `lifecycle_state='hedge_stopped_cooldown'` entered for the 3rd time in a 7-day rolling window
+4. **Partial repair exhausted** — `partial_repair` consumer fails 3 consecutive repair attempts for the same trigger event
+5. **Admin force-close** — Admin invokes `POST /api/exbot/close` explicitly
 
 ---
 
@@ -26,12 +32,12 @@ User navigates to the relevant screen or initiates the described action.
 - **System:** Hyperliquid, BnzaExVault, BnzaExPositionManager, RedemptionQueue, Aurora PostgreSQL
 
 ## 2. Preconditions
-- Trigger condition met: circuit breaker retries exhausted, OR margin critical + SAFE_MODE irrecoverable, OR 3 stops within 7 days, OR admin force-close
+- Trigger condition met: circuit breaker retries exhausted, OR margin critical + SAFE_MODE irrecoverable, OR 3 stops within 7 days, OR partial repair exhausted (3 consecutive failures), OR admin force-close
 - `bots.status NOT IN ('closed', 'closing')` — a trigger on a bot already closed or currently closing is rejected; the UNIQUE constraint on `close_operations.idempotency_key` enforces this at DB level (see FR-EXBOT-072)
 
 ## 3. Main Success Scenario
 1. Trigger creates `close_operations` row (kind='bot_safe_close', state='requested'); `lifecycle_state` set to `lp_closing`; `bots.status` set to `'closing'` — held until step 11
-2. Close Worker: acquire `User Lock (Redis Redlock via ElastiCache)` lease; full close HL short (`closeShortReduceOnlyIoc`)
+2. ExBot Lambda: acquire `User Lock (Redis Redlock via ElastiCache)` lease; full close HL short (`closeShortReduceOnlyIoc`)
 3. Cancel stop via `§19.5 replaceStopProtected` with size=0
 4. Reconcile: verify HL size = 0; update `close_operations.state='hedge_closed'`
 5. Call `vault.executeStrategy(RedeemStrategyV1, user, botId, params)` — closes LP position via BnzaExPositionManager

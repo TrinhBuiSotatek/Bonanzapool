@@ -3,9 +3,10 @@ type: srs-states
 module: exbot
 status: draft
 created: 2026-06-12
-updated: 2026-06-18
+updated: 2026-07-08
 owner: "@hienduong"
 changelog:
+  - 2026-07-08 | /ba-do | I-17: add provisioning as official key_status DB state — row created after KMS succeeds, before HL approveAgent; blocked at bot-start preflight (E-EXBOT-017)
   - 2026-07-03 | /ba-do | Q7: clarify paused row — pause only allowed from lifecycle_state='active'; hedge_stopped_cooldown and lp_rebalancing cannot be paused
   - 2026-06-29 | manual | replace Agent Key Approval Status section (approval_status, 4-state) with Agent Key Status (key_status, 3-state — active/superseded/revoked)
   - 2026-06-26 | manual | QC I-23 fix: add hl_agent_keys.approval_status state diagram (4 states, 4 transitions; reject path deferred OQ-EXBOT-016)
@@ -116,15 +117,18 @@ stateDiagram-v2
 
 ```mermaid
 stateDiagram-v2
-    [*] --> active : key-provision worker generates keys via KMS + HL approveAgent succeeds
+    [*] --> provisioning : KMS generates master key + agent key successfully; row created before HL approveAgent call
+    provisioning --> active : HL approveAgent confirms registration
+    provisioning --> provisioning : HL approveAgent fails — retry via key-provision queue (max 3 attempts)
     active --> superseded : key rotation — new key activated atomically (old row superseded + new row active in same tx)
     active --> revoked : admin explicit revocation
 ```
 
 | State | Meaning | Bot Start Preflight |
 |-------|---------|-------------------|
+| `provisioning` | KMS keys generated; HL approveAgent pending or in retry | Blocked (E-EXBOT-017) |
 | `active` | System-provisioned, HL-registered, usable by Signing Lambda for hedge-sync | Passes |
 | `superseded` | Replaced by a newer active key (rotation) | N/A — row inactive |
 | `revoked` | Explicitly revoked by admin | N/A — row inactive |
 
-**Note:** Keys are provisioned automatically by the key-provision worker on user on-chain deposit. No manual submission or admin approval required. Private keys are generated and retained in AWS KMS — they never leave the HSM.
+**Note:** Keys are provisioned automatically by the key-provision worker on user on-chain deposit. No manual submission or admin approval required. Private keys are generated and retained in AWS KMS — they never leave the HSM. The `provisioning` state persists in DB to enable retry recovery if queue message is lost.

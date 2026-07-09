@@ -3,10 +3,11 @@ type: use-case
 module: exbot
 status: draft
 created: 2026-06-18
-updated: 2026-07-04
+updated: 2026-07-09
 owner: "@hienduong"
 linked_stories: [US-EXBOT-002]
 changelog:
+  - 2026-07-09 | manual | A7: cite E-EXBOT-029 for status='error' UI display message
   - 2026-07-04 | arc-migration | replace Cloudflare primitives with AWS equivalents (D1→Aurora PostgreSQL, ExBot Worker→ExBot Lambda, MarketDataDO→Pool Slot0 Cache, CF service binding + shared-secret header→API Gateway + HMAC Lambda Authorizer)
   - 2026-07-03 | /ba-do | I-001: A3 rewrite — cooldown removed, A3a lp_closing + A3b closed (E-EXBOT-021/022). I-002: Actors add Admin + auth mechanism. I-004: step 3 last_light_check_at. I-005: A6 lp_rebalancing + A7 error + A4 clarify closed≠404. I-006: JSON response schema defined. I-009: E-EXBOT-023 registered + A4 updated. I-010: A5 infra-level note. I-011: Preconditions auth mechanism documented. I-013: step 4 + A8 MarketDataDO null fallback
   - 2026-06-18 | /ba-do | initial draft to cover US-002 monitor status flow via Operator Facade
@@ -94,7 +95,7 @@ Investor navigates to the ExBot status screen in the POOL UI.
 - **A3a (lifecycle_state='lp_closing'):** Bot close is in progress; UI displays "Bot close is in progress. Please wait." (E-EXBOT-021); all mutation buttons disabled
 - **A3b (lifecycle_state='closed'):** Bot fully closed; record still exists in Aurora PostgreSQL; 200 response with `lifecycle_state='closed'`; UI displays "Bot safely closed. Funds have been returned to your wallet." (E-EXBOT-022); all mutation buttons disabled
 - **A6 (lifecycle_state='lp_rebalancing'):** LP range rebalance in progress; 200 response with `lifecycle_state='lp_rebalancing'`; UI displays "Rebalancing in progress"; all mutation buttons disabled
-- **A7 (status='error'):** Bot error requiring admin intervention; 200 response with `status='error'`; UI displays "Bot error — admin intervention required"; only "Close Bot (emergency)" enabled
+- **A7 (status='error'):** Bot error requiring admin intervention; 200 response with `status='error'`; UI displays E-EXBOT-029; only "Close Bot (emergency)" enabled
 - **A8 (Pool Slot0 Cache unavailable or stale):** Step 4 — `current_tick: null`, `range_state: null` returned in response; all other fields returned normally; no 503, no retry. UI displays "—" for range state indicator
 - **A4 (no bot record found for botId):** 404 response (E-EXBOT-023); UI shows empty state "No active bot found for this account." Note: `closed` bots return 200 (record retained in Aurora PostgreSQL), not 404
 - **A5 (Operator Facade unavailable):** 503 Service Unavailable — AWS/infra-level response (API Gateway or Lambda cold-start/throttle), not application-defined; no E-EXBOT code required. UI shows error banner "Status service temporarily unavailable"

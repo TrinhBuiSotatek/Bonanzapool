@@ -2,7 +2,7 @@
 type: srs
 status: draft
 created: 2026-06-12
-updated: 2026-07-04
+updated: 2026-07-08
 owner: "@hienduong"
 module: exbot
 lang: en
@@ -12,6 +12,9 @@ links:
   - ../usecases/index.md
   - ../userstories/index.md
 changelog:
+  - 2026-07-09 | manual | register E-EXBOT-029: status='error' UI display message (uc-monitor-status A7)
+  - 2026-07-09 | manual | register E-EXBOT-028: LP mint on-chain tx reverted/timeout at bot-start → lifecycle_state='error'
+  - 2026-07-08 | /ba-do | add E-EXBOT-026/027; update KMS provisioning flow steps 4–7; add BR-EXBOT-012 UNIQUE active per user constraint
   - 2026-07-04 | arc-migration | FR-EXBOT-010: sync queue count to 11 (add key-provision), fixing inconsistency with FM-XB-02 backbone label
   - 2026-07-03 | arc-migration | replace Cloudflare primitives with AWS equivalents across all FRs
   - 2026-06-29 | manual | flow change: §1 intro; FM-XB-02/05/06; FR-002/080 KMS; remove FR-081/082/083; BR rewrite; remove E-003/004/014/015/016; add E-017; §6/7/8; FR-090; NFR-006; IC-005; close OQ-16
@@ -447,15 +450,16 @@ On user on-chain deposit, the system automatically provisions a per-user **maste
 1. Chain indexer (Fargate) detects on-chain deposit event and enqueues a `key-provision` job
 2. Key-provision worker requests KMS to generate per-user master key → KMS returns only the public address
 3. Key-provision worker requests KMS to generate per-user agent key → KMS returns only the public address
-4. Key-provision worker calls HL `approveAgent` API to register `agent_address` as authorized delegate of `hl_user_address` (master key public address)
-5. Only after HL confirms registration: worker sets `hl_agent_keys.key_status='active'`
-6. Bot start is enqueued automatically
+4. Worker creates `hl_agent_keys` row with `key_status='provisioning'` — row persisted before HL call to enable retry recovery
+5. Key-provision worker calls HL `approveAgent` API to register `agent_address` as authorized delegate of `hl_user_address` (master key public address)
+6. Only after HL confirms registration: worker sets `hl_agent_keys.key_status='active'`
+7. Bot start is enqueued automatically
 
 **Private keys never leave KMS.** All HL order signing goes through the Signing Lambda; only the Signing Lambda IAM role holds `kms:Sign` permission. No key material appears in app memory, logs, or database rows.
 
 **KMS failure handling:**
-- *During key generation:* Abort provisioning, enqueue retry (max 3 attempts with exponential backoff). On final failure, admin alert is sent. `key_status` remains unset (`provisioning`).
-- *During HL approveAgent call:* Key remains `key_status='provisioning'`; retry via key-provision queue; admin alerted on SLA breach.
+- *During key generation (steps 2-3):* Abort provisioning, no row created, enqueue retry (max 3 attempts with exponential backoff). On final failure: E-EXBOT-027 alert sent via `notification` queue; admin must manually re-trigger key-provision job via admin panel. User does NOT need to re-deposit — funds remain in BnzaExVault.
+- *During HL approveAgent call (step 5):* Row already exists with `key_status='provisioning'`; retry via key-provision queue (max 3 attempts). On final failure: E-EXBOT-027 alert sent via `notification` queue; admin must manually re-trigger from `provisioning` row via admin panel. User does NOT need to re-deposit.
 - *During hedge-sync signing:* Signing Lambda failure aborts the signing operation; hedge-sync worker transitions bot to SAFE_MODE. Admin is alerted. Recovery follows standard SAFE_MODE path.
 
 **Key rotation:** New KMS key pair generated; old agent key row set to `key_status='superseded'`; new row set to `key_status='active'` — atomically in the same transaction. Old key is deregistered from HL via `approveAgent` with revocation call.
@@ -537,7 +541,7 @@ The OPERATOR shall expose four endpoints under `/api/exbot/*`, each proxied to E
 | BR-EXBOT-008 | "BnzaExVault/Vault" (LP NFT custody Solidity contract) is unrelated to "vaultAddress/subaccount" (HL subaccount identifier) despite naming similarity. These must never be conflated in code or documents. | P0 |
 | BR-EXBOT-009 | Aurora PostgreSQL schema changes after Phase A deploy: ADD COLUMN only. DROP and RENAME of existing columns are forbidden. | P0 |
 | BR-EXBOT-010 | ExBot Lambda (`apps/bnza-exbot/`) must not be co-deployed with OPERATOR (`apps/bnza-operator/`). They communicate via API Gateway + HMAC Lambda Authorizer only. | P0 |
-| BR-EXBOT-012 | Only one `hl_agent_keys` row per user may have `key_status='active'` at any time. This constraint is enforced at the database level. Source: FR-EXBOT-080. | P0 |
+| BR-EXBOT-012 | Only one `hl_agent_keys` row per user may have `key_status='active'` at any time. This constraint is enforced at the database level. `provisioning` rows are not subject to this constraint — a user may have one `provisioning` row while no `active` row exists yet. Source: FR-EXBOT-080. | P0 |
 | BR-EXBOT-013 | Agent key rows are immutable after write — revocation and rotation are non-destructive. `revoked` and `superseded` rows must never be overwritten or deleted; they are retained for audit purposes. Source: FR-EXBOT-080. | P0 |
 | BR-EXBOT-014 | During key rotation, the old row's `key_status='superseded'` and the new row's `key_status='active'` must be committed atomically in the same transaction. There is no window where both rows are `active` or neither is `active`. Source: FR-EXBOT-080. | P0 |
 
@@ -562,6 +566,10 @@ The OPERATOR shall expose four endpoints under `/api/exbot/*`, each proxied to E
 | E-EXBOT-018 | bot_safe_close hedge close failed after 3 retries — `close_operations.state='residual_hl_liability'` | "Bot safe close failed: HL hedge could not be closed after 3 attempts. Manual intervention required. Bot held at residual_hl_liability." | — (internal alert) |
 | E-EXBOT-024 | user_redeem hedge close failed after 3 retries or reconcile mismatch — `close_operations.state='residual_hl_liability'` | "User redemption hedge close failed. Manual intervention required." | — (internal admin alert) |
 | E-EXBOT-025 | Bot start preflight — no confirmed deposit in `BnzaExVault` for this user | "No confirmed deposit found. Please complete an on-chain deposit before starting the bot." | 400 |
+| E-EXBOT-026 | HL rejects IOC order at bot-start hedge open | "Hedge order rejected by Hyperliquid. Bot entered Safe Mode." | — (internal alert) |
+| E-EXBOT-027 | Key-provision failed after max 3 retries (KMS or HL approveAgent) | "Key-provision failed for user {wallet_address} after 3 retries. Manual re-trigger required via admin panel." | — (internal alert) |
+| E-EXBOT-028 | LP mint on-chain tx reverted or timed out at bot-start — `bots.lifecycle_state='error'`; no funds moved | "Bot startup failed: LP mint transaction did not complete. No funds were moved. Please try again or contact support." | 502 |
+| E-EXBOT-029 | `bots.status='error'` — bot requires admin intervention; displayed on status screen | "Bot encountered a critical error. Admin intervention required. You may close the bot via emergency close." | 200 |
 
 ---
 

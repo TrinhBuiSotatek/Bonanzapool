@@ -3,9 +3,10 @@ type: srs-erd
 module: exbot
 status: draft
 created: 2026-06-12
-updated: 2026-07-04
+updated: 2026-07-08
 owner: "@hienduong"
 changelog:
+  - 2026-07-08 | /ba-do | I-14: add key_status TEXT NOT NULL with UNIQUE active per user constraint (BR-EXBOT-012) to hl_agent_keys table
   - 2026-07-04 | arc-migration | rename D1 header to Aurora PostgreSQL; annotate hl_agent_keys legacy fields as retired per FR-EXBOT-080 KMS flow
   - 2026-06-29 | manual | update hl_agent_keys table description: envelope encryption → AWS KMS key metadata
   - 2026-06-26 | manual | QC I-13 fix: add approved_by field to hl_agent_keys for admin audit trail
@@ -54,6 +55,7 @@ erDiagram
         TEXT user_id FK
         TEXT hl_user_address
         TEXT agent_address
+        TEXT key_status "NOT NULL; values: provisioning/active/superseded/revoked; UNIQUE active per user (BR-EXBOT-012)"
         BLOB encrypted_secret "RETIRED — legacy manual-approval flow, superseded by FR-EXBOT-080 KMS auto-provisioning"
         BLOB secret_iv "RETIRED — legacy manual-approval flow, superseded by FR-EXBOT-080 KMS auto-provisioning"
         BLOB secret_auth_tag "RETIRED — legacy manual-approval flow, superseded by FR-EXBOT-080 KMS auto-provisioning"
