@@ -1,8 +1,8 @@
 # Test Scenarios — UC-EXBOT-bot-safe-close System-Initiated Safe Close
 
-> **Source:** UC-EXBOT-bot-safe-close_bot-safe-close_audited_20260707_v3.md
+> **Source:** UC-EXBOT-bot-safe-close_bot-safe-close_audited_20260709_v4.md
 > **Generated:** 2026-07-02
-> **Updated:** 2026-07-07 (v3: **Q9 RE-OPENED (Medium — CẦN CONFIRM TỪ BA)**, Q4 open (CẦN CONFIRM TỪ BA))
+> **Updated:** 2026-07-09 (v4: **Q4 RESOLVED (BA 2026-07-04)**, Q9 still pending)
 > **Domain/Architecture:** ExBot Lambda + Hyperliquid + BnzaExVault (on-chain) + RedemptionQueue (on-chain) + Redis Redlock via ElastiCache (User Lock). No UI — logic-only / backend pipeline.
 
 ---
@@ -45,7 +45,7 @@
 **Req-ID:** FR-EXBOT-072, SRS erd.md, Q3 update
 **Test Type:** Functional
 **Description:** Given a bot with `bots.status='closed'`, when a new bot_safe_close trigger arrives from any of the 5 trigger sources, then the system must reject the trigger and return E-EXBOT-012: "Bot {id} is already closed. No action needed." — no new close_operations row must be created.
-**Expected Result Note:** ⚠️ Liên quan đến **Q4 (CẦN CONFIRM TỪ BA)** — xác nhận "Close Worker" là architecture component (ExBot Lambda), không phải actor. Trigger mechanism (5 conditions) cần được ghi rõ trong UC §1. Tuy nhiên, rejection behavior (UNIQUE constraint) không phụ thuộc vào Q4 answer.
+**Expected Result Note:** ✅ **Q4 RESOLVED (2026-07-09):** "Close Worker" là label cho ExBot Lambda — architecture component, không phải actor. 5 trigger conditions từ workers/admin đã được xác nhận. Actor list convention giữ nguyên. Trigger rejection behavior (UNIQUE constraint) không phụ thuộc vào Q4 answer.
 **Test Focus:** Error/Exception
 
 ---
@@ -56,7 +56,7 @@
 **Req-ID:** FR-EXBOT-072, FR-EXBOT-070, Q3 update
 **Test Type:** Functional
 **Description:** Given a bot with an active close_operations row (bot_safe_close in progress, `bots.status='closing'`), when a duplicate bot_safe_close trigger arrives for the same bot, then the system must reject the duplicate via UNIQUE constraint on `close_operations.idempotency_key` — exactly one close_operations row must exist, no double settlement.
-**Expected Result Note:** ⚠️ Liên quan đến **Q4 (CẦN CONFIRM TỪ BA)** — xác nhận "Close Worker" là architecture component (ExBot Lambda). Trigger mechanism (5 conditions từ workers khác + admin API) cần được ghi rõ trong UC §1. Tuy nhiên, UNIQUE constraint behavior không phụ thuộc vào Q4 answer.
+**Expected Result Note:** ✅ **Q4 RESOLVED (2026-07-09):** "Close Worker" là label cho ExBot Lambda — architecture component. 5 trigger conditions từ workers/admin đã được xác nhận. UNIQUE constraint idempotency không phụ thuộc vào Q4 answer.
 **Test Focus:** Idempotency/Concurrency
 
 ---
@@ -254,10 +254,10 @@
 ### Scenario ID: TS_UC-EXBOT-bot-safe-close_025
 **Scenario Title:** Duplicate trigger via redelivery is rejected (idempotency)
 **UC Reference:** UC-EXBOT-bot-safe-close
-**Req-ID:** FR-EXBOT-070, SRS erd.md, **Q4 CẦN CONFIRM TỪ BA**
+**Req-ID:** FR-EXBOT-070, SRS erd.md, **Q4 RESOLVED (2026-07-09)**
 **Test Type:** Idempotency/Concurrency
 **Description:** Given bot_safe_close trigger is delivered and processed, when the same trigger is redelivered (e.g., consumer ack failure, worker crash before ack), then the system must reject the duplicate via UNIQUE constraint on `close_operations.idempotency_key` — the operation must not be double-applied.
-**Expected Result Note:** ⚠️ Liên quan đến **Q4 (CẦN CONFIRM TỪ BA)** — "Close Worker" là ExBot Lambda (architecture component). Trigger mechanism cần BA xác nhận trong UC §1. Tuy nhiên, UNIQUE constraint idempotency không phụ thuộc vào Q4 answer.
+**Expected Result Note:** ✅ **Q4 RESOLVED (2026-07-09):** "Close Worker" là ExBot Lambda (architecture component). 5 trigger conditions đã được xác nhận trong UC. UNIQUE constraint idempotency không phụ thuộc vào Q4 answer.
 **Test Focus:** Idempotency/Concurrency
 
 ---
@@ -295,10 +295,10 @@
 ### Scenario ID: TS_UC-EXBOT-bot-safe-close_029
 **Scenario Title:** Each of 5 trigger conditions creates close_operations with correct trigger_reason populated
 **UC Reference:** UC-EXBOT-bot-safe-close
-**Req-ID:** FR-EXBOT-072, FR-EXBOT-073, **Q9 CẦN CONFIRM TỪ BA**, **Q4 CẦN CONFIRM TỪ BA**
+**Req-ID:** FR-EXBOT-072, FR-EXBOT-073, **Q9 CẦN CONFIRM TỪ BA**, **Q4 RESOLVED (2026-07-09)**
 **Test Type:** Boundary
 **Description:** Given a valid bot (not closed/closing) and each of the 5 trigger conditions is met individually: (1) circuit breaker exhausted, (2) margin critical irrecoverable, (3) 3 stops in 7 days, (4) partial_repair exhausted, (5) admin force-close, when trigger fires in each case, then a close_operations row must be created with `kind='bot_safe_close'` and `trigger_reason` populated matching the specific trigger type — enabling traceable audit trail.
-**Expected Result Note:** ⚠️ Liên quan đến **Q9 (CẦN CONFIRM TỪ BA)** — format cụ thể của `trigger_reason` enum values chưa được định nghĩa. BA cần xác nhận: `circuit_breaker_exhausted`, `margin_critical`, `3_stops_7d`, `partial_repair_exhausted`, `admin_force_close`. Ngoài ra, liên quan đến **Q4 (CẦN CONFIRM TỪ BA)** — xác nhận "Close Worker" là architecture component (ExBot Lambda). 5 trigger conditions đến từ: deep-audit worker, hedge-sync worker, partial_repair worker, light-check/hedge-stopped, HOẶC admin API (`POST /api/exbot/close`). Không có dedicated `bot_safe_close` queue trong 11 queues (FR-EXBOT-010).
+**Expected Result Note:** ⚠️ **Q9 CẦN CONFIRM TỪ BA** — format cụ thể của `trigger_reason` enum values chưa được định nghĩa. BA cần xác nhận: `circuit_breaker_exhausted`, `margin_critical`, `3_stops_7d`, `partial_repair_exhausted`, `admin_force_close`. ✅ **Q4 RESOLVED** — "Close Worker" là ExBot Lambda (architecture component). 5 trigger conditions đến từ: deep-audit worker, hedge-sync worker, partial_repair worker, light-check/hedge-stopped, HOẶC admin API (`POST /api/exbot/close`). Không có dedicated `bot_safe_close` queue trong 11 queues (FR-EXBOT-010).
 **Test Focus:** Boundary
 
 ---
@@ -367,7 +367,6 @@
 
 | Scenario Area | Reason | Recommended Action |
 |---|---|---|
-| Close Worker role clarification: actor vs architecture (**Q4 — CẦN CONFIRM TỪ BA**) | UC §1 lists "Close Worker" as Primary Actor, but evidence suggests it is an architecture component (ExBot Lambda). BA to confirm role definition and update UC §1 if needed. Trigger mechanism (5 conditions from other workers + admin API) documented but not yet confirmed in UC. | **Chờ Q4 answer từ BA** |
 | `idempotency_key` và `trigger_reason` format (**Q9 — CẦN CONFIRM TỪ BA**) | FR-EXBOT-072 nói "idempotency_key UNIQUE enforced" và "trigger_reason populated" nhưng không định nghĩa format/value cụ thể. BA cần bổ sung: (1) format của `idempotency_key` (ví dụ: `{botId}:{kind}:{trigger_timestamp}`), (2) enum values của `trigger_reason` (`circuit_breaker_exhausted`, `margin_critical`, `3_stops_7d`, `partial_repair_exhausted`, `admin_force_close`). | **Chờ Q9 answer từ BA** |
 | BnzaExVault Solidity contract internal logic | zen develops; SOTATEK integrates via ABI | Integration tests depend on ABI confirmation (OQ-EXBOT-08) |
 | RedemptionQueue contract internal logic (fulfillRequest ABI) | zen develops; SOTATEK integrates via ABI | Integration tests depend on ABI confirmation (OQ-EXBOT-08) |
@@ -377,6 +376,10 @@
 | Performance / load testing (NFR-EXBOT-003: 5-minute SLA) | Performance testing out of scope for functional scenario design | Defer to performance testing phase |
 | Security: private key never leaves KMS, Signing Lambda only | Security audit beyond functional testing scope | Defer to security audit |
 | EmergencyTransfer contract-level enforcement (no recipient param) | Cannot be tested via integration — requires contract audit | Defer to contract security review |
+
+---
+
+✅ **Q4 RESOLVED (2026-07-09):** "Close Worker" trong UC §1 là label cho ExBot Lambda — architecture component, không phải actor độc lập. 5 trigger conditions đã được xác nhận trong UC §1/FR-EXBOT-072. Actor list convention giữ nguyên.
 
 ---
 
