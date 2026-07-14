@@ -2,7 +2,7 @@
 type: srs
 status: draft
 created: 2026-06-12
-updated: 2026-07-08
+updated: 2026-07-14
 owner: "@hienduong"
 module: exbot
 lang: en
@@ -12,6 +12,7 @@ links:
   - ../usecases/index.md
   - ../userstories/index.md
 changelog:
+  - 2026-07-13 | manual | register E-EXBOT-030: GET /status wallet mismatch → 403 (N-002 fix for uc-monitor-status A9)
   - 2026-07-09 | manual | register E-EXBOT-029: status='error' UI display message (uc-monitor-status A7)
   - 2026-07-09 | manual | register E-EXBOT-028: LP mint on-chain tx reverted/timeout at bot-start → lifecycle_state='error'
   - 2026-07-08 | /ba-do | add E-EXBOT-026/027; update KMS provisioning flow steps 4–7; add BR-EXBOT-012 UNIQUE active per user constraint
@@ -146,7 +147,7 @@ The system shall implement exactly 11 queues: `bot-scan`, `light-check`, `hedge-
 
 Every queue consumer shall insert `message_id` with `state='started'` into the `queue_idempotency` table at the start of processing. A UNIQUE constraint conflict on `message_id` indicates duplicate delivery; the consumer shall return immediately without processing. On completion, the consumer updates `state='succeeded'`; on failure, `state='failed'` or `'retryable'`.
 
-**Acceptance criteria:** Redelivering the same queue message twice produces exactly one successful execution. The second delivery exits immediately after the UNIQUE constraint conflict. `queue_idempotency` row is present for every processed message. Lambda SQS consumers shall use `reportBatchItemFailures` response format; failed individual records are returned to SQS for retry while succeeded records are not re-delivered.
+**Acceptance criteria:** Redelivering the same queue message twice produces exactly one successful execution. The second delivery exits immediately after the UNIQUE constraint conflict. `queue_idempotency` row is present for every processed message. Lambda SQS consumers shall use `reportBatchItemFailures` response format; failed individual records are returned to SQS for retry while succeeded records are not re-delivered. A scheduled cleanup job (EventBridge cron, every 1 hour) shall execute `DELETE FROM queue_idempotency WHERE expires_at < now` to prevent unbounded table growth.
 
 ---
 
@@ -570,6 +571,7 @@ The OPERATOR shall expose four endpoints under `/api/exbot/*`, each proxied to E
 | E-EXBOT-027 | Key-provision failed after max 3 retries (KMS or HL approveAgent) | "Key-provision failed for user {wallet_address} after 3 retries. Manual re-trigger required via admin panel." | — (internal alert) |
 | E-EXBOT-028 | LP mint on-chain tx reverted or timed out at bot-start — `bots.lifecycle_state='error'`; no funds moved | "Bot startup failed: LP mint transaction did not complete. No funds were moved. Please try again or contact support." | 502 |
 | E-EXBOT-029 | `bots.status='error'` — bot requires admin intervention; displayed on status screen | "Bot encountered a critical error. Admin intervention required. You may close the bot via emergency close." | 200 |
+| E-EXBOT-030 | GET /status — Investor wallet_address does not match bot.user_wallet_address | "Access denied: this bot does not belong to your account." | 403 |
 
 ---
 

@@ -3,10 +3,14 @@ type: use-case
 module: exbot
 status: retired
 created: 2026-06-12
-updated: 2026-06-29
+updated: 2026-07-14
 owner: "@hienduong"
 linked_stories: []
 changelog:
+  - 2026-07-14 | manual | drop BR-EXBOT-011 (plain DEK rule obsolete post-KMS, absorbed into NFR-EXBOT-006); fix footnote BR-EXBOT-011..014→012..014; fix footnote FR-EXBOT-080..083→FR-EXBOT-080
+  - 2026-07-14 | manual | fix BR-EXBOT-012/013/014 source FR — FR-EXBOT-083 does not exist; correct source is FR-EXBOT-080; fix FR Trace to FR-EXBOT-080 only (FR-EXBOT-081/083 do not exist in spec.md)
+  - 2026-07-14 | manual | fix BR-EXBOT-014 wording — new row 'approved' → key_status='active' (consistent with canonical spec.md §4 and prior BR-EXBOT-012 fix)
+  - 2026-07-14 | manual | P6 fix: update BR-EXBOT-012 wording (approval_status→key_status='active'); remove retired FR-EXBOT-082 from BR table and FR Trace
   - 2026-06-29 | manual | retired: flow changed — system auto-generates master key + agent key via AWS KMS on deposit; admin approval removed; see FR-EXBOT-080, flows.md F-03, uc-bot-start.md
   - 2026-06-20 | /ba-do | QC audit fixes: A2 superseded/revoked split, A5 added, FR trace note, stale template removed
   - 2026-06-12 | /ba-start srs | initial draft
@@ -68,12 +72,11 @@ User navigates to the relevant screen or initiates the described action.
 
 | BR ID | Summary | Source FR |
 |-------|---------|-----------|
-| BR-EXBOT-011 | Plain agent key and plain DEK must never be persisted — function-scoped during decryption only. | FR-EXBOT-080 |
-| BR-EXBOT-012 | Only one `approval_status='approved'` row per user allowed at any time — enforced at DB level. | FR-EXBOT-082 |
-| BR-EXBOT-013 | Revocation and rotation are non-destructive — `revoked` and `superseded` rows must never be deleted. | FR-EXBOT-082 |
-| BR-EXBOT-014 | Key rotation atomicity — old row `superseded` and new row `approved` committed in the same transaction. | FR-EXBOT-083 |
+| BR-EXBOT-012 | Only one `key_status='active'` row per user allowed at any time — enforced at DB level. | FR-EXBOT-080 |
+| BR-EXBOT-013 | Revocation and rotation are non-destructive — `revoked` and `superseded` rows must never be deleted. | FR-EXBOT-080 |
+| BR-EXBOT-014 | Key rotation atomicity — old row `superseded` and new row `key_status='active'` committed in the same transaction. | FR-EXBOT-080 |
 
-Canonical source: `srs/spec.md §4` (BR-EXBOT-011..014) and `srs/spec.md §2` (FR-EXBOT-080..083).
+Canonical source: `srs/spec.md §4` (BR-EXBOT-012..014) and `srs/spec.md §2` (FR-EXBOT-080).
 
 ### Error Codes for This UC
 
@@ -102,6 +105,6 @@ sequenceDiagram
 ```
 
 ## 7. FR Trace
-FR-EXBOT-080, FR-EXBOT-081, FR-EXBOT-082, FR-EXBOT-083
+FR-EXBOT-080
 
-Note: frd.md uses implementation grouping numbers; srs/spec.md is canonical. Trace here always refers srs/spec.md.
+Note: FR-EXBOT-081 and FR-EXBOT-083 do not exist in spec.md. frd.md uses implementation grouping numbers; srs/spec.md is canonical. Trace here always refers srs/spec.md.

@@ -3,10 +3,13 @@ type: use-case
 module: exbot
 status: draft
 created: 2026-06-12
-updated: 2026-07-04
+updated: 2026-07-14
 owner: "@hienduong"
 linked_stories: [US-EXBOT-005, US-EXBOT-006, US-EXBOT-007, US-EXBOT-008]
 changelog:
+  - 2026-07-14 | manual | P2 fix: add FR-EXBOT-011 to §7 FR Trace — referenced in step 5 but missing from trace
+  - 2026-07-13 | manual | v3-I-01 fix: add FR-EXBOT-012 and FR-EXBOT-040 to §7 FR Trace
+  - 2026-07-13 | manual | I-10 fix: replace cleanup gap note with EventBridge cron 1h purge per FR-EXBOT-011 AC
   - 2026-07-04 | arc-migration | replace Cloudflare primitives with AWS equivalents (D1→Aurora PostgreSQL, MarketDataDO→Pool Slot0 Cache (ElastiCache Redis), HlMarkDO→HL Mark Price Cache (ElastiCache Redis), Cron Worker→EventBridge Scheduler)
   - 2026-07-02 | /ba-do | I-09: step 2 LIMIT 500 overflow behavior. I-10: step 5 expires_at TTL + cleanup gap. I-11: diagram → F-01 reference. I-12: step 7 MarketDataDO stale fail-fast + A5 added
   - 2026-07-02 | /ba-do | I-01: hlMarkPrice source HlMarkDO + fallback + staleness 120s. I-02: range_boundary_near price-based formula. I-03: drift_threshold lpValueUsd formula. I-04: funding_alert 7d APR formula. I-05: step 10 rewrite — range_out routes to hedge-sync like other triggers; remove phantom lp_rebalancing queue. I-07: step 12 rewrite — both status+lifecycle_state set atomically before partial_repair enqueue. I-08: step 4 clarify next_light_check_at updated for all eligible bots including skipped
@@ -38,7 +41,7 @@ EventBridge Scheduler fires on 1-minute schedule → enqueues `bot-scan` message
 2. Scan Worker queries Aurora PostgreSQL: `SELECT * FROM bots WHERE status='active' AND next_light_check_at <= now ORDER BY next_light_check_at LIMIT 500`. Bots beyond 500 are processed in the next EventBridge Scheduler tick (1 min later), oldest first — by design, jitter ±45s prevents overflow in steady state
 3. Scan Worker sends per-bot messages to `light-check` queue via `chunkSendBatch`
 4. Scan Worker updates `next_light_check_at = now + 5min + jitter(±45s)` for **every eligible bot** (including bots in `lp_rebalancing`, `lp_closing`) before enqueuing — bots that Light-Check Worker later skips due to `lifecycle_state` check are still rescheduled correctly and will not be flooded on recovery
-5. Light-Check Worker inserts `message_id` into `queue_idempotency` (state='started', expires_at=now+1min); UNIQUE conflict → skip. Note: `expires_at` is always set (default TTL=1min); however, no scheduled cleanup job exists to purge expired rows — table will accumulate over time. **Gap: Dev team to add periodic DELETE WHERE expires_at < now**
+5. Light-Check Worker inserts `message_id` into `queue_idempotency` (state='started', expires_at=now+1min); UNIQUE conflict → skip. Note: `expires_at` is always set (default TTL=1min); an EventBridge cron job (every 1 hour) purges rows WHERE expires_at < now to prevent unbounded table growth (per FR-EXBOT-011 AC).
 6. Light-Check Worker reads from Aurora PostgreSQL: `bot_runtime_state.last_known_hl_short_size`, `lifecycle_state`, `hedge_legs` (stop_price, margin_status, circuit_state)
 7. Light-Check Worker reads from the Pool Slot0 Cache (ElastiCache Redis): `sqrtPriceX96`, `currentTick` (zero HL API calls). If snapshot stale (> 5 min) or the cache is unreachable → throw immediately, skip tick for this bot entirely (no trigger evaluation)
 8. Computes `lpEthAmount` via TickMath + LiquidityAmounts (local, no RPC)
@@ -70,4 +73,4 @@ EventBridge Scheduler fires on 1-minute schedule → enqueues `bot-scan` message
 > See **F-01: Queue Fan-Out (EventBridge Scheduler → Scan → Light-Check → Hedge-Sync)** in [`srs/flows.md`](../srs/flows.md) — full sequence from EventBridge Scheduler → Scan Worker → Light-Check Worker fan-out → hedge-sync enqueue.
 
 ## 7. FR Trace
-FR-EXBOT-013, FR-EXBOT-014, FR-EXBOT-015, FR-EXBOT-016, FR-EXBOT-023, FR-EXBOT-032, FR-EXBOT-033
+FR-EXBOT-011, FR-EXBOT-012, FR-EXBOT-013, FR-EXBOT-014, FR-EXBOT-015, FR-EXBOT-016, FR-EXBOT-023, FR-EXBOT-032, FR-EXBOT-033, FR-EXBOT-040

@@ -3,9 +3,10 @@ type: srs-states
 module: exbot
 status: draft
 created: 2026-06-12
-updated: 2026-07-08
+updated: 2026-07-14
 owner: "@hienduong"
 changelog:
+  - 2026-07-14 | manual | I-N1 fix: add user_redeem column to State Registry — enumerate allowed/blocked states with on-chain rationale; verified against RedeemStrategyV1.sol and BnzaExVaultImpl.sol
   - 2026-07-08 | /ba-do | I-17: add provisioning as official key_status DB state — row created after KMS succeeds, before HL approveAgent; blocked at bot-start preflight (E-EXBOT-017)
   - 2026-07-03 | /ba-do | Q7: clarify paused row — pause only allowed from lifecycle_state='active'; hedge_stopped_cooldown and lp_rebalancing cannot be paused
   - 2026-06-29 | manual | replace Agent Key Approval Status section (approval_status, 4-state) with Agent Key Status (key_status, 3-state — active/superseded/revoked)
@@ -53,24 +54,24 @@ stateDiagram-v2
 
 ## State Registry
 
-| lifecycle_state | bots.status | Description | Light-Check | Hedge-Sync | Deep-Audit |
-|----------------|------------|-------------|------------|-----------|-----------|
-| `idle` | (pre-create) | Not started | — | — | — |
-| `preflight` | (transitional) | Running preflight checks | skip | skip | skip |
-| `lp_opening` | (transitional) | LP mint in progress | skip | skip | skip |
-| `lp_opened` | (transitional) | LP minted, hedge not yet open | skip | skip | skip |
-| `hedge_pre_open` | (transitional) | Opening HL short | skip | skip | skip |
-| `hedge_post_confirmed` | (transitional) | Short confirmed, stop not placed | skip | skip | skip |
-| `stop_placing` | (transitional) | Placing native stop | skip | skip | skip |
-| `stop_verified` | (transitional) | Stop confirmed | skip | skip | skip |
-| `active` | active | Normal monitoring | every 5 min | event-driven | every 6h |
-| `hedge_stopped_cooldown` | active | Stop fired; hedge-sync suppressed 4h | run (no hedge-sync) | suppressed | every 6h |
-| `lp_rebalancing` | active | LP range rebalance in progress | **skip** | skip | skip |
-| `lp_closing` | closing | Close in progress | **skip** | skip | skip |
-| `closed` | closed | Fully closed | skip | skip | skip |
-| `safe_mode` | safe_mode | No mutations; monitor only | limited (no HL) | blocked | when HL recovers |
-| `error` | error | Admin required | skip | skip | skip |
-| `active` (pre-pause) | paused | Hedge maintained; no new mutations; deep-audit may trigger SAFE_MODE via stuck marker detection. **Pause only allowed from `lifecycle_state='active'`** — `hedge_stopped_cooldown` and `lp_rebalancing` cannot be paused | skip | skip | every 6h |
+| lifecycle_state | bots.status | Description | Light-Check | Hedge-Sync | Deep-Audit | user_redeem |
+|----------------|------------|-------------|------------|-----------|-----------|------------|
+| `idle` | (pre-create) | Not started | — | — | — | — |
+| `preflight` | (transitional) | Running preflight checks | skip | skip | skip | — (no tokenId yet) |
+| `lp_opening` | (transitional) | LP mint in progress | skip | skip | skip | — (no tokenId yet) |
+| `lp_opened` | (transitional) | LP minted, hedge not yet open | skip | skip | skip | — (no tokenId yet) |
+| `hedge_pre_open` | (transitional) | Opening HL short | skip | skip | skip | — (no tokenId yet) |
+| `hedge_post_confirmed` | (transitional) | Short confirmed, stop not placed | skip | skip | skip | — (no tokenId yet) |
+| `stop_placing` | (transitional) | Placing native stop | skip | skip | skip | — (no tokenId yet) |
+| `stop_verified` | (transitional) | Stop confirmed | skip | skip | skip | — (no tokenId yet) |
+| `active` | active | Normal monitoring | every 5 min | event-driven | every 6h | ✓ Allowed |
+| `hedge_stopped_cooldown` | active | Stop fired; hedge-sync suppressed 4h | run (no hedge-sync) | suppressed | every 6h | ✓ Allowed |
+| `lp_rebalancing` | active | LP range rebalance in progress | **skip** | skip | skip | ✓ Allowed — `redeem(oldTokenId)` reverts safely mid-rebalance (NFT burned); `redeem(newTokenId)` succeeds after rebalance completes |
+| `lp_closing` | closing | Close in progress | **skip** | skip | skip | — Already closing |
+| `closed` | closed | Fully closed | skip | skip | skip | — Already closed |
+| `safe_mode` | safe_mode | No mutations; monitor only | limited (no HL) | blocked | when HL recovers | ✓ Allowed |
+| `error` | error | Admin required | skip | skip | skip | ✓ Allowed |
+| `active` (pre-pause) | paused | Hedge maintained; no new mutations; deep-audit may trigger SAFE_MODE via stuck marker detection. **Pause only allowed from `lifecycle_state='active'`** — `hedge_stopped_cooldown` and `lp_rebalancing` cannot be paused | skip | skip | every 6h | ✓ Allowed |
 
 **Note (HLD 2026-06-18):** `cooldown` and `parked` lifecycle states removed — park/redeploy feature dropped. After bot_safe_close, lifecycle transitions directly to `closed`.
 

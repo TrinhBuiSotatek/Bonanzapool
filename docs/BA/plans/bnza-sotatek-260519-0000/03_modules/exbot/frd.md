@@ -3,7 +3,7 @@ type: frd
 module: exbot
 status: draft
 created: 2026-06-12
-updated: 2026-07-08
+updated: 2026-07-14
 owner: "@hienduong"
 version: 0.1.0
 sources:
@@ -11,6 +11,8 @@ sources:
   - Google Doc: EXBOT System & Smart Contract Overview (Daniel, June 2026)
   - Google Sheet: BNZA ExBot Feature Tracker
 changelog:
+  - 2026-07-14 | manual | add funding_rolling_metrics to §FR-EXBOT-080 state_db_shard_xx table listing (per lead review comment)
+  - 2026-07-14 | manual | I-N4 fix (complete): renumber FR-EXBOT-090→091 (HL Rate Limiter), FR-EXBOT-091→092 (User Lock), FR-EXBOT-092→093 (Pool Slot0 Cache) to align with spec.md numbering
   - 2026-07-08 | /ba-do | I-18: sync FR-EXBOT-001 preflight from 5 to 6 checks — add vault balance check (E-EXBOT-025) as check #2, renumber #2-5 → #3-6
   - 2026-07-04 | arc-migration | replace Cloudflare primitives with AWS equivalents; sync queue count to 11 in spec.md
   - 2026-06-29 | manual | flow change: ACT-I role; §3 scope (KMS, deposit watcher, key-provision, 11 queues); FR-081 KMS rewrite; FR-010 queue 11; FR-100 endpoints; NFR-006; Phase0 gate NV-3; IC-EXBOT-005
@@ -422,6 +424,7 @@ Two physically separate databases:
 | `close_operations` | Close/redeem state machine ledger |
 | `queue_idempotency` | Consumer message deduplication ledger |
 | `funding_daily_metrics` | Daily funding aggregate (Phase A) |
+| `funding_rolling_metrics` | 1-row-per-bot rolling funding APR (Phase A, DDL ships) |
 | `hourly_bot_metrics` | Per-bot hourly metrics |
 | `daily_bot_metrics` | Per-bot daily metrics |
 
@@ -451,12 +454,12 @@ On user on-chain deposit, the key-provision worker automatically provisions a pe
 
 ### 4.10 Shared State Services (ElastiCache Redis)
 
-#### FR-EXBOT-090 — HL Rate Limiter (ElastiCache Redis)
+#### FR-EXBOT-091 — HL Rate Limiter (ElastiCache Redis)
 **Priority:** P0
 
 Sliding-window rate limit for HL API calls. BNZA operating budget: 800 weight/min (67% of HL's 1,200/min hard limit). Excess → queue + delay.
 
-#### FR-EXBOT-091 — User Lock (Redis Redlock)
+#### FR-EXBOT-092 — User Lock (Redis Redlock)
 **Priority:** P0
 
 Lease-based mutex for same-user HL mutations:
@@ -468,7 +471,7 @@ holderToken mismatch on release = noop. TTL expiry = auto-release. Caller Lambda
 
 `idempotencyKey` pattern: `hedge-sync:{botId}:{stateVersion}`. Prevents duplicate execution of same stateVersion on redelivery.
 
-#### FR-EXBOT-092 — Pool Slot0 Cache (ElastiCache Redis)
+#### FR-EXBOT-093 — Pool Slot0 Cache (ElastiCache Redis)
 **Priority:** P0
 
 Shared cache for pool slot0 (sqrtPriceX96, currentTick, blockNumber). All light-check workers read from this cache instead of individual RPC calls. Cache TTL and refresh cadence: per SPEC NV-12 result.
@@ -505,7 +508,7 @@ Forbidden at scale (light-check must NOT):
 
 Aurora PostgreSQL sharding: Phase A = 1 shard; Phase B = 4; Phase C = 16 (deferred until Phase B stable + 10k-equivalent load benchmark passes).
 
-Outbound HL API call concurrency is governed by the rate limiter (FR-EXBOT-090, 800 weight/min). No per-invocation connection limit is imposed on AWS Lambda.
+Outbound HL API call concurrency is governed by the rate limiter (FR-EXBOT-091, 800 weight/min). No per-invocation connection limit is imposed on AWS Lambda.
 
 ---
 

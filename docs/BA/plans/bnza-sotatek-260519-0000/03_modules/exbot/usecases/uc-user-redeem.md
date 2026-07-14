@@ -3,10 +3,14 @@ type: use-case
 module: exbot
 status: draft
 created: 2026-06-12
-updated: 2026-07-04
+updated: 2026-07-14
 owner: "@hienduong"
 linked_stories: [US-EXBOT-004]
 changelog:
+  - 2026-07-14 | manual | replace generic Mermaid placeholder with reference to flows.md F-04
+  - 2026-07-14 | manual | I-N3 fix: add hedge_close_pending transition as step 9 (after lock acquired, before HL close call); renumber steps 10–15 to 11–16
+  - 2026-07-14 | manual | I-N2 fix: clarify closeShortReduceOnlyIoc retry strategy — in-invocation (3 retries within same Lambda invocation, inside Redlock block); no SQS re-queue per retry
+  - 2026-07-14 | manual | I-N1 fix: expand Preconditions — enumerate all allowed lifecycle_states for user_redeem; clarify on-chain validation (tokenId ownership only, no lifecycle_state check); add lp_rebalancing edge case note
   - 2026-07-04 | arc-migration | replace UserLockDO with User Lock (Redis Redlock via ElastiCache) per FR-EXBOT-092
   - 2026-07-03 | /ba-do | I-11: define retry count 3 for closeShortReduceOnlyIoc (align with bot_safe_close); arc update deferred
   - 2026-07-03 | /ba-do | I-09: remove duplicate boilerplate Postconditions section
@@ -31,7 +35,8 @@ User navigates to the relevant screen or initiates the described action.
 - **System:** BnzaExVault (Solidity), Redeem Event Watcher, user_redeem Worker, Hyperliquid
 
 ## 2. Preconditions
-- Bot `status='active'` (or paused/safe_mode — user may redeem from any non-closed state)
+- Bot `lifecycle_state IN ('active', 'paused', 'hedge_stopped_cooldown', 'lp_rebalancing', 'safe_mode', 'error')` — user may initiate on-chain redeem from any non-closed state; `BnzaExVault` contract does not check `lifecycle_state`; only tokenId ownership (`position.owner == user` AND `position.botId == botId`) is validated on-chain
+- Note for `lp_rebalancing`: if user calls `redeem(oldTokenId)` mid-rebalance (before backend persists `newTokenId`), on-chain tx reverts safely (NFT already burned); `redeem(newTokenId)` succeeds after rebalance completes
 - Investor holds LP NFT redemption rights via BnzaExVault
 
 ## 3. Main Success Scenario
@@ -46,13 +51,14 @@ User navigates to the relevant screen or initiates the described action.
    - Update state=`lp_closed` (LP liquidated on-chain — confirmed from step 2)
    - Update state=`funds_returned` (LP-portion USDC in investor wallet — on-chain guarantee from step 3)
 8. Redeem Worker acquires a User Lock (Redis Redlock via ElastiCache) lease for this user
-9. Redeem Worker calls HL full close (`closeShortReduceOnlyIoc`, cloid) — retries up to 3 times on reject/timeout before escalating
-10. Cancels existing stop via `§19.5 replaceStopProtected` with size=0
-11. Reconcile: verify HL position size = 0
-12. Update `close_operations.state='hedge_closed'`
-13. Send HL-portion USDC to investor (tracked in `RedemptionQueue` ledger)
-14. Update `close_operations.state='done'`; `bots.lifecycle_state='closed'`
-15. Update `queue_idempotency.state='succeeded'`
+9. Update `close_operations.state = 'hedge_close_pending'` (recovery checkpoint — marks hedge close as in-progress before HL call; if Lambda crashes here, recovery worker knows to resume hedge close)
+10. Redeem Worker calls HL full close (`closeShortReduceOnlyIoc`, cloid) — retries up to 3 times in-invocation (within the same Lambda invocation, inside the Redlock-acquired block) on reject/timeout; after 3 failures → A2
+11. Cancels existing stop via `§19.5 replaceStopProtected` with size=0
+12. Reconcile: verify HL position size = 0
+13. Update `close_operations.state='hedge_closed'`
+14. Send HL-portion USDC to investor (tracked in `RedemptionQueue` ledger)
+15. Update `close_operations.state='done'`; `bots.lifecycle_state='closed'`
+16. Update `queue_idempotency.state='succeeded'`
 
 ## 4. Alternate Flows
 - **A1 (SLA breach — hedge not closed within 5 min):** Admin alert: "user_redeem SLA breached for bot {id}"; LP-portion repayment NOT reverted
@@ -82,15 +88,7 @@ User navigates to the relevant screen or initiates the described action.
 
 ## Diagram
 
-> **No diagram yet.** Add a Mermaid sequence diagram or PlantUML flow chart documenting the actor-system interaction for this use case.
-
-```mermaid
-sequenceDiagram
-    actor User
-    participant System
-    User->>System: Trigger action
-    System-->>User: Response
-```
+> See **F-04: Close Flow — user_redeem (LP-First)** in [`srs/flows.md`](../srs/flows.md) — full sequence from on-chain redeem → Redeem Event Watcher → user_redeem queue → Redeem Worker → User Lock (Redis Redlock) → Hyperliquid close → Aurora PostgreSQL update.
 
 ## 7. FR Trace
 FR-EXBOT-070

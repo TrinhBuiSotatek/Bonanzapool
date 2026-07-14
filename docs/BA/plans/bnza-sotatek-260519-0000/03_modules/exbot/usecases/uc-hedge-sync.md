@@ -3,10 +3,12 @@ type: use-case
 module: exbot
 status: draft
 created: 2026-06-12
-updated: 2026-07-04
+updated: 2026-07-13
 owner: "@hienduong"
 linked_stories: [US-EXBOT-006, US-EXBOT-008]
 changelog:
+  - 2026-07-13 | manual | Q12 fix: replace generic Mermaid placeholder with reference to flows.md F-02
+  - 2026-07-13 | manual | Q-N1 fix: add FR-EXBOT-092 to §7 FR Trace (missing after arc-migration 2026-07-03)
   - 2026-07-04 | arc-migration | replace UserLockDO with User Lock (Redis Redlock via ElastiCache), D1 with Aurora PostgreSQL per FR-EXBOT-092
   - 2026-06-20 | /ba-do | QC audit fixes: trigger updated, step 5 delta=0 note, A5 primary/secondary fix, A6 added, BR consecutive failures def, stale template removed
   - 2026-06-18 | /ba-do | add US-008 to linked_stories; fix phantom ref in A5 to point at uc-deep-audit.md
@@ -71,15 +73,7 @@ hedge-sync Worker dequeues a message from the hedge-sync queue. Message is enque
 
 ## Diagram
 
-> **No diagram yet.** Add a Mermaid sequence diagram or PlantUML flow chart documenting the actor-system interaction for this use case.
-
-```mermaid
-sequenceDiagram
-    actor User
-    participant System
-    User->>System: Trigger action
-    System-->>User: Response
-```
+> See **F-02: Hedge-Sync Execution (Delta-Only)** in [`srs/flows.md`](../srs/flows.md) — full sequence from hedge-sync queue → Hedge-Sync Worker → Redis Redlock → Hyperliquid → reconcile → Aurora PostgreSQL update.
 
 ## 7. FR Trace
-FR-EXBOT-020, FR-EXBOT-021, FR-EXBOT-022, FR-EXBOT-024, FR-EXBOT-025, FR-EXBOT-026, FR-EXBOT-027, FR-EXBOT-035, FR-EXBOT-036
+FR-EXBOT-020, FR-EXBOT-021, FR-EXBOT-022, FR-EXBOT-024, FR-EXBOT-025, FR-EXBOT-026, FR-EXBOT-027, FR-EXBOT-035, FR-EXBOT-036, FR-EXBOT-092

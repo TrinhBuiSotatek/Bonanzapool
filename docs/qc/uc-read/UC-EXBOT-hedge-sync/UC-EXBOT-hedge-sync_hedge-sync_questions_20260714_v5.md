@@ -3,11 +3,11 @@
 | UC ID | UC-EXBOT-hedge-sync |
 |-------|---------------------|
 | Ngày tạo | 2026-06-30 |
-| Ngày cập nhật | 2026-07-07 |
+| Ngày cập nhật | 2026-07-14 |
 | Người tạo | QC UC Read ExBot Agent |
-| Version | v4 |
+| Version | v5 |
 | Nguồn audited | UC-EXBOT-hedge-sync_hedge-sync_audited_20260706_v3.md |
-| Ghi chú | v4: Chuyển Q-N1, Q11, Q12 từ Open → Deferred. Lý do: không chặn test design, tài liệu hiện có đủ để tester tiến hành. |
+| Ghi chú | v5: Q3 được trả lời bởi Tech Lead (2026-07-14) — chuyển từ Open → Answered. |
 
 ---
 
@@ -17,7 +17,6 @@
 |----|----------|-----|----------|----------------|--------|
 | Q1 | High | UC §3 step 5 note; OQ-EXBOT-013 (SRS §9) | Khi delta tính bằng 0, Worker có nên bỏ qua lệnh HL và đi thẳng vào INV-STOP stop replacement hay nên abort toàn bộ hedge-sync? UC step 5 note ghi "Behavior pending OQ-EXBOT-013". Nếu skip stop replacement thì stop có thể bị stale khi giá ETH đóng hoặc mở/đóng range. | delta=0 có thể xảy ra khi target và actual khớp nhưng stop cần cập nhật (do entry_price thay đổi từ reconcile trước). Việc bỏ qua stop replacement trong luồng A6 sẽ là bug. Tester chưa thể viết expected result cho AC-11 một cách hoàn chỉnh. | Open — ⏳ Pending zen — OQ-EXBOT-013 |
 | Q2 | High | UC §3 step 8-9; FR-EXBOT-035; SPEC §19.5 | INV-STOP protocol (§19.5) được mô tả là "protected cancel→place", nhưng chi tiết cụ thể là: (a) place trước rồi cancel sau, hay (b) cancel trước rồi place sau? OQ-EXBOT-002 trong SRS note "Does HL support place-before-cancel stop replacement?". Kết quả quyết định nội dung test case cho bước F1-09 và F1-10. | Không biết path (a) hay (b) → không thể viết test case cho cancel/place sequence và dự kiến vùng thời gian 0-stop tồn tại. | Open — ⏳ Pending zen — OQ-EXBOT-002 |
-| Q3 | High | UC §3 step 4-6; FR-EXBOT-060; OQ-EXBOT-014 | Worker có phải fetch HL marginSummary (để cập nhật margin_status) TRƯỚC hay SAU khi giành Redlock không? OQ-EXBOT-014 trong SRS: "marginSummary fetch ordering in hedge-sync preflight: does the Worker fetch marginSummary before or after acquiring the lock?" Ordering này ảnh hưởng trực tiếp đến lock TTL design: nếu fetch sau lock thì weight HL bị tính vào thời gian giữ khóa. | Nếu fetch sau lock mà mất nhiều thời gian, heartbeat có thể bị bỏ lỡ → khóa tự động giải phóng → race condition. Tester không thể viết test cho timeout scenario. | Open — ⏳ Pending Tech Lead — OQ-EXBOT-014 |
 | Q6 | Medium | FR-EXBOT-036; OQ-EXBOT-011 | `partial_repair` dùng drift_threshold = `deltaErrorUsd > max($25, lpValueUsd × 3%)`. `lpValueUsd` trong công thức được tính như thế nào? OQ-EXBOT-011 (SRS §9) chưa xác nhận formula. | Nếu `lpValueUsd` chưa có formula xác nhận, expected result của test reconcile partial fill không thể tính ra con số cụ thể. | Open — ⏳ Pending zen — OQ-EXBOT-011 |
 | Q7 | Medium | UC §3 step 12-13; FR-EXBOT-030 | stop_trigger_px được tính lại sau reconcile, nhưng nếu delta=0 (không có lệnh HL) thì `entry_price` và `liq_price` có được update hay vẫn giữ giá trị cũ? UC step 12-13 ngầm định reconcile luôn trả về giá trị mới, nhưng nếu delta=0 thì `clearinghouseState` có cho `entry_price` mới không? | Nếu `entry_price` không đổi, việc tính lại `stop_trigger_px` cũng cho kết quả cũ → stop replacement trong luồng A6 có thể là no-op. Expected result của AC-11 bị mơ hồ. | Open — ⏳ Blocked bởi Q1 / OQ-EXBOT-013 |
 
@@ -38,6 +37,7 @@
 
 | ID | Priority | Ref | Question | Answer | Answered By | Date | Status |
 |----|----------|-----|----------|--------|-------------|------|--------|
+| Q3 | High | UC §3 step 4-6; FR-EXBOT-060; OQ-EXBOT-014 | Worker có phải fetch HL marginSummary (để cập nhật margin_status) TRƯỚC hay SAU khi giành Redlock không? OQ-EXBOT-014 trong SRS: "marginSummary fetch ordering in hedge-sync preflight: does the Worker fetch marginSummary before or after acquiring the lock?" Ordering này ảnh hưởng trực tiếp đến lock TTL design: nếu fetch sau lock thì weight HL bị tính vào thời gian giữ khóa. | Worker phải fetch HL marginSummary **SAU** khi giành User Lock (Redis Redlock) để tránh dùng dữ liệu margin cũ do worker khác vừa thay đổi position. Flow đúng: **Lock → fetch marginSummary → cập nhật margin_status → kiểm tra risk → mutation → unlock**. Implication cho test design: (a) lock TTL phải tính bao gồm cả thời gian fetch HL marginSummary; (b) test case timeout scenario phải giả định HL marginSummary call xảy ra trong khi lock đang giữ; (c) nếu HL marginSummary call bị timeout/chậm, heartbeat extend() phải được gọi trước khi TTL=90s hết. | Tech Lead | 2026-07-14 | Answered |
 | Q5 | Medium | UC §4 A4; FR-EXBOT-040 | Partial fill (status='partial') có tăng `failure_count` trong circuit breaker không? | Partial fill **không tăng** `failure_count`. Partial fill routes sang `partial_repair` queue (FR-EXBOT-036). Chỉ `status='failed'` (A3) mới gọi `incrementCircuitBreaker`. UC A4 đã được update. | BA — docs/BA/qc-notes-temp.md | 2026-07-02 | Answered |
 | Q8 | Medium | UC §7 FR Trace vs SRS §7 UC Inventory | UC §7 FR Trace thiếu FR-020, FR-021, FR-035; UC thêm FR-036 không có trong SRS §7. | UC §7 thêm FR-020/021/035. SRS §7 UC Inventory thêm FR-036 cho uc-hedge-sync. FR Trace đã sync. | BA — docs/BA/qc-notes-temp.md | 2026-07-02 | Answered |
 | Q9 | Medium | UC §2 Preconditions; FR-EXBOT-040 | Worker có kiểm tra lại `circuit_breakers.state` trước khi chạy HL mutation không? | Worker **recheck** `circuit_breakers.state` tại execution time (step 2). Nếu `open` → discard với `status='skipped'`. UC step 2 đã được update. | BA — docs/BA/qc-notes-temp.md | 2026-07-02 | Answered |

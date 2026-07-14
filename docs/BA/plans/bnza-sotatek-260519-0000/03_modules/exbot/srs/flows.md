@@ -3,9 +3,13 @@ type: srs-flows
 module: exbot
 status: draft
 created: 2026-06-12
-updated: 2026-07-07
+updated: 2026-07-14
 owner: "@hienduong"
 changelog:
+  - 2026-07-14 | manual | P2 fix: F-01 step 11 — normalize "freeze routine hedge-sync" to "suppress routine hedge-sync (this tick only)" for consistency with circuit open branch
+  - 2026-07-14 | manual | I-N3 fix: F-04 add hedge_close_pending transition after lock acquired, before closeShortReduceOnlyIoc call
+  - 2026-07-14 | manual | I-03 fix: F-04 add User Lock (Redis Redlock) participant; add lock acquire/release block around HL operations; fix close_operations notation (requested → lp_closed → funds_returned); add SLA breach note on re-queue
+  - 2026-07-13 | manual | v3-I-07 fix: F-01 add HL Mark Price Cache participant + stop monitoring sub-flow (step 11); fix alt block — add circuit half_open branch, remove stop trigger from rebalance alt; add overrun check block (step 12)
   - 2026-07-07 | manual | split F-03 into F-03a (auto key-provision on deposit) and F-03b (user-triggered bot start via POST /api/exbot/start)
   - 2026-07-04 | arc-migration | replace Cloudflare primitives with AWS equivalents across F-01, F-02, F-03, F-04, F-05
   - 2026-06-29 | manual | rewrite F-03: deposit-triggered KMS key-provision + Signing Lambda flow; remove manual Investor/Operator path
@@ -26,8 +30,10 @@ sequenceDiagram
     participant LCW as "Light-Check Worker"
     participant HSQ as "hedge-sync queue"
     participant PSAQ as "price-near-stop-audit queue"
+    participant PRQ as "partial-repair queue"
     participant D1 as "Aurora PostgreSQL"
-    participant MDO as "ElastiCache Redis"
+    participant MDO as "Pool Slot0 Cache (ElastiCache Redis)"
+    participant HLC as "HL Mark Price Cache (ElastiCache Redis)"
 
     Cron->>ScanQ: sendBatch via chunkSendBatch
     ScanQ->>ScanW: deliver batch
@@ -41,13 +47,28 @@ sequenceDiagram
     LCW->>LCW: compute lpEthAmount (zero HL calls)
     LCW->>LCW: evaluate RebalanceReason list
 
-    alt rebalance needed
-        LCW->>HSQ: enqueue hedge-sync
-    else stop trigger detected
-        LCW->>D1: SET stop_trigger_crossed_at
-        LCW->>PSAQ: enqueue price-near-stop-audit
+    alt decision.action = REBALANCE AND circuit != open
+        LCW->>HSQ: enqueue hedge-sync {botId, reasons, stateVersion}
+    else circuit half_open
+        LCW->>D1: atomically claim half_open_probe_used
+        LCW->>HSQ: enqueue 1 probe hedge-sync
     else circuit open
-        Note over LCW: suppress hedge-sync
+        Note over LCW: suppress hedge-sync; continue to stop monitoring
+    end
+
+    Note over LCW,HLC: Stop monitoring — always runs regardless of rebalance decision (step 11)
+    LCW->>HLC: read markPriceUsd
+    alt HL Mark Price Cache stale > 120s
+        Note over LCW: widen stop band 2%→4%; suppress routine hedge-sync (this tick only); fallback to bot_runtime_state.eth_price_usd
+    else markPrice >= stop_price
+        LCW->>D1: SET stop_trigger_crossed_at (write-once guard — skip if already set)
+        LCW->>PSAQ: enqueue price-near-stop-audit
+    end
+
+    opt stop_replacing_started_at IS SET AND overrun > 60s
+        Note over LCW: step 12 — overrun detected
+        LCW->>D1: atomic UPDATE bots SET status='safe_mode', lifecycle_state='safe_mode'
+        LCW->>PRQ: enqueue partial_repair(reason='stop_replacing_overrun')
     end
 ```
 
@@ -165,6 +186,7 @@ sequenceDiagram
     participant EVWATCHER as Redeem Event Watcher
     participant UREQ as user_redeem queue
     participant UREW as Redeem Worker
+    participant UDO as "User Lock (Redis Redlock)"
     participant HL as Hyperliquid
     participant D1 as "Aurora PostgreSQL"
 
@@ -175,15 +197,30 @@ sequenceDiagram
     EVWATCHER->>UREQ: enqueue {botId, redeemTxHash, userAddress} [highest priority]
     UREQ->>UREW: deliver (SLA: 5 min from detection)
 
-    UREW->>D1: create close_operations (kind=user_redeem, state=lp_closed→funds_returned)
-    UREW->>HL: closeShortReduceOnlyIoc (full close, cloid)
-    UREW->>HL: cancelStop (via §19.5 replaceStopProtected with size=0)
-    UREW->>HL: reconcilePosition (verify size=0)
-    UREW->>D1: update close_operations (state=hedge_closed)
+    UREW->>D1: insert close_operations (kind=user_redeem, state=requested)
+    UREW->>D1: update close_operations state=lp_closed
+    UREW->>D1: update close_operations state=funds_returned
+
+    UREW->>UDO: acquire(holderToken, ttl=90s, idempotencyKey=user-redeem:{botId}:{redeemTxHash})
+    alt lock held by hedge-sync worker
+        UDO-->>UREW: acquired=false
+        UREW->>UREQ: re-queue with delay
+        Note over UREW: SLA clock still running — delay > 5 min total → A1 SLA breach alert
+    else lock acquired
+        UDO-->>UREW: acquired=true
+        UREW->>D1: update close_operations state=hedge_close_pending
+        UREW->>HL: closeShortReduceOnlyIoc (full close, cloid)
+        UREW->>HL: cancelStop (via §19.5 replaceStopProtected with size=0)
+        UREW->>HL: reconcilePosition (verify size=0)
+        UREW->>D1: update close_operations (state=hedge_closed)
+        UREW->>UDO: release(holderToken)
+    end
+
     UREW->>VAULT: send HL-portion USDC to user (RedemptionQueue ledger)
     UREW->>D1: update close_operations (state=done), lifecycle_state=closed
 
     alt hedge close fails
+        UREW->>UDO: release(holderToken)
         UREW->>D1: close_operations.state=residual_hl_liability
         UREW->>D1: enqueue admin notification (outstanding liability amount)
         Note over UREW: LP-portion repayment NOT reverted

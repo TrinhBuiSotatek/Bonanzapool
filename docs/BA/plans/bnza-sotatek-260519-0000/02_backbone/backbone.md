@@ -2,7 +2,7 @@
 type: backbone
 status: in-review
 created: 2026-05-20
-updated: "2026-07-08"
+updated: "2026-07-14"
 owner: "@hien.duong"
 engagement_mode: formal
 lang: en
@@ -11,9 +11,21 @@ tags: []
 version: "0.9.0"
 links:
   - ../01_intake/intake.md
+  - design-system.md
 changelog:
+  - "2026-07-14 | manual | P2 fix: add funding_rolling_metrics to D1 Architecture state_db_shard_xx table listing (Phase A, DDL ships with shard schema)"
+  - "2026-07-13 | manual | replace PTL-IB with PTL-07 and sync 4 IB statuses"
+  - "2026-07-13 | /ba-start backbone | gap+mismatch fixes vs ib-scope-summary + pf_summary: IB-1 unclaimed actor corrected (Zen only); IB-2 status domain + bind-rejection rules; IB-3/4/5/6/7/8 implementation hazards + invariants; PF-1/2 monthly-cap wording removed; PF-3 reconciliation equations; PF-4 single-payout-chain + shortfall; PF-5 WL attribution source guard (QA C-1); PF-6 $1 carry min; PF-7 carry update timing; PF-8 points annotation D P-14"
+  - "2026-07-13 | /ba-start backbone | absorb ib_spec_v1.7.1: FM-ADM-03 v1.7.1 additions (middleware bypass D37 BLOCKING, ops bind D32, ib_partners table name, ib_enabled in FM-ADM-08); §5.2B IB Portal two-tranche split + release gate note; FM-PF-03 monthly-allowance-cap wording fix; §5.2C duplicate section removed; source traceability updated (ib_portal_spec v1.8, new ib_spec_v1.7.1 row)"
+  - "2026-07-10 | /ba-start impact | absorb ib_portal_spec_v1.8: FM-IBP-01 D22 distributions retention cap 100 (API contract, no full-history export); FM-IBP-01/03 D23 QR branded variant B (ECC H, BNZA POOL logo); resolve §4.8 merge conflict (PTL-07→PTL-07)"
+  - "2026-07-08 | /ba-impact | cascade OQ-ADM-048 to 052: unified User & Wallet Detail Modal, POOL monitor table limits, and Escalation polymorphic ref_id"
+  - "2026-07-07 | /ba-start backbone | sync from intake: absorb common v1.3 (Wallet Info Modal, Tx links) and top v1.2 (tvl_history, bot activity relocation)"
+  - "2026-07-06 | /ba-start backbone | absorb pf_spec_v1.0, ib_spec_v1.5, ib_portal_spec_v1.7, ib_splitter_spec_v1.0, admin_ui_spec_common_v1.2, admin_ui_spec_top_v1.2: PTL-07 Portal added, ACT-08 IB Partner added, FM-ADM-02 upgraded to on-chain PF, FM-ADM-03 upgraded to multi-group IB, FM-IBP and FM-PF feature maps added, auth row for IB Portal added, fee model PF row updated, source traceability updated"
+  - "2026-07-13 | manual | fix PR-348 review: restore deleted changelog entries and fix indent"
+  - "2026-07-10 | manual | add reference to design-system.md extracted from intake"
+  - "2026-07-09 | manual | sync PTL-07 code, update Nav Schema, and resolve stash conflicts"
   - "2026-07-08 | manual | bump updated date per PR review"
-  - "2026-07-07 | /ba-start backbone | absorb pf_spec_v1.0, ib_spec_v1.4, ib_spec_v1.5, ib_portal_spec_v1.7, ib_splitter_spec_v1.0, admin_ui_spec_common_v1.2, admin_ui_spec_top_v1.2: PTL-IB Portal added, ACT-08 IB Partner added, FM-ADM-02 upgraded to on-chain PF, FM-ADM-03 upgraded to multi-group IB, FM-IBP and FM-PF feature maps added, auth row for IB Portal added, fee model PF row updated, source traceability updated"
+  - "2026-07-08 | /ba-impact | cascade OQ-ADM-048 to 052: unified User & Wallet Detail Modal, POOL monitor table limits, and Escalation polymorphic ref_id"
   - "2026-07-02 | manual | resolve OQ-ADM-027 in FM-ADM-14 description"
   - "2026-07-02 | /ba-impact | GAP-FRD-01: rewrite FM-ADM-01 description — remove obsolete wl_partners fields, align to wl_codes/wl_members/wl_master_wallets canonical model"
   - "2026-07-02 | /ba-start intake | absorb auth_spec_v1.1 + admin_ui_spec_top/common v1.1: §8.1 BNZA-ADMIN auth row updated (SIWE+2FA+JWT replaces X-Wallet-Address); PTL-02 Portal Matrix auth layer updated; §11 source traceability updated"
@@ -93,13 +105,13 @@ changelog:
 | PTL-04 | api.bnza.io/exbot | BNZA-EXBOT Infra | CF Workers (standalone `apps/bnza-exbot/`) + D1 (ExBot schema) + 11 Queues + DO (3: HLRateLimitDO, UserLockDO, MarketDataDO) | CF Workers | Internal (service binding from OPERATOR) |
 | PTL-05 | pool.bnza.io | BNZA-POOL Steps 7-8 | Next.js 16.2 + React 19.2 + TS 5.9 + Tailwind 4 + shadcn/ui + Wagmi 2.19 + TanStack Query 5.94 | Vercel | Wallet |
 | PTL-06 **[OOS — Helix scope]** | wl-admin.bnza.io (TBD) | WL Admin System (bnza-wl-admin) | CF Pages (frontend) + CF Workers (backend/cron) + CF D1 (25 tables) + CF Queues | CF Pages + CF Workers | SSO (CF Access) + 2FA (TOTP mandatory); roles: Super / Operator / Read-only |
-| PTL-IB | ib.bnza.io | IB Portal | React 19 + Vite 8.0 + TS 5.9 + Tailwind 4.2 + shadcn/ui (same stack as PTL-02) | CF Pages | SIWE + 2FA TOTP + JWT |
+| PTL-07 | ib.bnza.io | IB Portal | React 19 + Vite 8.0 + TS 5.9 + Tailwind 4.2 + shadcn/ui (same stack as PTL-02) | CF Pages | SIWE + 2FA TOTP + JWT |
 
 ---
 
 ## 3. Permissions Matrix — Cross-Project (Actor × Portal Access)
 
-| Actor | PTL-01 WL MOBILE **[OOS]** | PTL-02 ADMIN | PTL-03 EX | PTL-04 EXBOT Infra | PTL-05 POOL | PTL-06 WL Admin **[OOS]** | PTL-IB IB Portal |
+| Actor | PTL-01 WL MOBILE **[OOS]** | PTL-02 ADMIN | PTL-03 EX | PTL-04 EXBOT Infra | PTL-05 POOL | PTL-06 WL Admin **[OOS]** | PTL-07 IB Portal |
 |-------|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | ACT-01 End User | — | — | Full | — | Full | — | — |
 | ACT-02 WL Partner | View earnings | — | — | — | — | — | — |
@@ -209,7 +221,7 @@ changelog:
 
 **Legend**: Super = all features; Operator = distribution ops + tree + refill, no settings; Read-only = view only
 
-### 4.8 IB Partner Portal (PTL-IB)
+### 4.8 IB Partner Portal (PTL-07)
 
 | Action | ACT-08 IB Partner |
 |--------|:---:|
@@ -220,8 +232,8 @@ changelog:
 | Configure default group (mandatory setup wizard) | ✅ |
 | Create/Edit/Archive Group (payout recipe, labels, % share) | ✅ |
 | View Revenue trend graph and breakdowns (By group/recipient/user) | ✅ |
-| Dynamically generate and view referral link QR codes | ✅ |
-| Claim unclaimed USDC on-chain from IBSplitter | ✅ |
+| Dynamically generate and view referral link QR codes (branded, ECC H, BNZA POOL logo) | ✅ |
+| View IBSplitter unclaimed balance and submit rescue ticket (execution is Zen owner-key only) | ✅ |
 
 ---
 
@@ -316,37 +328,62 @@ changelog:
 > user stop sau đó sẽ vẫn gửi net đến master (sai intent).
 > Downstream khi /ba-impact: bnza-admin FRD cần FM-ADM-10 section + SRS cần 1 screen mới.
 
-| FM-ADM-03: IB Partner Management (NEW — ib_spec_v1.4 & ib_spec_v1.5) | Introducing Broker (IB) management (ops.bnza.io `/ib` Codes and Members tabs) to manage IB accounts, user referral bindings, group codes `{main}-G{n}`, and config operators of the `IBSplitter` contract. | P1 | 0.5w |
+| FM-ADM-03: IB Partner Management (NEW — ib_spec_v1.4 & ib_spec_v1.5 & ib_spec_v1.7.1) | Introducing Broker (IB) management (ops.bnza.io `/ib` Codes and Members tabs) to manage IB Partners, user referral bindings, group codes `{main}-G{n}`, and config operators of the `IBSplitter` contract. | P1 | 0.5w |
 
 > **[DATA MODEL REWRITE — ib_spec_v1.4_EN.md & ib_spec_v1.5_EN.md]**
 > The flat `commission_rate` field is replaced by `ib_groups` + `ib_group_wallets` + per-group `group_code` + `is_default` tables. Distribution is bps-based per recipient per group, executed on-chain via `IBSplitter` within the same transaction as collect (compound prohibited). v1.4 is retained as historical comparison reference for transition to v1.5.
 
+> **[v1.7.1 ADDITIONS — ib_spec_v1.7.1_EN.md]**
+> - **Middleware bypass (D37) — BLOCKING**: `middleware/access-control.ts` must add pass-through for `users.referred_by IS NOT NULL` (same shape as WL bypass). Without this IB users cannot pass the access gate.
+> - **POST /api/ops/ib/bind (D32)**: Ops retroactive bind endpoint — allows admin to manually bind an existing user to an IB partner after account creation. Separate from the public signed-bind flow (§3.7.2).
+> - **Table name authority (§3.7.8)**: Implementation table is `ib_partners` (not `ib_partners`). Spec explicitly states implementation is authoritative on table naming.
+> - **`ib_enabled` flag in FM-ADM-08**: `system_config.ib_enabled` key belongs under FM-ADM-08 System Settings (alongside `global_bot_enabled`, `access_mode`, etc.). Controls release gate for IB flow.
+> - **IB partner status domain**: `ib_partners.status` = `active / inactive / paused / suspended` (`terminated` does not exist — D34). Bind behavior: new binds accepted only when status is `active`; `paused / suspended / inactive` all reject with `invalid_ref`. Start behavior: `inactive` → deny start with `bot_start_reason: 'ib_inactive'`; `paused` / `suspended` → allow start but on-chain distribution falls back 100% to user (no IB split).
+
 | FM-ADM-04: Bot Type Config | Complete partial impl: deposit tiers, cooldown range (10–180 min), EXBOT strategy params (hedge_ratio/leverage/stop_safety_factor). Excludes `deposit_tiers_usd` for `LPBOT` configuration completely. | P1 | 0.5w |
-| FM-ADM-05: Dashboard *(alias: Overall Revenue Dashboard)* | Provides a full ecosystem revenue picture by automatically UNIONing PF collected from both regular bots and WL partner bots. TVL calculated on-chain, AUM, users, EXBOT count, daily revenue. TVL data from `tvl_history` lightweight log table. Right guide panel removed (3-region layout), iPad & laptop responsiveness. | P2 | 0.5w |
+| FM-ADM-05: Dashboard *(alias: Overall Revenue Dashboard)* | Provides a full ecosystem revenue picture by automatically UNIONing PF collected from both regular bots and WL partner bots. TVL calculated on-chain, AUM, users, EXBOT count, daily revenue. TVL data from `tvl_history` lightweight log table. Right guide panel removed (3-region layout), iPad & laptop responsiveness. Features POOL monitor table (latest 100 limit, 15/page). | P2 | 0.5w |
 | FM-ADM-06: Reports *(alias: Fee Collection Report & Overall Revenue Dashboard)* | Provides reports: fee collection, bot performance, WL OpFee/PF Breakdown. Date-range queries. Sourced from `wl_bot_payouts.opfee_usdc` + `pf_usdc` (raw USDC amounts). TVL trend graph removed (uses `tvl_history`). | P2 | 0.5w |
 | FM-ADM-07: TOKEN Mgmt | Burn/supply/vesting/treasury/builder-fee (keep mock, BNZA Token contract NOT in SOTATEK scope). | P3 | — |
 | FM-ADM-08: System Settings | Manage system_config key-value pairs (global_bot_enabled, access_mode, max_bots_per_user, safe_mode, exbot_enabled, etc., including `min_range_width_percent` limit $\ge 0.1\%$ to prevent gas drain). | P2 | 0.5w |
 | FM-ADM-09: Relayer Monitor | Relayer status: wallet address, ETH balance, last tx hash + timestamp, health (balance > threshold). | P2 | 0.5w |
 | FM-ADM-11: User Management | View and manage all registered users: wallet address, role (viewer/admin/super_admin), registration date, linked bots count. Read-only list with RBAC-based action controls (super_admin only for block/unblock). | P1 | — |
 | FM-ADM-12: Audit Log Viewer | Paginated, filterable read-only viewer for all audit log entries (NFR-ADM-005). Filters: date range (max 90 days), module, action, actor. Detail drawer shows old/new values. Append-only — no edit/delete. | P0 | 0.5w |
-| FM-ADM-13: Escalations Dashboard | Provides admin visibility into WL SLA violations by surfacing `wl_escalations` records (migration 0029) that have been unresolved for > 24h. Escalation kinds covered: `failed_set`, `needs_repair`, `hold_sla`, `manual_reconcile_sla`, `unattributed_sla`, `master_not_configured`. Admin and above can acknowledge open escalations to clear the alert queue. Role gate for ACK action: `admin+` (both `admin` and `super_admin` roles have acknowledge permission; viewers are read-only). | P1 | 0.5w |
+| FM-ADM-13: Escalations Dashboard | Provides admin visibility into WL SLA violations by surfacing `wl_escalations` records (migration 0029) that have been unresolved for > 24h. Escalation kinds covered: `failed_set`, `needs_repair`, `hold_sla`, `manual_reconcile_sla`, `unattributed_sla`, `master_not_configured`. Features polymorphic `ref_id` rendering (tx_hash vs plain text ID). Admin and above can acknowledge open escalations to clear the alert queue. Role gate for ACK action: `admin+` (both `admin` and `super_admin` roles have acknowledge permission; viewers are read-only). | P1 | 0.5w |
 | FM-ADM-14: Holds / Corrections Review | Allows admin to monitor `wl_holds` records (migration 0026) generated by chain reorgs or corrections, ensuring zero-loss WL reconciliation. Displays hold reason, raw USDC amount, affected bot/WL, and Helix ACK status. Helix performs the financial ACK via its own `/api/wl/ledger/ack` endpoint (external). BNZA admin write action (e.g., mark-acknowledged): read-only on frontend (status overrides resolved on DB/runbook level, OQ-ADM-027 resolved). | P2 | 0.5w |
 | FM-ADM-15: Attribution History Viewer | Provides a read-only audit trail of per-bot WL attribution intervals from `wl_token_attribution_history` (migration 0026). Shows which WL partner, membership epoch, and master wallet each bot was attributed to for a given block range. Used for reconciliation and dispute resolution between BNZA and Helix. Role gate: `viewer+` (viewer, admin, super_admin can all view). Admin API endpoint: `GET /api/admin/tokens/attribution-history`. | P2 | 0.5w |
+| FM-ADM-16: Wallet Detail Modal & Tx Hash Viewer | Unified Wallet Detail Modal and Tx Hash Display rendering across all screens. Click any wallet address to open full details. Renders 0x+64 tx_hash fields as chain-aware explorer links. | P2 | 0.5w |
 
-### 5.2B IB Partner Portal (PTL-IB) — (Priority: P1 — Post-WL)
+### 5.2B IB Partner Portal (PTL-07) — (Priority: P1 — Post-WL)
 
 **Actor**: ACT-08 (IB Partner) | **Role**: Self-manage referral groups, recipients, and view downline statistics & rewards
 **Folder**: `03_modules/ib/`
 
 | Sub-module | Description | Priority | Effort |
 |------------|-------------|----------|--------|
-| FM-IBP-01: Dashboard | Displays rewards KPI cards (Your rewards / Group rewards / TVL), dynamic referral-link QR codes, and recent distributions (9 columns). TVL is direct on-chain read. | P1 | 0.5w |
+| FM-IBP-01: Dashboard | Displays rewards KPI cards (Your rewards / Group rewards / TVL), QR codes for referral links (branded variant B: ECC level H, BNZA POOL logo — D23), and recent distributions (9 columns, 5/page, **hard cap 100 records — API contract: `GET /api/ib/distributions` always scopes to latest 100; no full-history export — D22**). TVL is direct on-chain read. | P1 | 0.5w |
 | FM-IBP-02: User Management | View downline users list with active status and group detail. Allows reassigning users to different groups (15/page pagination). | P1 | 0.5w |
-| FM-IBP-03: Group Management | Create, edit, and archive groups. Mandatory initial-setup wizard on first login to create the default group. Recipe supports max 10 wallets, allocation in % (1 bps precision). | P1 | 0.5w |
+| FM-IBP-03: Group Management | Create, edit, and archive groups. Mandatory initial-setup wizard on first login to create the default group. Recipe supports max 10 wallets, allocation in % (1 bps precision). Per-group referral links with branded QR codes (ECC H, BNZA POOL logo — D23). | P1 | 0.5w |
 | FM-IBP-04: Revenue & Breakdowns | Displays rewards trend graph and breakdowns (By group / By recipient / By user) with filters and pagination. | P1 | 0.5w |
-| FM-IBP-05: IBSplitter Integration | Integrates with `IBSplitter` contract to execute on-chain immediate Net splitting by bps, and claim unclaimed USDC. | P1 | 0.5w |
+| FM-IBP-05: IBSplitter Integration | Integrates with `IBSplitter` contract to execute on-chain immediate Net splitting by bps. Unclaimed USDC (`unclaimed[user]`) is a terminal fallback populated only when a transfer to the user fails (e.g. USDC blacklist) — ops screen shows status + rescue ticket; rescue execution is Zen owner-key only. | P1 | 0.5w |
 
----
+> **[TWO-TRANCHE SPLIT — ib_spec_v1.7.1_EN.md D41]**
+> - **Tranche 1 (SOTATEK starts immediately)**: Participation-route APIs — POST /api/ib/bind (signed, EIP-191, 7 branches A–E/F1/F2, returns `ref_status`), middleware bypass (D37), ops bind POST /api/ops/ib/bind (D32), abolish `users/me?ref=` legacy endpoint (D38), `deferred` sync_status for new IB user inserts (D33).
+> - **Tranche 2 (gated on Zen finalizing `router_ib_diff`)**: On-chain IB distribution mechanics. Release controlled by `system_config.ib_enabled`.
+>
+> **[RELEASE GATE — ib_spec_v1.7.1_EN.md D42]**
+> `system_config.ib_enabled` controls `bot_start_allowed` / `bot_start_reason` fields on `GET /api/access/check`. Fail-closed: if key is unreadable, IB users are denied bot start. Gate fires BEFORE any on-chain TX. Must NOT reuse `isIbSyncEnabled` getter (that getter is fail-open). Config key managed via FM-ADM-08 System Settings.
+>
+> **[IMPLEMENTATION HAZARDS — ib_spec_v1.7.1_EN.md]**
+> - **D36 — Rate-limit order (security)**: Per-IP limit (10 req/60s) applied **before** JSON parsing; per-wallet limit (5 req/60s) applied **after** signature verification keyed on the recovered address. Never apply per-wallet limit before verification — an attacker could drain a victim wallet's rate budget (grief attack).
+> - **D33 — `deferred` sync_status**: Every INSERT path (bind / `ensureBoundChainAssignment` / ops bind) must explicitly set `sync_status = 'deferred'`. Migration 0043 column default is `pending` — omitting the override stores the wrong state. Cron must permanently exclude `deferred` rows (`WHERE sync_requested_at IS NOT NULL`). `deferred` is never a cron or alert target.
+> - **`api/ib-members.ts` defect**: Current file bypasses `ib-binding.ts`, INSERTs assignments for both chains directly, and creates no `ib_access_list` row. Must be replaced by the `POST /api/ops/ib/bind` endpoint (D32) which routes through `ib-binding.ts`.
+> - **`checkStartPermission()` dead code**: `ib-start-permission.ts` is currently dead code with zero callers. Do not naively call it — split its role per the start-permission order in §3.7.5 (evaluate / ensure assignment / sync).
+>
+> **[ON-CHAIN INVARIANTS — ib_splitter_spec_v1.0_EN.md]**
+> - `ib_distributions` records `Distributed` events only — NOT `UserShareSent`. Revenue page (FM-IBP-04) must index `Distributed` events exclusively to avoid inflated figures.
+> - Daily balance invariant: `usdc.balanceOf(splitter) == totalUnclaimed` (sum of `unclaimed[user]` mappings). OPERATOR monitoring duty.
+> - Per-collect invariant: `ib_collect_events.net_usd == Σ(Distributed + UserShareSent + UserPayoutFailed)`.
+> - Route fixation: `(user_wallet, chain_id)` has exactly one route (regular / WL / IB) — fixed at first bind, no exceptions (D2, D39). Enforced by `UNIQUE(user_wallet, chain_id)` on `ib_user_assignments`. `users.referred_by` may be updated by exactly two paths only: `POST /api/ops/ib/bind` (D32) and the public signed-bind case F1.
 
 ### 5.2C PF Distribution System (PTL-02/PF) — (Priority: P1 — Post-WL)
 
@@ -355,9 +392,9 @@ changelog:
 
 | Sub-module | Description | Priority | Effort |
 |------------|-------------|----------|--------|
-| FM-PF-01: Ops PF Configuration UI | Admin CRUD PF recipients on ops `/pf` page. Max 5 active recipients. Configures label, wallet, allocated points (1-30), and channel scopes (normal/WL/IB). Blocklist validation. | P1 | 0.5w |
-| FM-PF-02: Daily Aggregation Batch | Batch cron running daily at 13:00 JST. Scans USDC transfers to `pfCollector`, aggregates by channel (WL/IB/normal), fallbacks unattributed >72h. Verification of `processedBatch(batchId)` to prevent double-pay. | P1 | 0.5w |
-| FM-PF-03: PFDistributor Integration | Integrates with `PFDistributor` contract (UUPS) on OP and Base. Pulls USDC from treasury monthly allowance monthly cap, distributes to recipients in a single transaction. | P1 | 0.5w |
+| FM-PF-01: Ops PF Configuration UI | Admin CRUD PF recipients on ops `/pf` page. Max 5 active recipients. Configures label, wallet, allocated points (1-30, always annotated as "n% out of the 30% PF" — D P-14), and channel scopes (normal/WL/IB). Blocklist validation (USDC contract / PFDistributor self / treasury forbidden as recipients). Changes take effect from the next batch only. | P1 | 0.5w |
+| FM-PF-02: Daily Aggregation Batch | Batch cron running daily at 13:00 JST on one chain (payouts run on the chain where the main wallet lives; cross-chain shortfall detected before step ④ → batch postponed + ops alert). Scans USDC transfers to `pfCollector` on both OP + Base; aggregates by channel (WL/IB/normal) — **WL channel joins `wl_bot_payouts` only** (WL bots are excluded from `fee_collections` by the recorder guard; using `fee_collections` for WL yields zero WL attribution — QA C-1). Unresolved rows stay `pending`; re-resolved at batch close; rows still unresolved >72h fixed to `unattributed`. Carry-forward: payable < $1.00 → full amount to `carry_out` (dust suppression); `pf_recipients.carry_balance_usd` updated only at step ⑤ paid confirmation (updating at step ③ would lose carry on TX failure). Verification of `processedBatch(batchId)` to prevent double-pay. | P1 | 0.5w |
+| FM-PF-03: PFDistributor Integration | Integrates with `PFDistributor` contract (UUPS) on OP and Base. Treasury approves Distributor allowance (kill switch = zero allowance); distributes to recipients in a single daily transaction. Reconciliation equations verified automatically per batch: (1) `Σ pf_payouts.earned_usd + bnza_kept_usd == total_pf_usd`; (2) per recipient `amount_usd == earned_usd + carry_in − carry_out`. | P1 | 0.5w |
 
 ---
 
@@ -387,7 +424,7 @@ changelog:
 
 > **EXBOT Phase 0 Gate (blocks Phase A start)**: Prerequisites per SPEC v5.2.6 §0.3 — (1) zen approves SPEC v5.2.6; (2) BnzaExVault deployed, Base + OP addresses/operator finalized (2 sets) — multiSig no longer required for emergencyTransfer (Operator-only when paused, per HLD 2026-06-18); (3) AWS KMS key custody verified: master key + agent key generation pipeline confirmed end-to-end (key-provision worker → KMS → HL approveAgent); (4) WL stability gate — 7 consecutive days post-launch with zero SAFE_MODE + no major incident. Before all 4 met: SOTATEK prepares D1 schema + Queue skeleton only — no HL integration.
 
-> **D1 Architecture (2 DBs)**: `control_db` (users, bot_registry, shard_registry, hl_agent_keys — stores key metadata + key_status only; private keys generated and retained in AWS KMS HSM, never stored in D1) + `state_db_shard_xx` (bots, positions, hedge_legs, bot_runtime_state, circuit_breakers, rebalance_attempts, lp_operations, close_operations, queue_idempotency, funding_daily_metrics, hourly/daily_bot_metrics). Phase A: 1 shard; Phase B: 4; Phase C: 16 (deferred). R2 archive + Analytics Engine: Phase B+.
+> **D1 Architecture (2 DBs)**: `control_db` (users, bot_registry, shard_registry, hl_agent_keys — stores key metadata + key_status only; private keys generated and retained in AWS KMS HSM, never stored in D1) + `state_db_shard_xx` (bots, positions, hedge_legs, bot_runtime_state, circuit_breakers, rebalance_attempts, lp_operations, close_operations, queue_idempotency, funding_daily_metrics, funding_rolling_metrics, hourly/daily_bot_metrics). Phase A: 1 shard; Phase B: 4; Phase C: 16 (deferred). R2 archive + Analytics Engine: Phase B+.
 
 ### 5.5 BNZA-POOL Steps 7-8 (Priority: P1 — Post-WL)
 
@@ -445,8 +482,8 @@ changelog:
 | MOBILE → Router/LPBot | Bot start/stop (user wallet TX, zapMint/stop) | On-chain (user wallet signs) | No (existing) |
 | ADMIN → OPERATOR | WL, PF, IB, Bot config, TOKEN endpoints | REST API (admin role) | Yes |
 | ADMIN → OPERATOR | WL bot lifecycle: setBotWlMaster, unsetBotWlMaster, wl_activation_status transitions, wl_members CRUD, wl_master_wallets CRUD | REST API (admin role) + on-chain tx via OPERATOR Relayer | Yes |
-| IB Portal (PTL-IB) → OPERATOR | Downline users, groups, user assignments, rewards, SIWE auth | REST API (SIWE/JWT) | Yes |
-| IB Portal (PTL-IB) → IBSplitter (on-chain) | Read TVL/LP valuation, fetch distribution events | Web3 read / RPC | Yes |
+| IB Portal (PTL-07) → OPERATOR | Downline users, groups, user assignments, rewards, SIWE auth | REST API (SIWE/JWT) | Yes |
+| IB Portal (PTL-07) → IBSplitter (on-chain) | Read TVL/LP valuation, fetch distribution events | Web3 read / RPC | Yes |
 | ADMIN (PTL-02) → PFDistributor (on-chain) | Configure operators, monitor unclaimed balances | Web3 read/write / RPC | Yes |
 | OPERATOR (cron) → PFDistributor (on-chain) | Execute daily 13:00 JST batch payout transaction | Web3 transaction / RPC | Yes |
 
@@ -526,7 +563,7 @@ changelog:
 | WL-ADMIN | SSO (Cloudflare Access) + 2FA (TOTP mandatory); roles: Super / Operator / Read-only | PTL-06 only |
 | WL Mobile | SIWE (Sign-In with Ethereum) → 24h JWT; tenant resolved by subdomain + signature domain | PTL-01 → PTL-06 Backend |
 | WL post-record (bot start/stop) | HMAC-SHA256 (§7.2 scheme); Helix server → BNZA OPERATOR; server-to-server (CORS N/A); starter wallet passed explicitly by Helix server; anti-spoofing: tx_hash + NPM ownerOf + BotStarted/ZapMintFor event decode (§4.4 finalized v1.1) | `/api/bot-configs/atomic-start`, `/api/bot-configs/:id/stop` (WL path only) |
-| IB Portal | **SIWE + 2FA TOTP + JWT** (24h sliding / 7d absolute cap) — same auth foundation as BNZA-ADMIN (auth_spec_v1.1 shared ecosystem auth). No Cloudflare Access gate. Single role (IB partner). | PTL-IB (ib.bnza.io) |
+| IB Portal | **SIWE + 2FA TOTP + JWT** (24h sliding / 7d absolute cap) — same auth foundation as BNZA-ADMIN (auth_spec_v1.1 shared ecosystem auth). No Cloudflare Access gate. Single role (IB partner). | PTL-07 (ib.bnza.io) |
 | Direct | Wallet connect → Hyperliquid API | PTL-03 only (no OPERATOR) |
 
 ### 8.2 Fee Model (Router v2.2.2)
@@ -1184,8 +1221,8 @@ From WL_HANDOVER_EN.md §B — settled decisions, not re-open items:
 | EXBOT strategy SPEC (zen-approved, source of truth for Module 4) | **SPEC_v5.2.6_EN.md** — client-provided external file, NOT in repo. Local path at time of writing: `/Users/hienduong/Downloads/SPEC_v5.2.6_EN.md`. Repo only has v5.2.5 at `docs/bnza-exbot/docs/SPEC_v5.2.5.md`. Key content absorbed inline in §8.9. | §8.9 (formulas, NV items, behavioral rules, Phase 0 conditions) |
 | WL API surface: admin plane vs Helix plane, auth separation, wl_codes/wl_members/wl_master_wallets state machines, api_key/secret separation, v1.7.6 opFee/PF scanner capture, post-launch backlog | **WL_ADMIN_API_GUIDE_EN.md** (absorbed 2026-06-16) + **WL_SPECv1.7.6_EN.md** §3.7.1 (absorbed 2026-06-16) + **WL_SPEC_TO_v1.7.6_DELTA_EN.md** §1/§4/§6 (absorbed 2026-06-16) + **WL_HANDOVER_EN.md** §A/§B/§C (absorbed 2026-06-16). Note: WL_SPEC_TO_v1.7.5_DELTA_EN.md content was applied manually Jun 04 (backbone sync WL_SPEC_SOTATEK_EN_v1.0/v1.1); now formally logged. WL_API_CONNECTION_GUIDE_EN.md is Helix-facing only — no SOTATEK admin impact; logged in intake §13. | §8.10 WL API Surface |
 | Auth model (BNZA-ADMIN & IB Portal) | auth_spec_v1.1_EN.md (SOTATEK client spec, absorbed 2026-07-02) | §8.1 Authentication Model |
-| Admin UI TOP page + common design spec (v1.2) | admin_ui_spec_top_v1.2_EN.md + admin_ui_spec_common_v1.2_EN.md (absorbed 2026-07-06) | §5.2 FM-ADM-05/06, §8.5 Shared Design Language |
-| IB Core Spec (v1.4 & v1.5) | ib_spec_v1.4_EN.md + ib_spec_v1.5_EN.md (absorbed 2026-07-06 / 2026-07-07) | §5.2 FM-ADM-03, §5.2B IB Partner Portal |
-| IB Partner Portal Spec (v1.7) | ib_portal_spec_v1.7_EN.md (absorbed 2026-07-06) | §5.2B IB Partner Portal |
+| Admin UI TOP page + common design spec (v1.2 / v1.3) | admin_ui_spec_top_v1.2_EN.md + admin_ui_spec_common_v1.3_EN.md (absorbed 2026-07-06) | §5.2 FM-ADM-05/06, §8.5 Shared Design Language |
+| IB Core Spec (v1.4 & v1.5 & v1.7.1) | ib_spec_v1.4_EN.md + ib_spec_v1.5_EN.md (absorbed 2026-07-06 / 2026-07-07) + ib_spec_v1.7.1_EN.md (absorbed 2026-07-13) | §5.2 FM-ADM-03, §5.2B IB Partner Portal |
+| IB Partner Portal Spec (v1.8) | ib_portal_spec_v1.8_EN.md (absorbed 2026-07-10) | §5.2B IB Partner Portal |
 | IBSplitter Contract Spec (v1.0) | ib_splitter_spec_v1.0_EN.md (absorbed 2026-07-06) | §5.2B FM-IBP-05 IBSplitter Integration |
 | Performance Fee (PF) Spec (v1.0) | pf_spec_v1.0_EN.md (absorbed 2026-07-06) | §5.2 FM-ADM-02, §5.2B IB Partner Portal, §5.2C PF Distribution System |

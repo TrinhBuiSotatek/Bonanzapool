@@ -3,9 +3,11 @@ type: srs-erd
 module: exbot
 status: draft
 created: 2026-06-12
-updated: 2026-07-08
+updated: 2026-07-14
 owner: "@hienduong"
 changelog:
+  - 2026-07-14 | manual | P2 fix: clarify funding_rolling_metrics v1 note — DDL ships Phase A, table empty until bnza-market-cron deploys
+  - 2026-07-13 | manual | v3-I-03 fix: add funding_rolling_metrics table to ERD (schema from develop branch); add v1 status note
   - 2026-07-08 | /ba-do | I-14: add key_status TEXT NOT NULL with UNIQUE active per user constraint (BR-EXBOT-012) to hl_agent_keys table
   - 2026-07-04 | arc-migration | rename D1 header to Aurora PostgreSQL; annotate hl_agent_keys legacy fields as retired per FR-EXBOT-080 KMS flow
   - 2026-06-29 | manual | update hl_agent_keys table description: envelope encryption → AWS KMS key metadata
@@ -244,6 +246,15 @@ erDiagram
         INTEGER events_count
     }
 
+    funding_rolling_metrics {
+        UUID id PK
+        UUID bot_id FK "UNIQUE — one row per bot"
+        NUMERIC funding_rate_1h_pct
+        NUMERIC funding_rate_24h_pct
+        NUMERIC funding_apr_7d_pct "primary source for funding_alert trigger"
+        TIMESTAMP updated_at
+    }
+
     %% Relationships
     users ||--o{ bot_registry : "owns"
     users ||--o{ hl_agent_keys : "has"
@@ -259,6 +270,7 @@ erDiagram
     bots ||--o{ close_operations : "close/redeem ledger"
     bots ||--o{ queue_idempotency : "message dedup"
     bots ||--o{ funding_daily_metrics : "daily funding"
+    bots ||--o| funding_rolling_metrics : "rolling funding APR"
 ```
 
 ## DB Separation
@@ -268,7 +280,9 @@ erDiagram
 | `control_db` (global, 1) | users, bot_registry, shard_registry, hl_agent_keys | Phase A |
 
 > **Note on `hl_agent_keys`:** Table holds per-user key metadata and `key_status` only. Private keys (master key + agent key) are generated and retained inside AWS KMS — no key material is stored in this table. See FR-EXBOT-080.
-| `state_db_shard_00` (1 shard) | bots, positions, hedge_legs, bot_runtime_state, circuit_breakers, rebalance_attempts, lp_operations, close_operations, queue_idempotency, funding_daily_metrics, hourly_bot_metrics, daily_bot_metrics | Phase A |
+
+> **Note on `funding_rolling_metrics`:** Populated by `bnza-market-cron` worker (not yet deployed in v1). DDL ships Phase A — table will be empty until `bnza-market-cron` deploys. Strategy engine falls back to `fundingRate × 8760` annualization when row is absent. See FR-EXBOT-012 `funding_alert` trigger.
+| `state_db_shard_00` (1 shard) | bots, positions, hedge_legs, bot_runtime_state, circuit_breakers, rebalance_attempts, lp_operations, close_operations, queue_idempotency, funding_daily_metrics, funding_rolling_metrics, hourly_bot_metrics, daily_bot_metrics | Phase A |
 | `state_db_shard_00..03` (4 shards) | same as above | Phase B |
 | `state_db_shard_00..15` (16 shards) | same as above — deferred until Phase B stable + 10k load benchmark | Phase C |
 
