@@ -1,7 +1,7 @@
 # Test Scenarios — UC-EXBOT-light-check Execute Periodic Light-Check
 
-> Source: docs/qc/uc-read/UC-EXBOT-light-check/UC-EXBOT-light-check_light-check_audited_20260706_v3.md
-> Generated: 2026-07-07
+> Source: docs/qc/uc-read/UC-EXBOT-light-check/UC-EXBOT-light-check_light-check_audited_20260714_v4.md
+> Generated: 2026-07-15
 > Domain/Architecture: AWS Lambda (Scan Worker + Light-Check Worker) + SQS queues + Aurora PostgreSQL + ElastiCache Redis (Pool Slot0 Cache + HL Mark Price Cache). Zero Hyperliquid API calls in light-check (BR-EXBOT-003).
 
 ## UC-EXBOT-light-check — Execute Periodic Light-Check
@@ -321,9 +321,9 @@
 ### Scenario ID: TS_LC_032
 **Scenario Title:** Idempotency — expires_at always set to now+1min on INSERT
 **UC Reference:** UC-EXBOT-light-check — Execute Periodic Light-Check
-**Req-ID:** UC-EXBOT-light-check §3 step 5 (gap note); AC-LC-18
+**Req-ID:** UC-EXBOT-light-check §3 step 5; SRS FR-EXBOT-011 AC
 **Test Type:** Data/State
-**Description:** After a Light-Check Worker INSERT into queue_idempotency, verify expires_at is set to approximately now+1 minute (not NULL). This confirms the known gap behavior: expires_at is populated but no cleanup job removes expired rows.
+**Description:** After a Light-Check Worker INSERT into queue_idempotency, verify expires_at is set to approximately now+1 minute (not NULL). This confirms the FR-EXBOT-011 AC behavior: expires_at is always populated with TTL=1min. The system must never insert a row with expires_at=NULL. (Cleanup of expired rows is handled by the EventBridge hourly cron job — covered in TS_LC_048.)
 **Test Focus:** Happy path
 
 ---
@@ -458,10 +458,85 @@
 
 ---
 
+
+---
+
+### Scenario ID: TS_LC_046
+**Scenario Title:** funding_alert fires via fallback path — fundingRate x 8760 < -15% APR when funding_rolling_metrics is empty (v1 scope)
+**UC Reference:** UC-EXBOT-light-check — Execute Periodic Light-Check
+**Req-ID:** UC-EXBOT-light-check §3 step 9; SRS FR-EXBOT-023; v4 audit note (v3-I-03 partially resolved)
+**Test Type:** Functional
+**Description:** Process a light-check for a bot when funding_rolling_metrics table is empty (bnza-market-cron not deployed in v1) and the fallback fundingRate x 8760 computes to less than -15% APR; the funding_alert reason must be included in decision.reason[] and hedge-sync enqueued. This is the only testable path in v1 scope. Zero HL API calls must be confirmed — fundingRate must be sourced from Aurora PostgreSQL (cached), not from a live HL API call.
+**Test Focus:** Alternative flow
+
+---
+
+### Scenario ID: TS_LC_047
+**Scenario Title:** funding_alert threshold boundary — exactly -15% APR must fire, -14.99% must not
+**UC Reference:** UC-EXBOT-light-check — Execute Periodic Light-Check
+**Req-ID:** UC-EXBOT-light-check §3 step 9; SRS FR-EXBOT-023
+**Test Type:** Functional
+**Description:** Test the boundary of the funding_alert threshold: when fundingRate x 8760 equals exactly -15.0% APR (or fundingApr7dPct = -15.0% when primary source available), funding_alert must fire; when the value equals -14.99% (just above the threshold), funding_alert must NOT fire. Verifies strict less-than vs less-than-or-equal-to semantics of the trigger condition.
+**Test Focus:** Boundary
+
+---
+
+### Scenario ID: TS_LC_048
+**Scenario Title:** queue_idempotency cleanup cron — hourly EventBridge job deletes rows with expires_at < now
+**UC Reference:** UC-EXBOT-light-check — Execute Periodic Light-Check
+**Req-ID:** UC-EXBOT-light-check §3 step 5 note; SRS FR-EXBOT-011 AC
+**Test Type:** Functional
+**Description:** Verify the hourly EventBridge cron job (as defined in FR-EXBOT-011 AC) executes DELETE FROM queue_idempotency WHERE expires_at < now and removes expired rows. After the cron runs, rows with expires_at older than the current time must be absent from the table; rows with expires_at in the future must be unaffected. This prevents unbounded table growth over time.
+**Test Focus:** Happy path
+
+---
+
+### Scenario ID: TS_LC_049
+**Scenario Title:** HL Mark Price Cache stale — "freeze routine hedge-sync this tick only" — next tick resumes normally
+**UC Reference:** UC-EXBOT-light-check — Execute Periodic Light-Check
+**Req-ID:** UC-EXBOT-light-check §3 step 11; SRS flows.md F-01; v4-N-04
+**Test Type:** Functional
+**Description:** Process two successive light-check ticks for the same bot: in tick N, HL Mark Price Cache updatedAt > 120s (stale), causing routine hedge-sync to be frozen. In tick N+1, HL Mark Price Cache updatedAt <= 120s (fresh); hedge-sync must resume normally without requiring any manual intervention. Verifies the freeze is scoped to one tick only — not a persistent suppression that carries over.
+**Test Focus:** Alternative flow
+
+---
+
+### Scenario ID: TS_LC_050
+**Scenario Title:** Circuit breaker state read — system reads from circuit_breakers table (canonical), not hedge_legs.circuit_state field
+**UC Reference:** UC-EXBOT-light-check — Execute Periodic Light-Check
+**Req-ID:** UC-EXBOT-light-check §3 step 6; SRS erd.md (circuit_breakers table); v4-N-02
+**Test Type:** Data/State
+**Description:** Verify that circuit breaker suppression logic (step 10) is driven by the circuit_breakers.state column from the circuit_breakers table, which is the canonical source per the ERD — not from a circuit_state field hypothetically in hedge_legs. Set circuit_breakers.state='open' with circuit_state absent from hedge_legs (or inconsistent); confirm hedge-sync is correctly suppressed. This test confirms the correct table is the decision point.
+**Test Focus:** State transition
+
+---
+
+### Scenario ID: TS_LC_051
+**Scenario Title:** Bot in safe_mode — light-check precondition check must prevent processing (invalid lifecycle_state)
+**UC Reference:** UC-EXBOT-light-check — Execute Periodic Light-Check
+**Req-ID:** UC-EXBOT-light-check §2; SRS states.md
+**Test Type:** Data/State
+**Description:** Process a light-check message for a bot where bots.lifecycle_state='safe_mode' (entered due to prior overrun or hedge failure); the Light-Check Worker must skip all trigger evaluation and produce zero downstream messages. safe_mode is not listed as a valid precondition state in UC §2 and bots in safe_mode require partial_repair to exit — light-check must not interfere.
+**Test Focus:** State transition
+
+---
+
+### Scenario ID: TS_LC_052
+**Scenario Title:** Acceptance — AC-LC-14: range_out triggers hedge-sync correctly, light-check does NOT set lifecycle_state='lp_rebalancing'
+**UC Reference:** UC-EXBOT-light-check — Execute Periodic Light-Check
+**Req-ID:** UC-EXBOT-light-check §3 step 10; US-EXBOT-007 AC-007-4; v3-I-02 resolved
+**Test Type:** Acceptance
+**Description:** Process a light-check where currentTick is outside [tickLower, tickUpper] (range_out condition); verify: (1) range_out is in decision.reason[] in the hedge-sync message; (2) bots.lifecycle_state in Aurora PostgreSQL remains 'active' — NOT changed to 'lp_rebalancing' by the Light-Check Worker; (3) no separate lp_rebalancing queue message is produced. The lifecycle_state='lp_rebalancing' transition belongs exclusively to the downstream hedge-sync worker (per US-EXBOT-007 AC-007-1).
+**Test Focus:** Happy path
+
+
 ## Out-of-Scope Flags
 
 | Scenario Area | Reason | Recommended Action |
 |---|---|---|
-| funding_alert trigger scenarios | BLOCKED: `funding_rolling_metrics` table not in SRS ERD; OQ-EXBOT-12 (7d APR aggregation formula) still Open — cannot define pre-conditions without schema and formula | Resolve via qc-qna + BA must define funding_rolling_metrics schema + close OQ-EXBOT-12 before designing |
+| funding_alert primary path (bnza-market-cron) | BLOCKED (v1): funding_rolling_metrics table exists in ERD (confirmed 2026-07-14) but bnza-market-cron worker not deployed in v1 — primary fundingApr7dPct source is empty. Fallback path (fundingRate x 8760) IS testable and covered by TS_LC_046, TS_LC_047. OQ-EXBOT-12 (7d APR formula) still Open — primary path test cases will be designed post-v2 deployment. | Design fallback path scenarios now (done); defer primary path to v2 release + qc-qna for OQ-EXBOT-12 |
 | Load / throughput testing (10,000 bot cycle SLA) | NFR: PERFORMANCE — out of scope for this skill | Defer to performance testing specialist with k6 / locust; validate via AWS Lambda concurrent execution + SQS throughput metrics |
 | Security testing (SQS message tampering, IAM boundary) | NFR: SECURITY — out of scope for this skill | Defer to security review; validate IAM least-privilege for Lambda → SQS → ElastiCache access |
+| manual_admin RebalanceReason trigger in light-check | BLOCKED (v4-N-01): UC step 9 does not define conditions under which light-check fires manual_admin reason — unclear if light-check can emit this reason at all | BA to clarify whether manual_admin is emittable by light-check worker; if not, document explicitly in UC step 9 |
+| recovery_reconcile RebalanceReason trigger in light-check | BLOCKED (v4-N-01): UC step 9 does not define conditions under which light-check fires recovery_reconcile reason | BA to clarify whether recovery_reconcile is emittable by light-check worker; add trigger condition to UC step 9 |
+| fundingRate fallback source identity | BLOCKED (v4-N-03): UC step 9 does not document which Aurora PostgreSQL field supplies fundingRate for the fallback formula (fundingRate x 8760). If sourced from HL API, this violates BR-EXBOT-003. | BA to confirm field name (e.g. bot_runtime_state.last_funding_rate); TS_LC_046 is written assuming Aurora source — update if different |
