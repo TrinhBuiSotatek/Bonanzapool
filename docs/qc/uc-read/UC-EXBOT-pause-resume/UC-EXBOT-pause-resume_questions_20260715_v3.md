@@ -1,18 +1,15 @@
 # Question Backlog — UC-EXBOT-pause-resume
 
 > Generated: 2026-06-30
-> Source files: `docs/qc/uc-read/UC-EXBOT-pause-resume/UC-EXBOT-pause-resume_pause-resume_audited_20260706_v4.md`
-> Updated: 2026-07-06 (re-audit after BA update 2026-07-04: ARC migration)
-> Previous versions: v1 (2026-06-30), v2 (2026-07-01), v3 (2026-07-03)
+> Source files: `docs/qc/uc-read/UC-EXBOT-pause-resume/UC-EXBOT-pause-resume_audited_20260715_v5.md`
+> Updated: 2026-07-15 (BA responses 2026-07-14)
+> Previous versions: v1 (2026-06-30), v2 (2026-07-01), v3 (2026-07-03), v2 (2026-07-06)
 
 ---
 
 ## Open Questions
 
-| ID | Priority | Ref | Question | Why It Matters | Status |
-|----|----------|-----|----------|----------------|--------|
-| Q14 | Minor | UC §1; SRS spec.md §1 | **Naming inconsistency sau ARC migration (2026-07-04):** UC §1 Actor list viết "ExBot System Operator (status update worker)" nhưng SRS spec.md §1 giới thiệu "ExBot Lambda". Sau ARC migration, tên chuẩn là "ExBot Lambda". UC cần cập nhật để nhất quán. | Nhất quán về naming — không ảnh hưởng đến test design nhưng gây nhầm lẫn khi đọc tài liệu. | **Open** |
-| Q15 | Minor | UC §1; UC Diagram | **UC Diagram (Mermaid) vẫn dùng "Status Worker" thay vì "ExBot Lambda" sau ARC migration.** UC §1 Actor list và Mermaid diagram cần được cập nhật thành "ExBot Lambda" để nhất quán với SRS spec.md. | Nhất quán về naming — không ảnh hưởng đến test design nhưng gây nhầm lẫn. | **Open** |
+*Không có câu hỏi nào đang mở — tất cả đã được resolved.*
 
 Priority: H = High (blocks design), M = Medium (affects scope), L = Low (nice to know)
 Status: Open | Answered | Deferred
@@ -34,6 +31,8 @@ Status: Open | Answered | Deferred
 | Q10 | Minor | UC §2; SRS states.md | **Không có precondition cho resume khi bot ở `lifecycle_state='lp_rebalancing'` hoặc `'hedge_stopped_cooldown'`.** | states.md state registry row `(pre-pause value) | paused` ngụ ý mọi giá trị `lifecycle_state` đều có thể pause — không chỉ `'active'`. UC §2 pause precondition nêu `lifecycle_state='active'` nhưng không nói đó là giá trị DUY NHẤT được phép. Resume precondition chỉ nêu `bots.status='paused'`, không giới hạn `lifecycle_state`. Ngụ ý: cả `'active'`, `'hedge_stopped_cooldown'`, `'lp_rebalancing'` đều được phép pause/resume. Không có spec nào nói ngược lại. | QC UC Read Agent (docs evidence) | 2026-07-01 | Answered |
 | Q11 | Minor | FR-EXBOT-033; UC §6; SRS states.md | **SAFE_MODE entry từ pause state không rõ behavior.** | states.md state registry rõ ràng: row `(pre-pause value) | paused` và row `safe_mode | safe_mode` là hai trạng thái độc lập. State machine cho thấy `safe_mode` có transition riêng: `safe_mode → active` (auto-recovery) hoặc `safe_mode → closed` (bot_safe_close). Khi deep-audit phát hiện SAFE_MODE condition trên bot đang paused, `bots.status` chuyển từ `paused` sang `safe_mode` — `lifecycle_state` giữ nguyên giá trị pre-pause. Không có spec nào nói phải giữ `paused` khi vào SAFE_MODE. | QC UC Read Agent (docs evidence) | 2026-07-01 | Answered |
 | Q12 | Minor | UC §4 step 5; flows.md F-01; FR-EXBOT-012 | **Bot-scan worker có scheduling cho bot vừa resume không?** | Không phải test issue — không phải spec gap. UC §4 step 5 nêu ExBot Lambda enqueue `light-check` ngay sau resume. Bot-scan worker scan định kỳ theo cron (F-01). Implementer sẽ xử lý duplicate prevention (ví dụ: idempotency key trên message hoặc worker tự deduplicate). Không cần BA/Tech Lead xác nhận — đây là implementation detail. | QC UC Read Agent (not a test design issue) | 2026-07-01 | Answered |
+| Q14 | Minor | UC §1; SRS spec.md §1 | **Naming inconsistency sau ARC migration (2026-07-04):** UC §1 Actor list viết "ExBot System Operator (status update worker)" nhưng SRS spec.md §1 giới thiệu "ExBot Lambda". Sau ARC migration, tên chuẩn là "ExBot Lambda". UC cần cập nhật để nhất quán. | Q14 already resolved by arc-migration 2026-07-04 — UC §1 Actors currently lists "ExBot Lambda" (not "status update worker"). No further action needed. | BA (@hienduong) | 2026-07-14 | Answered |
+| Q15 | Minor | UC §1; UC Diagram | **UC Diagram (Mermaid) vẫn dùng "Status Worker" thay vì "ExBot Lambda" sau ARC migration.** UC §1 Actor list và Mermaid diagram cần được cập nhật thành "ExBot Lambda" để nhất quán với SRS spec.md. | Already fixed in arc-migration 2026-07-04. Mermaid diagram currently uses `participant ExBotLambda as ExBot Lambda`. | BA (@hienduong) | 2026-07-14 | Answered |
 
 ---
 
@@ -50,11 +49,11 @@ Status: Open | Answered | Deferred
 | Category | Count |
 |----------|-------|
 | Total Questions | 15 (Q1–Q15) |
-| Open | 2 (Q14, Q15 — Minor, naming consistency) |
-| Answered | 11 (Q2–Q12) |
+| Open | 0 (all resolved) |
+| Answered | 13 (Q2–Q12, Q14, Q15) |
 | Deferred | 1 (Q1 — API endpoints, per-environment) |
 | Q13 | Removed — confirmed duplicate of Q1 |
 
 ---
 
-*Question Backlog — UC-EXBOT-pause-resume — updated by QC UC Read Agent (2026-07-06)*
+*Question Backlog — UC-EXBOT-pause-resume — updated by QC UC Read Agent (2026-07-15)*

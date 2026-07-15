@@ -267,8 +267,8 @@ Cho phép NĐT tạm dừng hoạt động của ExBot mà không thanh lý vị
 | Q11 | Minor | Missing | FR-EXBOT-033; UC §6; SRS states.md | **SAFE_MODE entry từ pause state không rõ behavior.** | **Đã được trả lời từ docs:** states.md state registry rõ ràng: row `(pre-pause value) | paused` và row `safe_mode | safe_mode` là hai trạng thái độc lập. State machine cho thấy `safe_mode` có transition riêng. Khi deep-audit phát hiện SAFE_MODE condition trên bot đang paused, `bots.status` chuyển từ `paused` sang `safe_mode` — `lifecycle_state` giữ nguyên giá trị pre-pause. Không có spec nào nói phải giữ `paused` khi vào SAFE_MODE. | Đã được trả lời — evidence: states.md state registry; FR-EXBOT-050 | QC UC Read Agent | **Answered** |
 | Q12 | Minor | Missing | UC §4 step 5; flows.md F-01; FR-EXBOT-012 | **Bot-scan worker có scheduling cho bot vừa resume không?** | **Đã được trả lời:** Không phải test issue — không phải spec gap. UC §4 step 5 nêu ExBot Lambda enqueue `light-check` ngay sau resume. Bot-scan worker scan định kỳ theo cron (F-01). Implementer sẽ xử lý duplicate prevention. Không cần BA/Tech Lead xác nhận — đây là implementation detail. | Đã được trả lời — not a test design issue | QC UC Read Agent | **Answered** |
 | **Q13** | ~~**Blocker**~~ | ~~Missing~~ | **FR-EXBOT-090; FR-EXBOT-100; UC §3 step 1, §4 step 1** | **⚠️ API endpoints `/api/exbot/pause` và `/api/exbot/resume` KHÔNG được định nghĩa trong FRD/SRS.** FR-EXBOT-090 (SRS spec.md) chỉ liệt kê 4 endpoints: `POST /api/exbot/start`, `GET /api/exbot/status`, `POST /api/exbot/close`, `POST /api/exbot/margin`. FR-EXBOT-100 (FRD) cũng chỉ liệt kê 4 endpoints tương tự. UC dùng `POST /api/exbot/pause` và `POST /api/exbot/resume` nhưng endpoint này không được đăng ký trong spec. BA cần: (1) bổ sung pause/resume endpoints vào FR-EXBOT-090 và FR-EXBOT-100, HOẶC (2) xác nhận pause/resume được xử lý qua endpoint khác (ví dụ: `POST /api/exbot/start` có thể dùng cho resume?). | Tester không biết endpoint nào để test. Nếu endpoint không được đăng ký, implementation có thể khác với UC. | BA (@hienduong) | **→ Đã xác nhận trùng với Q1 đã deferred (2026-07-06)** |
-| Q14 | Minor | Inconsistency | UC §1; SRS spec.md §1 | **Naming inconsistency sau ARC migration:** UC §1 viết "ExBot System Operator (status update worker)" nhưng SRS spec.md §1 giới thiệu "ExBot Lambda". Sau ARC migration (2026-07-04), tên chuẩn là "ExBot Lambda". UC cần cập nhật để nhất quán. | Nhất quán về naming — không ảnh hưởng đến test design nhưng gây nhầm lẫn khi đọc tài liệu. | BA (@hienduong) | **Open** |
-| Q15 | Minor | Inconsistency | UC §1; UC Diagram | **UC §1 Actor list viết "ExBot System Operator (status update worker)" nhưng Mermaid diagram trong UC §Diagram vẫn dùng "Status Worker".** Cả hai đều cần được cập nhật thành "ExBot Lambda" sau ARC migration. | Nhất quán về naming — không ảnh hưởng đến test design nhưng gây nhầm lẫn. | BA (@hienduong) | **Open** |
+| Q14 | Minor | Inconsistency | UC §1; SRS spec.md §1 | **Naming inconsistency sau ARC migration:** UC §1 viết "ExBot System Operator (status update worker)" nhưng SRS spec.md §1 giới thiệu "ExBot Lambda". Sau ARC migration (2026-07-04), tên chuẩn là "ExBot Lambda". UC cần cập nhật để nhất quán. | Nhất quán về naming — không ảnh hưởng đến test design nhưng gây nhầm lẫn khi đọc tài liệu. | BA (@hienduong) | **✅ Resolved (2026-07-14)** — Q14 already resolved by arc-migration 2026-07-04 — UC §1 Actors currently lists "ExBot Lambda" (not "status update worker"). No further action needed. |
+| Q15 | Minor | Inconsistency | UC §1; UC Diagram | **UC §1 Actor list viết "ExBot System Operator (status update worker)" nhưng Mermaid diagram trong UC §Diagram vẫn dùng "Status Worker".** Cả hai đều cần được cập nhật thành "ExBot Lambda" sau ARC migration. | Nhất quán về naming — không ảnh hưởng đến test design nhưng gây nhầm lẫn. | BA (@hienduong) | **✅ Resolved (2026-07-14)** — Already fixed in arc-migration 2026-07-04. Mermaid diagram currently uses `participant ExBotLambda as ExBot Lambda`. |
 
 ### 10.2 Dependency cần theo dõi
 
@@ -277,7 +277,7 @@ Cho phép NĐT tạm dừng hoạt động của ExBot mà không thanh lý vị
 | `POST /api/exbot/pause` và `POST /api/exbot/resume` endpoints | API | **Q13: Endpoint không có trong FR-EXBOT-090/FR-EXBOT-100 — CẦN BA BỔ SUNG** | BA (@hienduong) | **Open** |
 | Q2, Q3, Q7, Q8, Q9 | BA responses (2026-07-03) | Đã được giải quyết — ExBot Lambda synchronous handler, DB conditional UPDATE idempotency, pause only from `lifecycle_state='active'`, ExBot scope ends at API response, MSG-SUC-81/82 registered | — | **Answered** |
 | Q4, Q5, Q6, Q10, Q11, Q12 | Docs evidence | Đã được trả lời từ FR-EXBOT-013, FR-EXBOT-014, FR-EXBOT-016, states.md | — | **Answered** |
-| Q14, Q15 | Naming consistency | UC cần cập nhật "Status Update Worker" → "ExBot Lambda" sau ARC migration | BA (@hienduong) | **Open** |
+| Q14, Q15 | Naming consistency | ✅ Resolved — Already fixed in arc-migration 2026-07-04. UC §1 and Mermaid diagram both use "ExBot Lambda". | — | **Resolved** |
 
 ---
 
@@ -289,10 +289,10 @@ Cho phép NĐT tạm dừng hoạt động của ExBot mà không thanh lý vị
 | Area 2: Data Object / State Attributes, Business Rules, Validations & Messages | 25 | **25** | ✅ Ready | 0 |
 | Area 3: Functional Logic & Workflow Decomposition | 25 | **25** | ✅ Ready | 0 |
 | Area 4: Functional Integration & Data Consistency | 15 | **15** | ✅ Ready | 0 |
-| Area 5: UC / Spec Documentation Quality Issues | 15 | **15** | ✅ Ready | 0 Minor (Q14, Q15) |
-| **Tổng điểm** | **100** | **100** | **✅ Ready** | **0 (Q1 deferred, Q14/Q15 minor)** |
+| Area 5: UC / Spec Documentation Quality Issues | 15 | **15** | ✅ Ready | 0 |
+| **Tổng điểm** | **100** | **100** | **✅ Ready** | **0 (Q1 deferred, Q14/Q15 resolved)** |
 
-**Chi tiết Area (sau khi Q2, Q3, Q7, Q8, Q9 được BA giải quyết):**
+**Chi tiết Area (sau khi tất cả questions được resolved):**
 
 - **Area 1 (20/20):** Q2 (Status Update Worker) đã được giải quyết — ExBot Lambda xử lý synchronous. Q7 (lifecycle_state) đã được BA chốt. Điểm tối đa.
 
@@ -302,7 +302,7 @@ Cho phép NĐT tạm dừng hoạt động của ExBot mà không thanh lý vị
 
 - **Area 4 (15/15):** Q7 và cross-function effects (pause → light-check suppress, deep-audit continue) được nêu rõ. SAFE_MODE entry từ pause (Q11) đã được trả lời. Điểm tối đa.
 
-- **Area 5 (15/15):** Q13 = Q1 (đã deferred). Naming inconsistency (Q14, Q15) không ảnh hưởng test design — chỉ là documentation consistency. Điểm tối đa.
+- **Area 5 (15/15):** Q13 = Q1 (đã deferred). Naming inconsistency (Q14, Q15) đã được resolved trong arc-migration 2026-07-04. Điểm tối đa.
 
 ---
 
@@ -328,6 +328,8 @@ Cho phép NĐT tạm dừng hoạt động của ExBot mà không thanh lý vị
 | Q7 | Major | Chỉ `lifecycle_state='active'` được phép pause. `hedge_stopped_cooldown` và `lp_rebalancing` không được pause — đang trong quá trình xử lý tự động. | `states.md` changelog 2026-07-03 |
 | Q8 | Major | ExBot scope dừng ở API response. "Investor receives UI confirmation" thuộc POOL UI (PTL-05) — nằm ngoài ExBot scope. | `uc-pause-resume.md` changelog 2026-07-03 |
 | Q9 | Major | Success messages đã đăng ký: MSG-SUC-81 (pause) và MSG-SUC-82 (resume) trong `message-list.md` §MSG-EXBOT. | `message-list.md` changelog 2026-07-03 |
+| Q14 | Minor | ✅ Resolved (2026-07-14) — Already resolved by arc-migration 2026-07-04. UC §1 Actor list currently uses "ExBot Lambda". | BA responses (2026-07-14) |
+| Q15 | Minor | ✅ Resolved (2026-07-14) — Already fixed in arc-migration 2026-07-04. Mermaid diagram uses `participant ExBotLambda as ExBot Lambda`. | BA responses (2026-07-14) |
 
 ### Đã được trả lời từ docs
 
@@ -340,14 +342,6 @@ Cho phép NĐT tạm dừng hoạt động của ExBot mà không thanh lý vị
 | Q11 | Minor | SAFE_MODE entry từ pause: states.md state registry cho thấy `safe_mode` là trạng thái độc lập — `bots.status` chuyển `paused` → `safe_mode`, `lifecycle_state` giữ nguyên. | states.md |
 | Q12 | Minor | Duplicate light-check sau resume: không phải test issue — implementer sẽ xử lý duplicate prevention. | — |
 
-### Issues mới phát hiện (2026-07-06 — sau BA update 2026-07-04)
-
-| ID | Priority | Issue | Ảnh hưởng | Action |
-|---|---|---|---|---|
-| ~~Q13~~ | ~~Blocker~~ → **Confirmed = Q1** | ~~API endpoints `/api/exbot/pause` và `/api/exbot/resume` KHÔNG được định nghĩa trong FR-EXBOT-090 hoặc FR-EXBOT-100~~ → **Đã được xác nhận trùng với Q1 đã deferred.** Q1 deferred: "API endpoint names khác nhau giữa các môi trường test". Q13 là cùng vấn đề: endpoint không có trong FR-EXBOT-090/FR-EXBOT-100. | Đã deferred — không ảnh hưởng test design | Không cần action — Q1 deferred cover rồi |
-| Q14 | Minor | UC §1 Actor list viết "ExBot System Operator (status update worker)" nhưng SRS spec.md §1 giới thiệu "ExBot Lambda" sau ARC migration. Naming inconsistency. | Nhất quán về naming — không ảnh hưởng đến test design nhưng gây nhầm lẫn khi đọc tài liệu. | BA cần cập nhật UC §1 → "ExBot Lambda" |
-| Q15 | Minor | UC Diagram (Mermaid) vẫn dùng "Status Worker" thay vì "ExBot Lambda" sau ARC migration. | Nhất quán về naming — không ảnh hưởng đến test design nhưng gây nhầm lẫn. | BA cần cập nhật Mermaid diagram → "ExBot Lambda" |
-
 ### Deferred
 
 | ID | Priority | Lý do defer | Action |
@@ -359,7 +353,7 @@ Cho phép NĐT tạm dừng hoạt động của ExBot mà không thanh lý vị
 **UC-EXBOT-pause-resume đạt trạng thái Ready cho test design.**
 
 - **Q1 (API endpoints):** Đã deferred — Q1 đã được resolve: "Endpoint names khác nhau giữa các môi trường test — QA sẽ lấy endpoint thực tế từ test environment config."
-- **Q14, Q15 (Minor):** Naming consistency sau ARC migration — cần BA cập nhật UC để sử dụng "ExBot Lambda" thay vì "Status Update Worker" / "Status Worker". Không ảnh hưởng đến test design.
+- **Q14, Q15 (Minor):** Đã resolved trong arc-migration 2026-07-04. UC §1 và Mermaid diagram đều sử dụng "ExBot Lambda".
 - Tất cả các issues khác (Q2–Q12) đã được giải quyết hoặc trả lời từ docs.
 - Tester có thể tiến hành thiết kế test case dựa trên UC và SRS baseline.
 
@@ -372,7 +366,8 @@ Cho phép NĐT tạm dừng hoạt động của ExBot mà không thanh lý vị
 | v1 | 2026-06-30 | QC UC Read Agent | Tạo báo cáo audited lần đầu cho UC-EXBOT-pause-resume. Tổng điểm: 54/100 — Not Ready. 4 blockers, 9 major, 4 minor issues. |
 | v2 | 2026-07-01 | QC UC Read Agent | Cập nhật sau verification: Q1 deferred (endpoint per environment); Q4, Q5, Q6, Q10, Q11, Q12 trả lời từ docs — đưa sang Answered; Q2, Q3, Q7, Q8, Q9 giữ lại làm Open. Tổng điểm: 75/100 — Conditionally Ready. 1 blocker, 4 major. |
 | v3 | 2026-07-03 | QC UC Read Agent | Cập nhật sau BA responses (2026-07-03): Q2, Q3, Q7, Q8, Q9 được BA giải quyết — sang Answered. Tổng điểm: 100/100 — Ready. 0 issues (Q1 deferred). UC sẵn sàng cho test design. |
-| **v4** | **2026-07-06** | **QC UC Read Agent** | **Re-audit sau BA update (2026-07-04: ARC migration).** Phát hiện Q14, Q15 (Minor): naming inconsistency sau ARC migration — "Status Update Worker"/"Status Worker" vs "ExBot Lambda". Q13 = Q1 (đã deferred) — loại khỏi issue list. Tổng điểm: 100/100 — Ready. 0 blockers, 2 Minor. |
+| v4 | 2026-07-06 | QC UC Read Agent | Re-audit sau BA update (2026-07-04: ARC migration). Phát hiện Q14, Q15 (Minor): naming inconsistency sau ARC migration — "Status Update Worker"/"Status Worker" vs "ExBot Lambda". Q13 = Q1 (đã deferred) — loại khỏi issue list. Tổng điểm: 100/100 — Ready. 0 blockers, 2 Minor. |
+| **v5** | **2026-07-15** | **QC UC Read Agent** | **Cập nhật sau BA responses (2026-07-14).** Q14, Q15 đã được BA xác nhận là đã resolved trong arc-migration 2026-07-04. Chuyển từ Open → Answered. All 15 questions resolved (13 Answered, 1 Deferred, 1 Removed as duplicate). Tổng điểm: 100/100 — Ready. 0 Open issues. |
 
 ---
 
