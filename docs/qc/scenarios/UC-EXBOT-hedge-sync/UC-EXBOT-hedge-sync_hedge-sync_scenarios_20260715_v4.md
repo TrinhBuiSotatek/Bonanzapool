@@ -1,20 +1,19 @@
 # Test Scenarios — UC-EXBOT-hedge-sync Execute Delta-Only Hedge Adjustment
 
-> Source: docs/qc/uc-read/UC-EXBOT-hedge-sync/UC-EXBOT-hedge-sync_hedge-sync_audited_20260706_v3.md
-> Generated: 2026-07-06
+> Source: docs/qc/uc-read/UC-EXBOT-hedge-sync/UC-EXBOT-hedge-sync_hedge-sync_audited_20260715_v4.md
+> Generated: 2026-07-15
 > Author: QC Func Scenario Design ExBot Agent
-> Version: v3
+> Version: v4
 > Domain/Architecture: AWS Lambda (ExBot) + Hyperliquid API + Aurora PostgreSQL (control_db + state_db_shard) + Redis Redlock via ElastiCache (UserLock) + HLRateLimit (ElastiCache) + SQS queue topology (hedge-sync → reconcile → partial_repair)
 >
-> **Changes from v2:**
-> - UPDATED: Domain/Architecture header — Cloudflare Workers → AWS Lambda; D1 → Aurora PostgreSQL; UserLockDO → Redis Redlock via ElastiCache; HLRateLimitDO → ElastiCache Redis
-> - UPDATED: Bảng mã viết tắt — UserLockDO, D1, DO terminology replaced with AWS equivalents; added Redlock entry
-> - UPDATED: TS_007/008/009/037 — UserLockDO → User Lock (Redis Redlock via ElastiCache) in descriptions
-> - UPDATED: TS_032/033/039 — D1 → Aurora PostgreSQL in descriptions
-> - UPDATED: TS_036 — HLRateLimitDO → ElastiCache Redis rate limiter in description
-> - NO logic, business rule, coverage, or scenario count change vs v2 (52 scenarios retained)
-> - Carried forward blocked items: Q1 (OQ-EXBOT-013 delta=0), Q2 (OQ-EXBOT-002 INV-STOP), Q3 (OQ-EXBOT-014), Q6 (OQ-EXBOT-011)
-> - New low gap Q-N1 noted: FR-EXBOT-092 not in UC §7 FR Trace (does not affect coverage)
+> **Changes from v3 (4 new scenarios added):**
+> - NEW: TS_053 — marginSummary fetch sequence: margin_status updated AFTER lock, BEFORE mutation (Q3 closed)
+> - NEW: TS_054 — slow marginSummary call triggers extend() to prevent TTL expiry (Q3 closed)
+> - NEW: TS_055 — step 2 short-circuit: stateVersion mismatch discards before circuit recheck (N4-03)
+> - NEW: TS_056 — F-01 light-check "suppress this tick only" ≠ permanent suppress; next tick resumes (flows.md F-01 fix)
+> - UPDATED: Out-of-Scope Flags — Q3 removed (answered); Q1/Q2/Q6 remain blocked
+> - Scenarios TS_001–TS_052 carry forward unchanged from v3
+
 
 ---
 
@@ -23,7 +22,7 @@
 | Mã / Tiền tố | Ý nghĩa + vai trò trong dự án | Định nghĩa tại |
 |---|---|---|
 | HL | Hyperliquid — sàn giao dịch perpetual bên ngoài. Trong dự án, ExBot short ETH trên HL để hedge LP position trên Uniswap V3. Mọi lệnh delta, stop market đều gửi qua HL API. | (tên sản phẩm) |
-| Aurora PostgreSQL | AWS Aurora PostgreSQL Serverless v2 — cơ sở dữ liệu quan hệ phân tán. ExBot dùng control_db và state_db_shard để lưu trạng thái bot, hedge_legs, queue_idempotency, v.v. Thay thế Cloudflare D1 trong kiến trúc AWS arc. | SRS §1.1, FM-XB-01 |
+| Aurora PostgreSQL | AWS Aurora PostgreSQL Serverless v2 — cơ sở dữ liệu quan hệ phân tán. ExBot dùng control_db và state_db_shard để lưu trạng thái bot, hedge_legs, queue_idempotency, v.v. | SRS §1.1, FM-XB-01 |
 | SQS | AWS Simple Queue Service — hàng đợi message thay thế Cloudflare Queue. ExBot dùng 11 queue SQS FIFO bao gồm hedge-sync, reconcile, partial_repair, user_redeem, v.v. | SRS §FM-XB-02 |
 | ElastiCache | AWS ElastiCache Redis — cluster Redis chia sẻ cho 3 mục đích: HLRateLimit (rate limiter), UserLock via Redlock (mutex per-user), pool slot0 cache (MarketData). | SRS §FM-XB-03, FR-EXBOT-091/092/093 |
 | Redlock | Redis Redlock distributed mutex algorithm — cung cấp phân tán mutex per-user qua ElastiCache. Interface: acquire(holderToken, ttl=90s, idempotencyKey) → {acquired, lockKey}; extend(holderToken, ttl); release(holderToken, idempotencyKey). holderToken mismatch = no-op. | FR-EXBOT-092 |
@@ -37,8 +36,8 @@
 | marginUsage | Tỷ lệ ký quỹ: marginRequiredUsd / marginBalanceUsd. Ngưỡng warning: 0.55–0.75; critical: ≥ 0.75. | FR-EXBOT-060 |
 | SAFE_MODE | Trạng thái bot không cho phép bất kỳ mutation nào. Bot chỉ được monitor và retry kết nối. | FR-EXBOT-050 |
 | RebalanceReason | Enum lý do kích hoạt hedge-sync. Giá trị cụ thể là canonical enum trong FR-EXBOT-023; không thêm giá trị mới. | FR-EXBOT-023 |
+| marginSummary | Dữ liệu ký quỹ được fetch từ HL API sau khi acquire Redlock — dùng để update margin_status trước khi thực hiện hedge mutation. | FR-EXBOT-060, Q3 answer (Tech Lead 2026-07-14) |
 
----
 
 ## UC-EXBOT-hedge-sync — Execute Delta-Only Hedge Adjustment
 
@@ -564,15 +563,58 @@
 
 ---
 
+---
+
+### Scenario ID: TS_UC-EXBOT-hedge-sync_053
+**Scenario Title:** marginSummary fetch xảy ra sau khi acquire Redlock — margin_status được cập nhật trước khi thực hiện mutation
+**UC Reference:** UC-EXBOT-hedge-sync — Execute Delta-Only Hedge Adjustment
+**Req-ID:** UC-EXBOT-hedge-sync §3 step 4; FR-EXBOT-060; FR-EXBOT-092; Q3 answer (Tech Lead 2026-07-14)
+**Test Type:** Functional
+**Description:** Sau khi Worker acquire User Lock (Redlock) thành công, Worker phải fetch HL marginSummary (cùng với clearinghouseState tại step 4), tính marginUsage bằng BigDecimal, và cập nhật hedge_legs.margin_status trong Aurora PostgreSQL TRƯỚC khi thực hiện adjustShortDelta. Đây là thứ tự bắt buộc: Lock → fetch marginSummary + clearinghouseState → update margin_status → kiểm tra risk threshold → mutation → unlock. Không được dùng dữ liệu margin_status cũ từ trước khi lock để quyết định mutation.
+**Test Focus:** Happy path
+
+---
+
+### Scenario ID: TS_UC-EXBOT-hedge-sync_054
+**Scenario Title:** HL marginSummary call chậm trong khi đang giữ lock — extend() được gọi trước khi TTL=90s hết
+**UC Reference:** UC-EXBOT-hedge-sync — Execute Delta-Only Hedge Adjustment
+**Req-ID:** UC-EXBOT-hedge-sync §3 step 4; FR-EXBOT-092; Q3 answer (Tech Lead 2026-07-14)
+**Test Type:** Functional
+**Description:** Worker acquire Redlock (TTL=90s) và bắt đầu fetch HL marginSummary tại step 4. HL API phản hồi chậm (giả lập latency > 80s). Worker phải gọi User Lock.extend(holderToken, ttlMs) trước khi TTL=90s hết để gia hạn lease — đảm bảo lock không bị tự giải phóng bởi ElastiCache TTL expiry trong khi Worker vẫn đang fetch dữ liệu margin. Verify: sau khi marginSummary trả về, Worker tiếp tục xử lý bình thường và release lock trong finally block; Aurora PostgreSQL không thấy lock contention do TTL expiry.
+**Test Focus:** State transition
+
+---
+
+### Scenario ID: TS_UC-EXBOT-hedge-sync_055
+**Scenario Title:** Step 2 short-circuit: stateVersion mismatch discard trước khi circuit recheck được thực hiện
+**UC Reference:** UC-EXBOT-hedge-sync — Execute Delta-Only Hedge Adjustment
+**Req-ID:** UC-EXBOT-hedge-sync §3 step 2; FR-EXBOT-027; FR-EXBOT-040; flows.md F-02; N4-03
+**Test Type:** Functional
+**Description:** Gửi message hedge-sync với stateVersion lỗi thời (message.stateVersion < Aurora PostgreSQL state_version). Worker thực hiện step 2: kiểm tra stateVersion TRƯỚC, phát hiện mismatch, và discard message ngay lập tức với status='skipped' và reason = original RebalanceReason[]. Worker KHÔNG thực hiện circuit recheck (không đọc circuit_breakers.state). Đây là short-circuit theo thứ tự từ flows.md F-02 — stateVersion check first, circuit recheck second. Verify: không có Aurora PostgreSQL read nào cho circuit_breakers sau khi stateVersion mismatch detected.
+**Test Focus:** Alternative flow
+
+---
+
+### Scenario ID: TS_UC-EXBOT-hedge-sync_056
+**Scenario Title:** F-01 "suppress this tick only" — light-check suppress hedge-sync 1 tick, tick tiếp theo resume bình thường
+**UC Reference:** UC-EXBOT-hedge-sync — Execute Delta-Only Hedge Adjustment
+**Req-ID:** UC-EXBOT-hedge-sync flows.md F-01 step 11 (updated 2026-07-14); FR-EXBOT-033
+**Test Type:** Functional
+**Description:** Light-check worker phát hiện điều kiện suppress (ví dụ: bot đang trong thao tác ưu tiên cao hơn trong tick này — F-01 step 11 "suppress routine hedge-sync (this tick only)"). Worker KHÔNG enqueue hedge-sync message trong tick hiện tại. Tuy nhiên, suppress chỉ có hiệu lực cho tick này — không phải circuit open, không phải safe_mode. Tick tiếp theo (≤5 phút sau) light-check đánh giá lại bình thường: nếu drift vẫn vượt ngưỡng, hedge-sync được enqueue. Verify: chỉ đúng 1 tick bị suppress, tick kế tiếp có hedge-sync message trong queue.
+**Test Focus:** Alternative flow
+
+---
+
 ## ⚠️ Out-of-Scope Flags
 
 | Scenario Area | Reason | Recommended Action |
 |---|---|---|
-| delta=0 exact behavior (send no-op vs skip) | UC không định nghĩa behavior khi delta=0 sau BigDecimal computation (TS_040). Behavior suy luận nhưng chưa được BA confirm. | Raise với BA: liệu delta=0 là valid no-op hay error? |
+| delta=0 exact behavior (send no-op vs skip) | UC A6 documents "skip HL, proceed to stop replacement" nhưng note "Behavior pending OQ-EXBOT-013". BLOCKED: Q1 — zen confirmation outstanding. TS_040 covers suy luận nhưng expected result chưa hoàn chỉnh. | Chờ zen trả lời OQ-EXBOT-013 trước khi finalize test case chi tiết cho A6. |
 | Minimum order size handling khi delta < HL tick size (TS_041) | UC không định nghĩa cách xử lý delta nhỏ hơn minimum tick size HL. BLOCKED: chưa có spec. | Resolve qua qc-qna trước khi thiết kế test case atomic. |
-| Q1 (OQ-EXBOT-013): delta=0 exact behavior | BLOCKED: OQ-EXBOT-013 chưa được BA trả lời. Scenarios liên quan đến delta boundary cases còn open. | Chờ BA trả lời OQ-EXBOT-013 trước khi thiết kế test case chi tiết. |
-| Q2 (OQ-EXBOT-002): INV-STOP concurrent cancel race | BLOCKED: OQ-EXBOT-002 — behavior khi concurrent request cancel stop trong INV-STOP chưa có spec. TS_026 (crash recovery) có thể bị ảnh hưởng. | Chờ BA trả lời OQ-EXBOT-002. |
-| Q3 (OQ-EXBOT-014): reconcile timeout / HL position unavailable | BLOCKED: OQ-EXBOT-014 — behavior khi reconcile worker không fetch được HL position sau timeout chưa được định nghĩa. | Chờ BA trả lời OQ-EXBOT-014. |
-| Q6 (OQ-EXBOT-011): partial fill circuit breaker edge case | BLOCKED: OQ-EXBOT-011 — spec hiện tại nói partial fill KHÔNG gọi incrementCircuitBreaker, nhưng edge case khi partial fill nhiều lần liên tiếp chưa được làm rõ. | Chờ BA trả lời OQ-EXBOT-011. |
+| Q1 (OQ-EXBOT-013): delta=0 exact behavior | BLOCKED: OQ-EXBOT-013 chưa được zen trả lời. TS_040 có thể thiếu expected result cho stop replacement path. | Chờ zen trả lời OQ-EXBOT-013. |
+| Q2 (OQ-EXBOT-002): INV-STOP cancel/place ordering | BLOCKED: OQ-EXBOT-002 — behavior place-before-cancel vs cancel-before-place chưa xác nhận. TS_024/025/026 liên quan đến INV-STOP sequence có thể cần update. | Chờ zen trả lời OQ-EXBOT-002. |
+| Q6 (OQ-EXBOT-011): lpValueUsd formula cho partial_repair drift_threshold | BLOCKED: OQ-EXBOT-011 — công thức tính lpValueUsd chưa được confirm. TS_028 (partial_repair threshold) thiếu expected numeric value. | Chờ zen trả lời OQ-EXBOT-011. |
+| Q7: entry_price/liq_price update khi delta=0 | BLOCKED bởi Q1. Nếu Q1 confirm delta=0 → stop replacement thì Q7 cần được resolve để tester biết entry_price có update không. | Chờ Q1 resolved. |
 | Performance / Load testing | Out-of-scope cho logic scenario skill. Throughput (hedge-sync latency, SQS batch size) cần load testing. | Delegate sang performance testing team. |
 | Security testing ngoài functional auth (key_status check) | Out-of-scope. Key management security, KMS HSM audit, AWS IAM policy audit không thuộc functional scenario. | Delegate sang security audit. |
+
