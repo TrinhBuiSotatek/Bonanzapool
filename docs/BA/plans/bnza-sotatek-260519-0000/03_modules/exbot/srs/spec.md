@@ -2,7 +2,7 @@
 type: srs
 status: draft
 created: 2026-06-12
-updated: 2026-07-14
+updated: 2026-07-20
 owner: "@hienduong"
 module: exbot
 lang: en
@@ -12,6 +12,14 @@ links:
   - ../usecases/index.md
   - ../userstories/index.md
 changelog:
+  - 2026-07-21 | manual | register E-EXBOT-031: status='paused' UI label for uc-monitor-status A10
+  - 2026-07-20 | manual | FR-EXBOT-073: clarify redemption_queued step — principal_amount is placeholder at createRequest; overwritten by hl_withdraw Phase 3 (withdrawable delta); step 6 expanded with full hl_withdraw+hl_fulfill+CCTP chain
+  - 2026-07-20 | manual | OQ-EXBOT-009 closed: pool slot0 cache refresh interval = 60s provisional (zen); stale threshold = 120s; UC light-check step 7 + A1 updated
+  - 2026-07-20 | manual | OQ-EXBOT-012 closed: funding_alert formula confirmed by zen; add formula to FR-EXBOT-012 AC; note bnza-market-cron fallback
+  - 2026-07-20 | manual | OQ-EXBOT-013 closed: delta=0 returns no_op_dust immediately — no stop replacement, no reconcile (confirmed develop branch rebalance.ts + handler-impl.ts)
+  - 2026-07-20 | manual | FR-EXBOT-035: chốt INV-STOP place-before-cancel sequence per zen; close OQ-EXBOT-02; update AC
+  - 2026-07-20 | manual | FR-EXBOT-025 AC: define exact-fill reconcile threshold (no % tolerance); close OQ-EXBOT-11 with zen confirmed lp_value_usd formula; clarify drift_threshold belongs to light-check only
+  - 2026-07-20 | manual | FR-EXBOT-072: fix trigger_reason claim — field not in close_operations DB; reason in SQS payload only (enum: l2_evacuation|parked_escalation|admin), logged to CloudWatch
   - 2026-07-13 | manual | register E-EXBOT-030: GET /status wallet mismatch → 403 (N-002 fix for uc-monitor-status A9)
   - 2026-07-09 | manual | register E-EXBOT-029: status='error' UI display message (uc-monitor-status A7)
   - 2026-07-09 | manual | register E-EXBOT-028: LP mint on-chain tx reverted/timeout at bot-start → lifecycle_state='error'
@@ -161,7 +169,7 @@ In addition to rebalance evaluation, each light-check pass shall:
 1. Check `stop_replacing_started_at IS NOT NULL AND (now − stop_replacing_started_at) > 60s` — if true, enqueue `partial_repair` with `reason='stop_replacing_overrun'` and enter SAFE_MODE (primary detection, ≤5 min; see FR-EXBOT-033).
 2. Use `uniPoolPrice` (Uniswap V3 pool slot0 `sqrtPriceX96`, sourced from ElastiCache Redis pool slot0 cache) when computing `deltaErrorUsd` for drift threshold evaluation. `hlMarkPrice` is used only for stop trigger detection (`markPrice >= stop_price`). `hlOraclePrice` is used only for margin calculations. These three price sources must not be interchanged (v5.2.6 X-5 3-way price split).
 
-**Acceptance criteria:** A 10,000-bot light-check cycle does not consume any HL API rate limit weight. Any HL fetch introduced into light-check is an architectural violation flagged by code review. `deltaErrorUsd` computation uses pool slot0 price from ElastiCache Redis, not HL mark or oracle price. 10,000 concurrent light-check workers make at most 1 RPC call per refresh interval (via the Fargate price poller writing to ElastiCache Redis), not 10,000.
+**Acceptance criteria:** A 10,000-bot light-check cycle does not consume any HL API rate limit weight. Any HL fetch introduced into light-check is an architectural violation flagged by code review. `deltaErrorUsd` computation uses pool slot0 price from ElastiCache Redis, not HL mark or oracle price. 10,000 concurrent light-check workers make at most 1 RPC call per refresh interval (via the Fargate price poller writing to ElastiCache Redis), not 10,000. `funding_alert` fires when `funding_apr_7d_pct < −15%`; primary source = `funding_rolling_metrics.funding_apr_7d_pct` (populated by `bnza-market-cron`); fallback = `fundingRate × 8760` when row absent. Formula (zen confirmed): `funding_apr_7d_pct(%) = ( Σ funding_net_usd latest 7 rows / lp_value_usd ) × (365/7) × 100`; if fewer than 7 rows, annualize over n available days (× 365/n).
 
 ---
 
@@ -261,7 +269,7 @@ Client order IDs shall be deterministic: `first128BitsHex(keccak256("bnza:{botId
 
 After every hedge mutation, the worker shall fetch the actual HL position via `clearinghouseState`, verify the size matches expected, extract `entry_price`, `liquidation_price`, and `effective_leverage`, save these to `hedge_legs`, recompute `stop_trigger_px`, and update `bot_runtime_state.last_known_hl_short_size`. Success is recorded in `rebalance_attempts` only after reconcile confirms the actual state.
 
-**Acceptance criteria:** `rebalance_attempts.status='success'` is never written before reconcile. `hedge_legs.entry_price` and `stop_price` are populated after every hedge open or resize.
+**Acceptance criteria:** `rebalance_attempts.status='success'` is never written before reconcile. `hedge_legs.entry_price` and `stop_price` are populated after every hedge open or resize. Match is defined as exact fill — actual HL position size must equal target size. Any partial fill results in `reconcile_partial` status and triggers the partial_repair flow. No percentage tolerance is applied.
 
 ---
 
@@ -343,9 +351,9 @@ After a stop fires and is confirmed, `lifecycle_state` shall transition to `hedg
 **Trace:** FM-XB-07
 **Priority:** P0
 
-Stop replacement on hedge resize shall use the INV-STOP protected protocol (§19.5 of SPEC v5.2.6). Direct cancel-then-place without protection is forbidden. `stop_replacing_started_at` shall be set at the start of the replacement critical section and cleared in a `finally` block.
+Stop replacement on hedge resize shall use the INV-STOP protected protocol — place-before-cancel sequence: (1) place new stop, (2) verify new stop active (verifyStopPlaced), (3) cancel old stop only after verification succeeds. This guarantees no 0-stop window at any point. Direct cancel-then-place is forbidden. On new stop placement failure, old stop remains active; partial_repair is enqueued. `stop_replacing_started_at` shall be set at the start of the replacement critical section and cleared in a `finally` block.
 
-**Acceptance criteria:** No hedge-sync implementation calls `cancelStop` then `placeStop` directly without the protected protocol. `stop_replacing_started_at` is always NULL when no replacement is in progress.
+**Acceptance criteria:** Stop replacement always follows place-before-cancel sequence — new stop must be verified active before old stop is cancelled. No 0-stop window exists at any point during replacement. `stop_replacing_started_at` is always NULL when no replacement is in progress.
 
 ---
 
@@ -426,9 +434,9 @@ Two separate close systems exist, both tracked in the `close_operations` ledger 
 **Trace:** FM-XB-08, US-EXBOT-009
 **Priority:** P0
 
-The system shall initiate `bot_safe_close` when any of the following conditions is confirmed: (1) circuit breaker exhausted — `circuit_breakers.state='open'` and `reset_at` has been extended 3 or more times without probe success; (2) margin critical — `margin_status='critical'` twice in a row leading to SAFE_MODE with no auto-recovery path; (3) 3 stops within 7 days — `lifecycle_state='hedge_stopped_cooldown'` is entered for the third time within a 7-day rolling window; (4) partial repair exhausted — `partial_repair` consumer fails 3 consecutive repair attempts for the same trigger event; (5) admin force-close — admin invokes `/api/exbot/close` explicitly. All five trigger paths create a `close_operations` row with `trigger_reason` populated and `idempotency_key UNIQUE` enforced.
+The system shall initiate `bot_safe_close` when any of the following conditions is confirmed: (1) circuit breaker exhausted — `circuit_breakers.state='open'` and `reset_at` has been extended 3 or more times without probe success; (2) margin critical — `margin_status='critical'` twice in a row leading to SAFE_MODE with no auto-recovery path; (3) 3 stops within 7 days — `lifecycle_state='hedge_stopped_cooldown'` is entered for the third time within a 7-day rolling window; (4) partial repair exhausted — `partial_repair` consumer fails 3 consecutive repair attempts for the same trigger event; (5) admin force-close — admin invokes `/api/exbot/close` explicitly. All five trigger paths create a `close_operations` row with `idempotency_key UNIQUE` enforced. Trigger reason is conveyed via the SQS message `reason` field (enum: `l2_evacuation | parked_escalation | admin`) and logged to CloudWatch as `bot_safe_close_requested` audit event — it is not persisted as a DB column in `close_operations`.
 
-**Acceptance criteria:** Each trigger condition creates exactly one `close_operations` row (UNIQUE constraint prevents duplicate). `trigger_reason` is populated for all 5 trigger types. A duplicate trigger for the same bot (e.g., two concurrent admin close calls) is rejected by the UNIQUE constraint on `idempotency_key`.
+**Acceptance criteria:** Each trigger condition creates exactly one `close_operations` row (UNIQUE constraint prevents duplicate). SQS message `reason` field is populated with the correct enum value for each trigger type (verify via CloudWatch `bot_safe_close_requested` event). A duplicate trigger for the same bot (e.g., two concurrent admin close calls) is rejected by the UNIQUE constraint on `idempotency_key`.
 
 ---
 
@@ -436,7 +444,7 @@ The system shall initiate `bot_safe_close` when any of the following conditions 
 **Trace:** FM-XB-08
 **Priority:** P0
 
-The `bot_safe_close` execution follows a fixed hedge-first sequence tracked atomically in `close_operations`: (1) `requested` — trigger received, `close_operations` row created; (2) `hedge_close_pending` — close HL short position fully via `closeShortReduceOnlyIoc` (target = 0); cancel stop via `replaceStopProtected(size=0)` — both are actions within this step, not separate states; (3) `hedge_closed` — `close_operations.state` advances to `hedge_closed` only after reconcile confirms HL position size = 0 and stop is cancelled; (4) `lp_closed` — call `vault.executeStrategy(RedeemStrategyV1, user, botId, params)` via ExBot Lambda; BnzaExPositionManager closes LP position, fees routed via LpFeeOps, principal returned; `PositionClosed` event emitted; (5) `redemption_queued` — RedemptionQueue.createRequest(user, botId, tokenId, hlPortionId) enqueued; RequestCreated event emitted; (6) `done` — Operator calls fulfillRequest(tokens, amounts); FIFO pop; safeTransferFrom(operator, user, amount) on-chain; RequestFulfilled event emitted; bots.status='closed'. On hedge close failure, the system retries up to 3 times before escalating to admin and holding at `hedge_close_pending`. LP close is not attempted until hedge is confirmed closed.
+The `bot_safe_close` execution follows a fixed hedge-first sequence tracked atomically in `close_operations`: (1) `requested` — trigger received, `close_operations` row created; (2) `hedge_close_pending` — close HL short position fully via `closeShortReduceOnlyIoc` (target = 0); cancel stop via `replaceStopProtected(size=0)` — both are actions within this step, not separate states; (3) `hedge_closed` — `close_operations.state` advances to `hedge_closed` only after reconcile confirms HL position size = 0 and stop is cancelled; (4) `lp_closed` — call `vault.executeStrategy(RedeemStrategyV1, user, botId, params)` via ExBot Lambda; BnzaExPositionManager closes LP position, fees routed via LpFeeOps, principal returned; `PositionClosed` event emitted; (5) `redemption_queued` — RedemptionQueue.createRequest(user, botId, tokenId, hlPortionId) enqueued; RequestCreated event emitted; `principal_amount` is subsequently overwritten by `hl_withdraw` Phase 3 as `clearinghouseState.withdrawable (initial − final)` — net of PnL, funding, and trading fees; (6) `done` — `hl_withdraw` worker signs master withdraw3 + polls balance; `hl_fulfill` worker bridges USDC via CCTP if needed then calls fulfillRequest(tokens, amounts); FIFO pop; safeTransferFrom(operator, user, principal_amount) on-chain; RequestFulfilled event emitted; bots.status='closed'. On hedge close failure, the system retries up to 3 times before escalating to admin and holding at `hedge_close_pending`. LP close is not attempted until hedge is confirmed closed.
 
 **Acceptance criteria:** `close_operations` state transitions are sequential — no step is skipped. LP close is never attempted before `hedge_closed`. RedemptionQueue request is enqueued at step 5; user funds are returned on-chain when Operator calls fulfillRequest. A failure at any step holds `close_operations.status` at the failed step — does not silently advance.
 
@@ -572,6 +580,7 @@ The OPERATOR shall expose four endpoints under `/api/exbot/*`, each proxied to E
 | E-EXBOT-028 | LP mint on-chain tx reverted or timed out at bot-start — `bots.lifecycle_state='error'`; no funds moved | "Bot startup failed: LP mint transaction did not complete. No funds were moved. Please try again or contact support." | 502 |
 | E-EXBOT-029 | `bots.status='error'` — bot requires admin intervention; displayed on status screen | "Bot encountered a critical error. Admin intervention required. You may close the bot via emergency close." | 200 |
 | E-EXBOT-030 | GET /status — Investor wallet_address does not match bot.user_wallet_address | "Access denied: this bot does not belong to your account." | 403 |
+| E-EXBOT-031 | `bots.status='paused'` — bot is paused; displayed on status screen | "Bot Paused. Hedge and LP are maintained. You may still redeem." | 200 |
 
 ---
 
@@ -622,18 +631,18 @@ Full story files in `../userstories/`. 11 active stories across 4 epics (US-011 
 | OQ ID | Question | Impact | Status |
 |---|---|---|---|
 | OQ-EXBOT-01 | NV-1: HL `marginSummary` exact API field names for `marginBalanceUsd` | Blocks FR-EXBOT-060 final implementation | Open |
-| OQ-EXBOT-02 | NV-3: Does HL support place-before-cancel stop replacement? Determines §19.5 path (a) vs (b). | Blocks FR-EXBOT-035 (INV-STOP protocol path) | Open |
+| OQ-EXBOT-02 | NV-3: Does HL support place-before-cancel stop replacement? Determines §19.5 path (a) vs (b). | Blocks FR-EXBOT-035 (INV-STOP protocol path) | **Closed** — Confirmed by zen: place-before-cancel is the required path. No 0-stop window permitted. Dev to update default config from 'b' to 'a'. |
 | OQ-EXBOT-03 | NV-12: Pool addresses + `wethIndex` for USDC/WETH 0.3% on Base + Optimism | Blocks FR-EXBOT-004 dual-chain LP open | Open |
 | OQ-EXBOT-04 | NV-13: HL ETH-USD perp minimum order size / dust handling rules | Blocks FR-EXBOT-022 (minimum delta threshold) | Open |
 | OQ-EXBOT-05 | NV-14: HL builder fee 5bps approval flow — on-chain transaction or API call? | Blocks FR-EXBOT-002 preflight step 4 | Open |
 | OQ-EXBOT-06 | Margin thresholds (0.55/0.75) — finalized via Phase 0 backtest (zen task) | FR-EXBOT-060 values pending | Open |
 | OQ-EXBOT-07 | `stopSafetyFactor` Phase B+ value — finalized via Phase 0 backtest (zen task) | FR-EXBOT-030 Phase B value pending | Open |
 | OQ-EXBOT-08 | BnzaExVault final ABI — confirmed when zen deploys contract at Phase 0 | IC-EXBOT-002 (integration constraints) | Open |
-| OQ-EXBOT-09 | ElastiCache Redis pool slot0 cache refresh interval — determined by Phase 0 NV-12 RPC verification | Blocks FR-EXBOT-093 TTL configuration | Open |
+| OQ-EXBOT-09 | ElastiCache Redis pool slot0 cache refresh interval — determined by Phase 0 NV-12 RPC verification | Blocks FR-EXBOT-093 TTL configuration | **Closed** — Confirmed by zen: provisional refresh interval = 60s (config-driven). Stale threshold = 2× 60s = 120s, consistent with FR-EXBOT-093 "2× refresh interval" policy. To be finalized after Phase 0 NV-12 RPC cost verification — may tighten if measurements allow. UC step 7 and A1 updated to "> 2× refresh interval (provisional: 120s)". |
 | OQ-EXBOT-10 | `range_boundary_near` exact computation: is "90% to upper/lower" measured in tick distance or price distance? Formula needed before implementation. E.g. tick-based: `currentTick >= tickUpper - 0.10 × (tickUpper - tickLower)` vs price-based: `sqrtPrice >= sqrtUpper × 0.90`. Owner: zen/SOTATEK to confirm. | Blocks FR-EXBOT-012 `range_boundary_near` implementation | **Closed (2026-07-02)** — Price-based USD. Formula: `nearestFraction = min(distToLower, distToUpper) / halfRange`; fires when `nearestFraction <= rangeBoundaryFraction` (default 0.9). Example: range $3,000–$3,400 → fires when price ≤ $3,020 or ≥ $3,380. Source: `packages/exbot-strategy/src/triggers/range-boundary.trigger.ts` + test suite. Note: code comment has typo (`>=` should be `<=`). |
-| OQ-EXBOT-11 | `lpValueUsd` formula: how is `bot_runtime_state.lp_value_usd` computed and updated? Candidate: `(lpEthAmount × uniPoolPrice) + lpUsdcAmount` — but SPEC v5.2.6 does not define it explicitly. Owner: zen to confirm or SOTATEK to propose. | Blocks FR-EXBOT-012 `drift_threshold` (lpValueUsd × 3% term) | Open |
-| OQ-EXBOT-12 | 7d funding APR aggregation formula: how is `funding_alert` condition (`7d APR < −15%`) computed from `funding_daily_metrics`? Candidate (from SPEC v5.2.6 §7.5): sum of latest 7 rows `funding_net_usd`, annualize relative to LP capital — but exact annualization formula not specified. Owner: zen to confirm. | Blocks FR-EXBOT-012 `funding_alert` implementation | Open |
-| OQ-EXBOT-13 | delta=0 behavior in hedge-sync: if computed delta=0, should the Lambda skip HL order entirely and proceed directly to stop replacement, or abort the sync? Owner: Tech Lead. | Blocks UC-EXBOT-hedge-sync step 5 / A6 | Open |
+| OQ-EXBOT-11 | `lpValueUsd` formula: how is `bot_runtime_state.lp_value_usd` computed and updated? Candidate: `(lpEthAmount × uniPoolPrice) + lpUsdcAmount` — but SPEC v5.2.6 does not define it explicitly. Owner: zen to confirm or SOTATEK to propose. | Blocks FR-EXBOT-012 `drift_threshold` (lpValueUsd × 3% term) | **Closed** — Confirmed by zen: `lp_value_usd = (lpEthAmount × uniPoolPrice) + lpUsdcAmount`, principal only (exclude uncollected fees/tokensOwed); price source = Uniswap pool slot0 price (not external oracle). Updated at hedge-sync / full-check. Note: OQ-11 unblocks FR-EXBOT-012 `drift_threshold` for light-check only — does NOT affect A11 bot-start reconcile threshold (which is exact fill, no percentage tolerance). |
+| OQ-EXBOT-12 | 7d funding APR aggregation formula: how is `funding_alert` condition (`7d APR < −15%`) computed from `funding_daily_metrics`? Candidate (from SPEC v5.2.6 §7.5): sum of latest 7 rows `funding_net_usd`, annualize relative to LP capital — but exact annualization formula not specified. Owner: zen to confirm. | Blocks FR-EXBOT-012 `funding_alert` implementation | **Closed** — Confirmed by zen: `funding_apr_7d_pct(%) = ( Σ funding_net_usd latest 7 rows / lp_value_usd ) × (365/7) × 100`. Alert fires when < −15%. Denominator = `lp_value_usd` at evaluation time. If fewer than 7 rows exist, annualize over n available days (× 365/n). `lp_value_usd` is the right yardstick — keeps funding APR directly comparable to fee APR (same denominator). `funding_rolling_metrics.funding_apr_7d_pct` populated by `bnza-market-cron` (not yet deployed v1 — fallback: `fundingRate × 8760`). AC-LC-09 unblocked when `bnza-market-cron` deploys. |
+| OQ-EXBOT-13 | delta=0 behavior in hedge-sync: if computed delta=0, should the Lambda skip HL order entirely and proceed directly to stop replacement, or abort the sync? Owner: Tech Lead. | Blocks UC-EXBOT-hedge-sync step 5 / A6 | **Closed** — Confirmed from develop branch `rebalance.ts` line 83-84: when delta=0 (or abs < 0.000001), function returns `no_op_dust` immediately. No HL order, no reconcile, no stop replacement, no entry_price/liq_price update. Stop and position data unchanged. handler-impl.ts confirms no stop replacement runs at handler level after dispatchAction returns. |
 | OQ-EXBOT-14 | `marginSummary` fetch ordering in hedge-sync preflight: does the Lambda fetch marginSummary before or after acquiring Redis Redlock? Ordering affects lock TTL design. Owner: Tech Lead. | Blocks FR-EXBOT-060 preflight step ordering | Open |
 | OQ-EXBOT-15 | HL Rate Limiter (Redis) + User Lock (Redis Redlock) interaction in hedge-sync: should rate-limit weight be consumed before or after lock acquisition? Determines retry behavior on rate-limit hit while lock is held. Owner: Tech Lead. | Blocks FR-EXBOT-091 + hedge-sync flow | Open |
 | OQ-EXBOT-16 | Admin reject path for agent key: when admin rejects a pending key, what is the resulting row status — remain `pending`, set to `rejected`, or delete? | Blocks UC-EXBOT-agent-key A4 admin reject enum | **Closed (2026-06-29)** — UC-EXBOT-agent-key retired; manual agent key flow removed. Admin reject path no longer applicable. |

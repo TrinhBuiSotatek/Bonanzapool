@@ -3,10 +3,11 @@ type: use-case
 module: exbot
 status: draft
 created: 2026-06-12
-updated: 2026-07-14
+updated: 2026-07-20
 owner: "@hienduong"
 linked_stories: [US-EXBOT-004]
 changelog:
+  - 2026-07-20 | manual | step 14 expanded: hl_withdraw (principalAmount = withdrawable delta) + hl_fulfill (CCTP + fulfillRequest) — aligns with close chain lp_leg_exec→hedge_sync→hl_withdraw→hl_fulfill
   - 2026-07-14 | manual | replace generic Mermaid placeholder with reference to flows.md F-04
   - 2026-07-14 | manual | I-N3 fix: add hedge_close_pending transition as step 9 (after lock acquired, before HL close call); renumber steps 10–15 to 11–16
   - 2026-07-14 | manual | I-N2 fix: clarify closeShortReduceOnlyIoc retry strategy — in-invocation (3 retries within same Lambda invocation, inside Redlock block); no SQS re-queue per retry
@@ -56,7 +57,10 @@ User navigates to the relevant screen or initiates the described action.
 11. Cancels existing stop via `§19.5 replaceStopProtected` with size=0
 12. Reconcile: verify HL position size = 0
 13. Update `close_operations.state='hedge_closed'`
-14. Send HL-portion USDC to investor (tracked in `RedemptionQueue` ledger)
+14. HL-portion settlement (same chain as bot_safe_close: `hl_withdraw → hl_fulfill`):
+    - **14a (`hl_withdraw`):** query `clearinghouseState.withdrawable` from HL API (initial); sign master withdraw3 for full amount; poll until balance ≤ threshold (final); record `redemption_requests.principal_amount = initial − final` (USDC 6-decimal base units, net of PnL/funding/fees — HL API returns net balance, no per-fee breakdown)
+    - **14b (`hl_fulfill`):** ensure operator has enough USDC on redemption chain — skip CCTP if already funded (reserved liquidity), otherwise burn on Arbitrum + mint via CCTP bridge; mark `ready_to_fulfill`
+    - **14c:** call `RedemptionQueue.fulfillRequest` on-chain (FIFO enforced by contract); `safeTransferFrom(operator, investor, principal_amount)`
 15. Update `close_operations.state='done'`; `bots.lifecycle_state='closed'`
 16. Update `queue_idempotency.state='succeeded'`
 

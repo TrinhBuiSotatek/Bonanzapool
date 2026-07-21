@@ -3,10 +3,12 @@ type: use-case
 module: exbot
 status: draft
 created: 2026-06-12
-updated: 2026-07-08
+updated: 2026-07-21
 owner: "@hienduong"
 linked_stories: [US-EXBOT-009, US-EXBOT-010, US-EXBOT-012]
 changelog:
+  - 2026-07-21 | manual | A3: replace "Operator retries" with automated worker retry wording to match step 10a/10b/10c expansion
+  - 2026-07-20 | manual | step 8/10 expanded: principal_amount source clarified (hl_withdraw Phase 3 = withdrawable delta); hl_withdraw + hl_fulfill settlement chain documented
   - 2026-07-08 | /ba-do | Trigger section: replace stale template with 5 conditions from FR-EXBOT-072; step 2: Close Worker → ExBot Lambda
   - 2026-07-04 | arc-migration | replace UserLockDO with User Lock (Redis Redlock via ElastiCache), D1 with Aurora PostgreSQL per FR-EXBOT-092
   - "2026-06-18 | /ba-do hld-decisions | rewrite: drop park/redeploy/re-entry loop; new flow: executeStrategy(RedeemStrategyV1) → RedemptionQueue FIFO → user receives funds"
@@ -43,16 +45,19 @@ Any of the following system conditions creates a `close_operations` row and init
 5. Call `vault.executeStrategy(RedeemStrategyV1, user, botId, params)` — closes LP position via BnzaExPositionManager
 6. RedeemStrategyV1: earned fees routed via LpFeeOps (operation fee + performance fee in pair currency); principal returned in pair currency (optional convertPrincipalToUsdc)
 7. `close_operations.state='lp_closed'`; `PositionClosed` event emitted by BnzaExPositionManager
-8. `RedemptionQueue.createRequest(user, botId, tokenId, hlPortionId)` — enqueue HL portion payout
+8. `RedemptionQueue.createRequest(user, botId, tokenId, hlPortionId)` — enqueue HL portion payout; `principal_amount` at this point is a placeholder (set by `lp_leg_exec` from vault return value); the actual settled amount is computed and overwritten by `hl_withdraw` Phase 3
 9. `close_operations.state='redemption_queued'`; `RequestCreated` event emitted
-10. Operator closes HL portion off-chain → calls `RedemptionQueue.fulfillRequest(tokens, amounts)` — FIFO pop, `safeTransferFrom(operator, user, amount)` on-chain
+10. HL-portion settlement (`hl_withdraw → hl_fulfill`):
+    - **10a (`hl_withdraw`):** query `clearinghouseState.withdrawable` from HL API (initial); sign master withdraw3 for full amount; poll until balance ≤ threshold (final); overwrite `redemption_requests.principal_amount = initial − final` (USDC 6-decimal, net of PnL/funding/fees)
+    - **10b (`hl_fulfill`):** ensure operator USDC on redemption chain — skip CCTP if already funded (reserved liquidity), otherwise CCTP bridge Arbitrum → dest chain; mark `ready_to_fulfill`
+    - **10c:** call `RedemptionQueue.fulfillRequest` on-chain (FIFO); `safeTransferFrom(operator, user, principal_amount)`
 11. `close_operations.state='done'`; `RequestFulfilled` event emitted; `bots.status='closed'`
 12. Investor notification: "Bot safely closed. Funds have been returned to your wallet."
 
 ## 4. Alternate Flows
 - **A1 (hedge close impossible):** Step 3 — retry hedge close up to 3 times; on final failure set `close_operations.state='residual_hl_liability'` + enter SAFE_MODE; send admin escalation notification (E-EXBOT-018: "Bot safe close failed: HL hedge could not be closed after 3 attempts. Manual intervention required. Bot held at residual_hl_liability."); do NOT touch LP until hedge confirmed closed
 - **A2 (LP close reverts):** Step 5 — retry up to 3 times; on failure escalate to admin, hold at `lp_closed` pending
-- **A3 (RedemptionQueue fulfillRequest fails):** Step 10 — request stays in queue; Operator retries; user funds not lost (request remains enqueued)
+- **A3 (RedemptionQueue fulfillRequest fails):** Step 10c — `fulfillRequest` call fails; request remains enqueued in RedemptionQueue (FIFO on-chain); worker retries automatically on next invocation; user funds not lost
 - **A4 (3rd bot_safe_close trigger within 7 days):** Step 1 — create `close_operations` row; proceed with same flow; admin escalation notification sent concurrently
 
 ## 5. Postconditions

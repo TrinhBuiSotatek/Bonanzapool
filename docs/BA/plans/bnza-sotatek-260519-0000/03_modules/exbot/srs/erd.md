@@ -3,9 +3,11 @@ type: srs-erd
 module: exbot
 status: draft
 created: 2026-06-12
-updated: 2026-07-14
+updated: 2026-07-20
 owner: "@hienduong"
 changelog:
+  - 2026-07-20 | manual | add safe_mode_tier to bot_runtime_state (enum: warning|restricted|frozen; v1 gap — column added v1.1)
+  - 2026-07-20 | manual | fix bot_runtime_state.health_status → runtime_health_status (confirmed develop branch runtime-state.ts + get-bot-status handler)
   - 2026-07-14 | manual | P2 fix: clarify funding_rolling_metrics v1 note — DDL ships Phase A, table empty until bnza-market-cron deploys
   - 2026-07-13 | manual | v3-I-03 fix: add funding_rolling_metrics table to ERD (schema from develop branch); add v1 status note
   - 2026-07-08 | /ba-do | I-14: add key_status TEXT NOT NULL with UNIQUE active per user constraint (BR-EXBOT-012) to hl_agent_keys table
@@ -157,7 +159,8 @@ erDiagram
         TEXT last_light_check_at
         TEXT last_deep_audit_at
         TEXT last_rebalance_attempt_id
-        TEXT health_status
+        TEXT runtime_health_status
+        TEXT safe_mode_tier "enum: warning|restricted|frozen; null=normal. v1 gap — column added v1.1"
         TEXT updated_at
     }
 

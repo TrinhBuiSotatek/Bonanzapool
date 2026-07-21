@@ -3,10 +3,12 @@ type: use-case
 module: exbot
 status: draft
 created: 2026-06-18
-updated: 2026-07-14
+updated: 2026-07-20
 owner: "@hienduong"
 linked_stories: [US-EXBOT-002]
 changelog:
+  - 2026-07-21 | manual | register E-EXBOT-031 for status='paused' UI label; cite in A10
+  - 2026-07-20 | manual | fix endpoint URL to /api/exbot/status/{botId}; add v1 gap note to Preconditions (isAdmin guard blocks Investor); add A10 for status='paused'
   - 2026-07-13 | manual | N-003 fix: add FR-EXBOT-050, FR-EXBOT-060, FR-EXBOT-093 to FR Trace
   - 2026-07-13 | manual | N-002 fix: add A9 (wallet mismatch → 403 E-EXBOT-030) to Alternate Flows
   - 2026-07-13 | manual | N-001 fix: clarify pending fields must be present as null in JSON response; add tester assertion note
@@ -36,15 +38,17 @@ Investor navigates to the ExBot status screen in the POOL UI.
 - Operator Facade validates `X-Wallet-Address`: missing → 401; blocked → 403; not in whitelist (when `access_mode=whitelist`) → 403
 - Operator Facade forwards request to ExBot Lambda via API Gateway; HMAC Lambda Authorizer validates the request signature; invalid/missing signature → 401
 - Operator Facade service is available with a valid API Gateway route to ExBot Lambda
+- **v1 gap:** ExBot Lambda has a hard `isAdmin` guard — non-Admin callers (Investor) receive 403 before any business logic runs. Investor path is pending implementation; all Investor scenarios in this UC are not testable in v1.
 
 ## 3. Main Success Scenario
-1. POOL UI calls `GET /api/exbot/status` via Operator Facade
+1. POOL UI calls `GET /api/exbot/status/{botId}` via Operator Facade
 2. Operator Facade forwards request to ExBot Lambda via API Gateway with HMAC Lambda Authorizer
 3. ExBot Lambda reads from Aurora PostgreSQL:
    - `bots.status`, `lifecycle_state`
    - `bot_runtime_state.last_known_hl_short_size` (actual hedge size)
    - `bot_runtime_state.lp_eth_amount` (required to compute targetShortEth per FR-EXBOT-021)
    - `bot_runtime_state.last_light_check_at` (last completed light-check timestamp)
+   - `bot_runtime_state.last_error_code` (v1 gap — column not yet in schema; `getRuntimeState` hardcodes `null`; response always `null` in v1. Column will be added in v1.1; queue workers write via `upsertRuntimeState`)
    - `positions.tickLower`, `positions.tickUpper` (LP range)
    - `hedge_legs.target_ratio` (required to compute targetShortEth per FR-EXBOT-021)
    - `hedge_legs.margin_status`
@@ -56,7 +60,7 @@ Investor navigates to the ExBot status screen in the POOL UI.
    **Implemented fields:**
    ```json
    {
-     "bot_id": "string",
+     "bot_id": "string",    // = bots.id (Aurora PG primary key)
      "status": "string",
      "lifecycle_state": "string",
      "safe_mode_tier": "string | null",
@@ -106,6 +110,7 @@ Investor navigates to the ExBot status screen in the POOL UI.
 - **A7 (status='error'):** Bot error requiring admin intervention; 200 response with `status='error'`; UI displays E-EXBOT-029; only "Close Bot (emergency)" enabled
 - **A8 (Pool Slot0 Cache unavailable or stale):** Step 4 — `current_tick: null`, `range_state: null` returned in response; all other fields returned normally; no 503, no retry. UI displays "—" for range state indicator
 - **A9 (wallet mismatch):** Investor `wallet_address` does not match `bot.user_wallet_address` → 403 (E-EXBOT-030); UI displays "Access denied: this bot does not belong to your account."
+- **A10 (status='paused'):** Bot is paused (`bots.status='paused'` status overlay — `lifecycle_state` is preserved from before pause, typically `active`); 200 response with `status='paused'`, `lifecycle_state=<preserved value>`; UI displays E-EXBOT-031 "Bot Paused. Hedge and LP are maintained. You may still redeem."; all mutation buttons disabled; user_redeem remains allowed per State Registry. **v1 gap:** not testable for Investor until the `isAdmin` guard in ExBot Lambda is removed.
 - **A4 (no bot record found for botId):** 404 response (E-EXBOT-023); UI shows empty state "No active bot found for this account." Note: `closed` bots return 200 (record retained in Aurora PostgreSQL), not 404
 - **A5 (Operator Facade unavailable):** 503 Service Unavailable — AWS/infra-level response (API Gateway or Lambda cold-start/throttle), not application-defined; no E-EXBOT code required. UI shows error banner "Status service temporarily unavailable"
 
@@ -132,7 +137,7 @@ sequenceDiagram
     participant SlotCache as "Pool Slot0 Cache (ElastiCache Redis)"
     
     Investor->>PoolUI: Navigate to status screen
-    PoolUI->>OpFacade: GET /api/exbot/status
+    PoolUI->>OpFacade: GET /api/exbot/status/{botId}
     OpFacade->>ExBotLambda: Forward request (API Gateway + HMAC Lambda Authorizer)
     ExBotLambda->>AuroraDB: Read bots.status, lifecycle_state, LP range, hedge size, margin_status
     ExBotLambda->>SlotCache: Query current tick

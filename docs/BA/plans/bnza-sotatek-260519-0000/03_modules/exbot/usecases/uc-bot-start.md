@@ -3,11 +3,11 @@ type: use-case
 module: exbot
 status: draft
 created: 2026-06-12
-updated: 2026-07-08
+updated: 2026-07-20
 owner: "@hienduong"
 linked_stories: [US-EXBOT-001]
 changelog:
-  - 2026-07-09 | manual | P1 fix: register E-EXBOT-028 for LP mint failure (A4); cite E-EXBOT-005/006 in A5/A6
+  - 2026-07-20 | manual | A11 fix: replace incorrect drift_threshold reference with exact-fill threshold confirmed from develop branch; note drift_threshold belongs to light-check only; close OQ-EXBOT-11 dependency
   - 2026-07-09 | manual | P2 fix: remove builder fee from Preconditions — runtime check in preflight step 2, not a pre-assumed condition
   - 2026-07-08 | /ba-do | I-13: add FR-EXBOT-003/011/081/091 to FR Trace §7; I-11: A7/A10 error state → safe_mode; I-12: register E-EXBOT-026
   - 2026-07-07 | manual | flow change: trigger→user-initiated (POST /api/exbot/start); add vault balance preflight check; rewrite Trigger/Actors/Preconditions/Steps 1-2/A3
@@ -60,7 +60,7 @@ User-initiated: USDC Investor calls `POST /api/exbot/start` via POOL UI after co
 - **A8 (stop placement fail):** Step 9 — enter `safe_mode`; HL short open but stop not confirmed; alert operator; auto-recovery per FR-EXBOT-050 (retry when HL responsive + 3 reconciles succeed; if irrecoverable → bot_safe_close).
 - **A9 (key not yet provisioned):** Step 2 — block with E-EXBOT-017 "Bot cannot start: agent key not yet provisioned. Please wait for deposit processing to complete."
 - **A10 (HL order rejection):** Step 6 — HL rejects IOC order; enter `safe_mode` (E-EXBOT-026); alert operator; auto-recovery per FR-EXBOT-050 (retry when HL responsive + 3 reconciles succeed; if irrecoverable → bot_safe_close).
-- **A11 (reconcile mismatch):** Step 7 — actual size deviates > threshold; enqueue `partial_repair`; alert operator. *(threshold = `drift_threshold` = `lp_value_usd × 3%`; pending OQ-EXBOT-11)*
+- **A11 (reconcile mismatch):** Step 7 — actual size deviates > threshold; enqueue `partial_repair`; alert operator. *(threshold: exact fill required — actual HL position size must equal target; any partial fill results in `reconcile_partial` status → partial_repair flow. Note: `drift_threshold = max($25, lpValueUsd × 3%)` is the light-check rebalance trigger, unrelated to this reconcile step.)*
 
 ## 5. Postconditions
 - `bots.lifecycle_state='active'`, `bots.status='active'`

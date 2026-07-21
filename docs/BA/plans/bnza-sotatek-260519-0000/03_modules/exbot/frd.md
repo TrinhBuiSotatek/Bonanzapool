@@ -3,7 +3,7 @@ type: frd
 module: exbot
 status: draft
 created: 2026-06-12
-updated: 2026-07-14
+updated: 2026-07-21
 owner: "@hienduong"
 version: 0.1.0
 sources:
@@ -11,6 +11,7 @@ sources:
   - Google Doc: EXBOT System & Smart Contract Overview (Daniel, June 2026)
   - Google Sheet: BNZA ExBot Feature Tracker
 changelog:
+  - 2026-07-21 | manual | FR-EXBOT-073 line 390: expand settlement chain to hl_withdraw → hl_fulfill → fulfillRequest (automated, replaces "Operator fulfillRequest" wording)
   - 2026-07-14 | manual | add funding_rolling_metrics to §FR-EXBOT-080 state_db_shard_xx table listing (per lead review comment)
   - 2026-07-14 | manual | I-N4 fix (complete): renumber FR-EXBOT-090→091 (HL Rate Limiter), FR-EXBOT-091→092 (User Lock), FR-EXBOT-092→093 (Pool Slot0 Cache) to align with spec.md numbering
   - 2026-07-08 | /ba-do | I-18: sync FR-EXBOT-001 preflight from 5 to 6 checks — add vault balance check (E-EXBOT-025) as check #2, renumber #2-5 → #3-6
@@ -387,7 +388,7 @@ Triggers:
 - partial_repair exhausted
 - Compliance/admin force close
 
-Order: hedge → LP (via executeStrategy(RedeemStrategyV1)) → RedemptionQueue.createRequest → Operator fulfillRequest pays user FIFO on-chain.
+Order: hedge → LP (via executeStrategy(RedeemStrategyV1)) → RedemptionQueue.createRequest → hl_withdraw (compute principal_amount = withdrawable delta) → hl_fulfill (CCTP bridge if needed) → fulfillRequest pays user FIFO on-chain.
 
 After bot_safe_close completes: bots.status='closed'. User receives notification "Bot safely closed. Funds have been returned to your wallet."
 

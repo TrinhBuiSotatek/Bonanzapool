@@ -3,10 +3,12 @@ type: use-case
 module: exbot
 status: draft
 created: 2026-06-12
-updated: 2026-07-14
+updated: 2026-07-20
 owner: "@hienduong"
 linked_stories: [US-EXBOT-005, US-EXBOT-006, US-EXBOT-007, US-EXBOT-008]
 changelog:
+  - 2026-07-20 | manual | fix step 9 lpValueUsd formula: max(0, lpEthAmount × currentPriceUsd) → (lpEthAmount × uniPoolPrice) + lpUsdcAmount per OQ-EXBOT-11 zen confirmed
+  - 2026-07-20 | manual | OQ-EXBOT-09 closed: fix step 7 + A1 stale threshold from "> 5 min" to "> 2× refresh interval (provisional: 120s)" per FR-EXBOT-093 and zen confirmed 60s interval
   - 2026-07-14 | manual | P2 fix: add FR-EXBOT-011 to §7 FR Trace — referenced in step 5 but missing from trace
   - 2026-07-13 | manual | v3-I-01 fix: add FR-EXBOT-012 and FR-EXBOT-040 to §7 FR Trace
   - 2026-07-13 | manual | I-10 fix: replace cleanup gap note with EventBridge cron 1h purge per FR-EXBOT-011 AC
@@ -43,16 +45,16 @@ EventBridge Scheduler fires on 1-minute schedule → enqueues `bot-scan` message
 4. Scan Worker updates `next_light_check_at = now + 5min + jitter(±45s)` for **every eligible bot** (including bots in `lp_rebalancing`, `lp_closing`) before enqueuing — bots that Light-Check Worker later skips due to `lifecycle_state` check are still rescheduled correctly and will not be flooded on recovery
 5. Light-Check Worker inserts `message_id` into `queue_idempotency` (state='started', expires_at=now+1min); UNIQUE conflict → skip. Note: `expires_at` is always set (default TTL=1min); an EventBridge cron job (every 1 hour) purges rows WHERE expires_at < now to prevent unbounded table growth (per FR-EXBOT-011 AC).
 6. Light-Check Worker reads from Aurora PostgreSQL: `bot_runtime_state.last_known_hl_short_size`, `lifecycle_state`, `hedge_legs` (stop_price, margin_status, circuit_state)
-7. Light-Check Worker reads from the Pool Slot0 Cache (ElastiCache Redis): `sqrtPriceX96`, `currentTick` (zero HL API calls). If snapshot stale (> 5 min) or the cache is unreachable → throw immediately, skip tick for this bot entirely (no trigger evaluation)
+7. Light-Check Worker reads from the Pool Slot0 Cache (ElastiCache Redis): `sqrtPriceX96`, `currentTick` (zero HL API calls). If snapshot stale (> 2× refresh interval, provisional: 120s) or the cache is unreachable → throw immediately, skip tick for this bot entirely (no trigger evaluation)
 8. Computes `lpEthAmount` via TickMath + LiquidityAmounts (local, no RPC)
-9. Evaluates `RebalanceReason[]` using only Aurora PostgreSQL + Pool Slot0 Cache state. `range_boundary_near` uses price-based USD: fires when `min(distToLower, distToUpper) / halfRange <= rangeBoundaryFraction` (default 0.9). `drift_threshold` uses `lpValueUsd = max(0, lpEthAmount × currentPriceUsd)`; threshold = `max($25, lpValueUsd × 3%)`. `funding_alert` fires when 7d APR < -15%: primary source `fundingApr7dPct` from `funding_rolling_metrics`; fallback `fundingRate × 8760`
+9. Evaluates `RebalanceReason[]` using only Aurora PostgreSQL + Pool Slot0 Cache state. `range_boundary_near` uses price-based USD: fires when `min(distToLower, distToUpper) / halfRange <= rangeBoundaryFraction` (default 0.9). `drift_threshold` uses `lpValueUsd = (lpEthAmount × uniPoolPrice) + lpUsdcAmount` (principal only, exclude tokensOwed; price = Uniswap pool slot0); threshold = `max($25, lpValueUsd × 3%)`. `funding_alert` fires when 7d APR < -15%: primary source `fundingApr7dPct` from `funding_rolling_metrics`; fallback `fundingRate × 8760`
 10. Strategy engine evaluates all fired triggers → `decision.reason[]`. If `decision.action = REBALANCE` AND `circuit_state != 'open'`: enqueue **1 hedge-sync** with `{botId, reasons: decision.reason[], stateVersion}`. `range_out` is included in `reasons[]` like any other trigger — light-check does NOT set `lifecycle_state='lp_rebalancing'` or enqueue a separate `lp_rebalancing` queue. LP rebalance lifecycle transition is handled by hedge-sync handler downstream
 11. Read `markPrice` from the HL Mark Price Cache (ElastiCache Redis) `markPriceUsd` (primary); if the cache `updatedAt > 120s` → stale: audit `hl_mark_price_stale`, widen near-stop band 2%→4%, freeze routine hedge-sync after stop check; fallback to `bot_runtime_state.eth_price_usd` (last-known from prior light-check). If `markPrice >= stop_price`: set `stop_trigger_crossed_at` (guarded); enqueue `price-near-stop-audit`
 12. Check `stop_replacing_started_at`: if set and overrun > 60s → Light-Check Worker atomically sets **both** `bots.status='safe_mode'` AND `bots.lifecycle_state='safe_mode'` in a single UPDATE, then enqueues `partial_repair(reason='stop_replacing_overrun')`. Status change happens **before** the partial_repair message is in the queue
 13. Update `queue_idempotency.state='succeeded'`
 
 ## 4. Alternate Flows
-- **A1 (Pool Slot0 Cache stale/unreachable):** Step 7 — snapshot age > 5 min or the cache is unreachable → skip tick entirely; no trigger evaluation; next light-check runs normally at `next_light_check_at`
+- **A1 (Pool Slot0 Cache stale/unreachable):** Step 7 — snapshot age > 2× refresh interval (provisional: 120s) or the cache is unreachable → skip tick entirely; no trigger evaluation; next light-check runs normally at `next_light_check_at`
 - **A2 (circuit open):** Step 10 — suppress hedge-sync; continue to step 11 (stop monitoring always runs)
 - **A3 (circuit half_open):** Step 10 — atomically claim `half_open_probe_used`; enqueue one probe hedge-sync
 - **A4 (stop trigger crossed_at already set):** Step 11 — do NOT overwrite; still enqueue price-near-stop-audit
