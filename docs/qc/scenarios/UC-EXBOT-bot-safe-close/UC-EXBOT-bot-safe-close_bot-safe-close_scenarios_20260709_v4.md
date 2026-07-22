@@ -1,8 +1,8 @@
 # Test Scenarios — UC-EXBOT-bot-safe-close System-Initiated Safe Close
 
-> **Source:** UC-EXBOT-bot-safe-close_bot-safe-close_audited_20260709_v4.md
+> **Source:** UC-EXBOT-bot-safe-close_bot-safe-close_audited_20260709_v5.md
 > **Generated:** 2026-07-02
-> **Updated:** 2026-07-09 (v4: **Q4 RESOLVED (BA 2026-07-04)**, Q9 still pending)
+> **Updated:** 2026-07-22 (v5: **Q9 RESOLVED (BA 2026-07-20)**, all open questions closed)
 > **Domain/Architecture:** ExBot Lambda + Hyperliquid + BnzaExVault (on-chain) + RedemptionQueue (on-chain) + Redis Redlock via ElastiCache (User Lock). No UI — logic-only / backend pipeline.
 
 ---
@@ -53,10 +53,10 @@
 ### Scenario ID: TS_UC-EXBOT-bot-safe-close_005
 **Scenario Title:** Trigger rejected when bots.status is already 'closing' (idempotency)
 **UC Reference:** UC-EXBOT-bot-safe-close
-**Req-ID:** FR-EXBOT-072, FR-EXBOT-070, Q3 update
+**Req-ID:** FR-EXBOT-072, FR-EXBOT-070, Q3 update, **Q9 RESOLVED (2026-07-22)**
 **Test Type:** Functional
-**Description:** Given a bot with an active close_operations row (bot_safe_close in progress, `bots.status='closing'`), when a duplicate bot_safe_close trigger arrives for the same bot, then the system must reject the duplicate via UNIQUE constraint on `close_operations.idempotency_key` — exactly one close_operations row must exist, no double settlement.
-**Expected Result Note:** ✅ **Q4 RESOLVED (2026-07-09):** "Close Worker" là label cho ExBot Lambda — architecture component. 5 trigger conditions từ workers/admin đã được xác nhận. UNIQUE constraint idempotency không phụ thuộc vào Q4 answer.
+**Description:** Given a bot with an active close_operations row (bot_safe_close in progress, `bots.status='closing'`), when a duplicate bot_safe_close trigger arrives for the same bot, then the system must reject the duplicate via UNIQUE constraint on `close_operations.idempotency_key` — exactly one close_operations row must exist, no double settlement. **Idempotency key format:** `bot-safe-close:{botId}:{sessionId}` (confirmed from `buildIdempotencyKey()` in develop branch).
+**Expected Result Note:** ✅ **Q9 RESOLVED (2026-07-22):** `idempotency_key` format confirmed: `bot-safe-close:{botId}:{sessionId}`. ✅ **Q4 RESOLVED (2026-07-09):** "Close Worker" là label cho ExBot Lambda — architecture component. UNIQUE constraint idempotency không phụ thuộc vào Q4 answer.
 **Test Focus:** Idempotency/Concurrency
 
 ---
@@ -232,11 +232,12 @@
 ---
 
 ### Scenario ID: TS_UC-EXBOT-bot-safe-close_023
-**Scenario Title:** Force-close reason is logged in close_operations for audit trail
+**Scenario Title:** Force-close reason is logged to CloudWatch via bot_safe_close_requested event
 **UC Reference:** UC-EXBOT-bot-safe-close
-**Req-ID:** US-EXBOT-012 Notes, FR-EXBOT-090
+**Req-ID:** US-EXBOT-012 Notes, FR-EXBOT-090, **Q9 RESOLVED (2026-07-22)**
 **Test Type:** Functional
-**Description:** Given an admin initiates force-close with a reason, when the close_operations row is created, then `close_operations.trigger_reason` must be populated with the admin-provided reason, ensuring a traceable audit trail.
+**Description:** Given an admin initiates force-close with a reason, when the trigger fires, then the system must log the reason to CloudWatch via the `bot_safe_close_requested` event with `reason` field (enum: `l2_evacuation | parked_escalation | admin`) — ensuring a traceable audit trail. **Note:** `trigger_reason` does NOT persist to DB; there is no DB column for it. Verification must check CloudWatch log, not database.
+**Expected Result Note:** ✅ **Q9 RESOLVED (2026-07-22):** `trigger_reason` does NOT exist as a DB column. The equivalent field is `reason` in the SQS message payload (enum: `l2_evacuation | parked_escalation | admin`), logged to CloudWatch event `bot_safe_close_requested`. Tester must verify in CloudWatch, not in DB.
 **Test Focus:** Happy path
 
 ---
@@ -254,10 +255,10 @@
 ### Scenario ID: TS_UC-EXBOT-bot-safe-close_025
 **Scenario Title:** Duplicate trigger via redelivery is rejected (idempotency)
 **UC Reference:** UC-EXBOT-bot-safe-close
-**Req-ID:** FR-EXBOT-070, SRS erd.md, **Q4 RESOLVED (2026-07-09)**
+**Req-ID:** FR-EXBOT-070, SRS erd.md, **Q9 RESOLVED (2026-07-22)**, **Q4 RESOLVED (2026-07-09)**
 **Test Type:** Idempotency/Concurrency
-**Description:** Given bot_safe_close trigger is delivered and processed, when the same trigger is redelivered (e.g., consumer ack failure, worker crash before ack), then the system must reject the duplicate via UNIQUE constraint on `close_operations.idempotency_key` — the operation must not be double-applied.
-**Expected Result Note:** ✅ **Q4 RESOLVED (2026-07-09):** "Close Worker" là ExBot Lambda (architecture component). 5 trigger conditions đã được xác nhận trong UC. UNIQUE constraint idempotency không phụ thuộc vào Q4 answer.
+**Description:** Given bot_safe_close trigger is delivered and processed, when the same trigger is redelivered (e.g., consumer ack failure, worker crash before ack), then the system must reject the duplicate via UNIQUE constraint on `close_operations.idempotency_key` — the operation must not be double-applied. **Idempotency key format:** `bot-safe-close:{botId}:{sessionId}` (confirmed from `buildIdempotencyKey()` in develop branch).
+**Expected Result Note:** ✅ **Q9 RESOLVED (2026-07-22):** `idempotency_key` format confirmed: `bot-safe-close:{botId}:{sessionId}`. ✅ **Q4 RESOLVED (2026-07-09):** "Close Worker" là ExBot Lambda (architecture component). 5 trigger conditions đã được xác nhận trong UC. UNIQUE constraint idempotency không phụ thuộc vào Q4 answer.
 **Test Focus:** Idempotency/Concurrency
 
 ---
@@ -293,12 +294,12 @@
 ---
 
 ### Scenario ID: TS_UC-EXBOT-bot-safe-close_029
-**Scenario Title:** Each of 5 trigger conditions creates close_operations with correct trigger_reason populated
+**Scenario Title:** Each trigger type logs to CloudWatch with correct reason enum — trigger_reason does NOT persist to DB
 **UC Reference:** UC-EXBOT-bot-safe-close
-**Req-ID:** FR-EXBOT-072, FR-EXBOT-073, **Q9 CẦN CONFIRM TỪ BA**, **Q4 RESOLVED (2026-07-09)**
+**Req-ID:** FR-EXBOT-072, FR-EXBOT-073, **Q9 RESOLVED (2026-07-22)**, **Q4 RESOLVED (2026-07-09)**
 **Test Type:** Boundary
-**Description:** Given a valid bot (not closed/closing) and each of the 5 trigger conditions is met individually: (1) circuit breaker exhausted, (2) margin critical irrecoverable, (3) 3 stops in 7 days, (4) partial_repair exhausted, (5) admin force-close, when trigger fires in each case, then a close_operations row must be created with `kind='bot_safe_close'` and `trigger_reason` populated matching the specific trigger type — enabling traceable audit trail.
-**Expected Result Note:** ⚠️ **Q9 CẦN CONFIRM TỪ BA** — format cụ thể của `trigger_reason` enum values chưa được định nghĩa. BA cần xác nhận: `circuit_breaker_exhausted`, `margin_critical`, `3_stops_7d`, `partial_repair_exhausted`, `admin_force_close`. ✅ **Q4 RESOLVED** — "Close Worker" là ExBot Lambda (architecture component). 5 trigger conditions đến từ: deep-audit worker, hedge-sync worker, partial_repair worker, light-check/hedge-stopped, HOẶC admin API (`POST /api/exbot/close`). Không có dedicated `bot_safe_close` queue trong 11 queues (FR-EXBOT-010).
+**Description:** Given a valid bot (not closed/closing) and each of the 5 trigger conditions is met: (1) circuit breaker exhausted, (2) margin critical irrecoverable, (3) 3 stops in 7 days, (4) partial_repair exhausted, (5) admin force-close, when trigger fires in each case, then the system must log to CloudWatch via `bot_safe_close_requested` event with `reason` field populated with the correct enum value: `l2_evacuation` for system-initiated triggers (conditions 1-4), `admin` for admin force-close (condition 5). **Note:** `trigger_reason` does NOT exist as a DB column in `close_operations` table. The `reason` field is only in the SQS message payload and CloudWatch log — verification must check CloudWatch, not database.
+**Expected Result Note:** ✅ **Q9 RESOLVED (2026-07-22):** `idempotency_key` format confirmed: `bot-safe-close:{botId}:{sessionId}`. **`trigger_reason` does NOT exist in DB** — the equivalent is `reason` field in SQS message payload (enum: `l2_evacuation | parked_escalation | admin`), logged to CloudWatch event `bot_safe_close_requested`. Tester must verify reason in CloudWatch log, not in DB. ✅ **Q4 RESOLVED** — "Close Worker" là ExBot Lambda (architecture component). 5 trigger conditions đến từ: deep-audit worker, hedge-sync worker, partial_repair worker, light-check/hedge-stopped, HOẶC admin API (`POST /api/exbot/close`). Không có dedicated `bot_safe_close` queue trong 11 queues (FR-EXBOT-010).
 **Test Focus:** Boundary
 
 ---
@@ -367,7 +368,6 @@
 
 | Scenario Area | Reason | Recommended Action |
 |---|---|---|
-| `idempotency_key` và `trigger_reason` format (**Q9 — CẦN CONFIRM TỪ BA**) | FR-EXBOT-072 nói "idempotency_key UNIQUE enforced" và "trigger_reason populated" nhưng không định nghĩa format/value cụ thể. BA cần bổ sung: (1) format của `idempotency_key` (ví dụ: `{botId}:{kind}:{trigger_timestamp}`), (2) enum values của `trigger_reason` (`circuit_breaker_exhausted`, `margin_critical`, `3_stops_7d`, `partial_repair_exhausted`, `admin_force_close`). | **Chờ Q9 answer từ BA** |
 | BnzaExVault Solidity contract internal logic | zen develops; SOTATEK integrates via ABI | Integration tests depend on ABI confirmation (OQ-EXBOT-08) |
 | RedemptionQueue contract internal logic (fulfillRequest ABI) | zen develops; SOTATEK integrates via ABI | Integration tests depend on ABI confirmation (OQ-EXBOT-08) |
 | SPEC §19.5 INV-STOP protocol implementation details | Pending HL confirmation on stop placement behavior (OQ-EXBOT-02) | Wait for OQ-EXBOT-02 answer |
@@ -378,6 +378,12 @@
 | EmergencyTransfer contract-level enforcement (no recipient param) | Cannot be tested via integration — requires contract audit | Defer to contract security review |
 
 ---
+## ✅ Resolved Notes
+
+✅ **Q9 RESOLVED (2026-07-22):**
+- `idempotency_key` format confirmed: `bot-safe-close:{botId}:{sessionId}` (from `buildIdempotencyKey()` in develop branch)
+- **`trigger_reason` does NOT exist in DB** — equivalent field is `reason` in SQS message payload (enum: `l2_evacuation | parked_escalation | admin`), logged to CloudWatch event `bot_safe_close_requested`
+- **Verification location for testers:** Check CloudWatch log event `bot_safe_close_requested`, NOT database
 
 ✅ **Q4 RESOLVED (2026-07-09):** "Close Worker" trong UC §1 là label cho ExBot Lambda — architecture component, không phải actor độc lập. 5 trigger conditions đã được xác nhận trong UC §1/FR-EXBOT-072. Actor list convention giữ nguyên.
 

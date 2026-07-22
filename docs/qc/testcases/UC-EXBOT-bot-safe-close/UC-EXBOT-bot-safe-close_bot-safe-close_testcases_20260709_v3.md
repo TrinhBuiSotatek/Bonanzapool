@@ -1,9 +1,9 @@
 # Test Cases — UC-EXBOT-bot-safe-close System-Initiated Safe Close
 
-> **Source:** UC-EXBOT-bot-safe-close_bot-safe-close_audited_20260709_v4.md
+> **Source:** UC-EXBOT-bot-safe-close_bot-safe-close_audited_20260709_v5.md
 > **Scenarios:** UC-EXBOT-bot-safe-close_bot-safe-close_scenarios_20260709_v4.md
 > **Generated:** 2026-07-02
-> **Updated:** 2026-07-09 (v3: **Q4 RESOLVED (BA 2026-07-04)**, Q9 still pending)
+> **Updated:** 2026-07-22 (v4: **Q9 RESOLVED (BA 2026-07-20)**, all open questions closed)
 > **Language:** Vietnamese (per project global rules)
 > **Domain/Architecture:** ExBot Lambda + Hyperliquid + BnzaExVault (on-chain) + RedemptionQueue (on-chain) + Redis Redlock via ElastiCache (User Lock). No UI — logic-only / backend pipeline.
 
@@ -25,10 +25,10 @@
 
 | TC ID | Test Title/Summary of test cases | Pre-conditions | Test Steps | Expected Result | Priority |
 |---|---|---|---|---|---|
-| TC_001 | Verify trigger is accepted when bot is in valid state (active) | Bot tồn tại với `bots.status='active'`, `bots.lifecycle_state='active'`, `hedge_legs.last_known_hl_short_size > 0`, không có `close_operations` row với `kind='bot_safe_close'` nào tồn tại cho bot này, HL agent key có `key_status='active'` | Kích hoạt bot_safe_close qua một trong 5 trigger conditions (ví dụ: admin force-close qua POST /api/exbot/close) | 1. Quan sát `close_operations` row được tạo: `kind='bot_safe_close'`, `state='requested'`, `idempotency_key` được populate, `trigger_reason` được populate đúng lý do trigger. 2. Quan sát `bots.status` chuyển sang `'closing'`, `bots.lifecycle_state` chuyển sang `'lp_closing'`. | High |
+| TC_001 | Verify trigger is accepted when bot is in valid state (active) | Bot tồn tại với `bots.status='active'`, `bots.lifecycle_state='active'`, `hedge_legs.last_known_hl_short_size > 0`, không có `close_operations` row với `kind='bot_safe_close'` nào tồn tại cho bot này, HL agent key có `key_status='active'` | Kích hoạt bot_safe_close qua một trong 5 trigger conditions (ví dụ: admin force-close qua POST /api/exbot/close) | 1. Quan sát `close_operations` row được tạo: `kind='bot_safe_close'`, `state='requested'`, `idempotency_key` được populate (format: `bot-safe-close:{botId}:{sessionId}`). 2. `reason` được log ra CloudWatch event `bot_safe_close_requested` với enum: `l2_evacuation | parked_escalation | admin`. **Lưu ý:** `trigger_reason` KHÔNG persist vào DB. 3. Quan sát `bots.status` chuyển sang `'closing'`, `bots.lifecycle_state` chuyển sang `'lp_closing'`. | High |
 | TC_002 | Verify trigger is rejected when bot is already 'closed' | Bot tồn tại với `bots.status='closed'`, `bots.lifecycle_state='closed'` | Gửi bot_safe_close trigger cho bot đã closed qua bất kỳ trigger source nào trong 5 điều kiện | 1. Hệ thống từ chối trigger. 2. Không có `close_operations` row mới được tạo. 3. API trả về E-EXBOT-012: "Bot {id} is already closed. No action needed." | High |
-| TC_003 | Verify duplicate trigger is rejected via idempotency (bot in 'closing' state) | Bot tồn tại với active `close_operations` row (`kind='bot_safe_close'`), `bots.status='closing'` | Gửi bot_safe_close trigger thứ hai cho cùng bot đang trong quá trình đóng | 1. Hệ thống từ chối duplicate trigger qua UNIQUE constraint trên `close_operations.idempotency_key`. 2. Chỉ có đúng một `close_operations` row tồn tại; không có double settlement. **✅ Note:** **Q4 RESOLVED (2026-07-09):** "Close Worker" là ExBot Lambda (architecture component). Trigger mechanism (5 conditions từ workers + admin API) đã được xác nhận. UNIQUE constraint behavior không phụ thuộc vào Q4 answer. | High |
-| TC_004 | Verify each of 5 trigger conditions creates close_operations with correct trigger_reason | Bot tồn tại với `bots.status IN ('active', 'safe_mode')`, không có close operation tồn tại | Lần lượt kích hoạt bot_safe_close với từng trigger condition riêng biệt: (1) circuit breaker exhausted, (2) margin critical irrecoverable, (3) 3 stops trong 7 ngày, (4) partial_repair exhausted 3 lần liên tiếp, (5) admin force-close | Mỗi trigger tạo đúng một `close_operations` row với `trigger_reason` được populate đúng theo loại trigger tương ứng; `idempotency_key` UNIQUE được enforce. **⚠️ Note:** Liên quan đến **Q9 (CẦN CONFIRM TỪ BA)** — format cụ thể của `trigger_reason` enum values chưa được định nghĩa. BA cần xác nhận: `circuit_breaker_exhausted`, `margin_critical`, `3_stops_7d`, `partial_repair_exhausted`, `admin_force_close`. ✅ **Q4 RESOLVED** — "Close Worker" là ExBot Lambda (architecture component). 5 trigger conditions đến từ: deep-audit worker, hedge-sync worker, partial_repair worker, light-check/hedge-stopped, HOẶC admin API (`POST /api/exbot/close`). Không có dedicated `bot_safe_close` queue trong 11 queues (FR-EXBOT-010). | Medium |
+| TC_003 | Verify duplicate trigger is rejected via idempotency (bot in 'closing' state) | Bot tồn tại với active `close_operations` row (`kind='bot_safe_close'`), `bots.status='closing'` | Gửi bot_safe_close trigger thứ hai cho cùng bot đang trong quá trình đóng | 1. Hệ thống từ chối duplicate trigger qua UNIQUE constraint trên `close_operations.idempotency_key`. 2. Chỉ có đúng một `close_operations` row tồn tại; không có double settlement. **Idempotency key format:** `bot-safe-close:{botId}:{sessionId}`. **✅ Q9 RESOLVED (2026-07-22):** Format confirmed từ `buildIdempotencyKey()` in develop branch. | High |
+| TC_004 | Verify each of 5 trigger conditions logs to CloudWatch with correct reason enum | Bot tồn tại với `bots.status IN ('active', 'safe_mode')`, không có close operation tồn tại | Lần lượt kích hoạt bot_safe_close với từng trigger condition riêng biệt: (1) circuit breaker exhausted, (2) margin critical irrecoverable, (3) 3 stops trong 7 ngày, (4) partial_repair exhausted 3 lần liên tiếp, (5) admin force-close | 1. Mỗi trigger tạo đúng một `close_operations` row với `idempotency_key` format: `bot-safe-close:{botId}:{sessionId}`. 2. `reason` được log ra CloudWatch event `bot_safe_close_requested` với đúng enum: `l2_evacuation` cho system-initiated triggers (conditions 1-4), `admin` cho admin force-close (condition 5). **Lưu ý:** `trigger_reason` KHÔNG tồn tại trong DB; verify bằng CloudWatch, không phải database. **✅ Q9 RESOLVED (2026-07-22):** `idempotency_key` format confirmed. `trigger_reason` không tồn tại trong DB — tương đương là `reason` field trong SQS message payload. Enum values: `l2_evacuation | parked_escalation | admin`. Verification: CloudWatch log event `bot_safe_close_requested`. | Medium |
 | TC_005 | Verify admin force-close with missing required fields is rejected | Admin được authenticate với valid OPERATOR facade token | Gọi POST /api/exbot/close với valid botId nhưng thiếu field `reason` | 1. Request bị từ chối với validation error. 2. Không có `close_operations` row được tạo. 3. Audit trail cho thấy reason là bắt buộc | Medium |
 
 ### I.2. Integration & State verification — Operation: Bot safe close initiation (trigger)
@@ -63,7 +63,7 @@
 
 | TC ID | Test Title/Summary of test cases | Pre-conditions | Test Steps | Expected Result | Priority |
 |---|---|---|---|---|---|
-| TC_020 | Verify duplicate trigger via redelivery is rejected (idempotency) | bot_safe_close trigger đã được xử lý thành công | 1. Trigger được redeliver (cùng idempotency_key, ví dụ: consumer ack failure, worker crash before ack). 2. Quan sát hệ thống response | 1. Duplicate bị reject qua UNIQUE constraint. 2. Đúng một `close_operations` row tồn tại; operation không bị double-apply. **✅ Note:** **Q4 RESOLVED (2026-07-09):** "Close Worker" là ExBot Lambda (architecture component). 5 trigger conditions đã được xác nhận trong UC. UNIQUE constraint idempotency không phụ thuộc vào Q4 answer. | High |
+| TC_020 | Verify duplicate trigger via redelivery is rejected (idempotency) | bot_safe_close trigger đã được xử lý thành công | 1. Trigger được redeliver (cùng `idempotency_key` format: `bot-safe-close:{botId}:{sessionId}`, ví dụ: consumer ack failure, worker crash before ack). 2. Quan sát hệ thống response | 1. Duplicate bị reject qua UNIQUE constraint. 2. Đúng một `close_operations` row tồn tại; operation không bị double-apply. **✅ Q9 RESOLVED (2026-07-22):** `idempotency_key` format confirmed từ `buildIdempotencyKey()` in develop branch. | High |
 | TC_021 | Verify same cloid resubmission does not create duplicate HL orders | `closeShortReduceOnlyIoc` đã submit với deterministic cloid | 1. Submit `closeShortReduceOnlyIoc(size, cloid)`. 2. Resubmit với cùng cloid (network retry) | 1. HL deduplicates — chỉ một order được tạo. 2. Không có double-apply của hedge close | Medium |
 
 ---
@@ -106,7 +106,7 @@
 |---|---|---|---|---|---|
 | TC_029 | Verify admin force-close initiates full bot_safe_close flow | Admin được authenticate, bot với `bots.status='active'` | 1. Admin gọi POST /api/exbot/close với valid botId và reason. 2. Verify request forwarded qua OperatorFacade → API Gateway + HMAC Lambda Authorizer → ExBot Lambda. 3. Verify `bots.status='closing'`. 4. Verify full flow executes (hedge → LP → RedemptionQueue) | 1. bot_safe_close được khởi tạo. 2. Investor notified: "Your ExBot was administratively closed. USDC is available for withdrawal." | High |
 | TC_030 | Verify force-close on already-closed bot returns E-EXBOT-012 | Bot với `lifecycle_state='closed'` | Admin gọi POST /api/exbot/close cho bot đã closed | 1. Hệ thống trả về E-EXBOT-012: "Bot {id} is already closed. No action needed." (HTTP 409). 2. Không có `close_operations` row được tạo | High |
-| TC_031 | Verify force-close reason is logged in close_operations for audit trail | Admin được authenticate, valid botId | Admin gọi POST /api/exbot/close với reason | `close_operations.trigger_reason` được populate với admin-provided reason; audit trail đầy đủ | Medium |
+| TC_031 | Verify force-close reason is logged to CloudWatch via bot_safe_close_requested event | Admin được authenticate, valid botId | Admin gọi POST /api/exbot/close với reason | 1. `reason` được log ra CloudWatch event `bot_safe_close_requested` với `reason='admin'`. 2. **Lưu ý:** `trigger_reason` KHÔNG tồn tại trong DB — verify bằng CloudWatch log, không phải database. **✅ Q9 RESOLVED (2026-07-22):** `trigger_reason` không persist vào DB. Equivalent field là `reason` trong SQS message payload, logged to CloudWatch. | Medium |
 | TC_032 | Verify force-close on SAFE_MODE bot proceeds with existing hedge state | Bot với `bots.status='safe_mode'` | Admin initiate force-close trên SAFE_MODE bot | 1. System proceed với bot_safe_close sử dụng existing hedge state. 2. Nếu hedge không đóng được (irrecoverable), `residual_hl_liability` được ghi nhận và admin notified | Medium |
 | TC_033 | Verify investor receives correct notification on admin force-close | Admin force-close hoàn tất thành công | Quan sát investor notification sau khi fulfillRequest hoàn tất | Investor nhận đúng message: "Your ExBot was administratively closed. USDC is available for withdrawal." (khác với happy-path message) | Medium |
 | TC_034 | Verify 3rd trigger within 7 days executes normally with admin notification | Bot với 2 prior bot_safe_close events trong 7 ngày rolling window | 3rd trigger condition met trong 7 ngày | 1. Close flow execute bình thường (không bị block). 2. Admin notification được gửi đồng thời. 3. Bot đạt `closed` | Medium |
@@ -168,7 +168,6 @@
 
 | Area | Reason | Recommended Action | Related TCs |
 |---|---|---|---|
-| `idempotency_key` và `trigger_reason` format (**Q9 — CẦN CONFIRM TỪ BA**) | FR-EXBOT-072 nói "idempotency_key UNIQUE enforced" và "trigger_reason populated" nhưng không định nghĩa format/value cụ thể. BA cần bổ sung: (1) format của `idempotency_key` (ví dụ: `{botId}:{kind}:{trigger_timestamp}`), (2) enum values của `trigger_reason` (`circuit_breaker_exhausted`, `margin_critical`, `3_stops_7d`, `partial_repair_exhausted`, `admin_force_close`). | **Chờ Q9 answer từ BA** | TC_004 |
 | BnzaExVault Solidity contract internal logic | zen develops; SOTATEK integrates via ABI | Integration tests depend on ABI (OQ-EXBOT-08) | — |
 | RedemptionQueue contract internal logic | zen develops; SOTATEK integrates via ABI | Integration tests depend on ABI (OQ-EXBOT-08) | — |
 | SPEC §19.5 INV-STOP protocol implementation | Pending HL confirmation (OQ-EXBOT-02) | Wait for OQ-EXBOT-02 | — |
@@ -178,6 +177,14 @@
 | EmergencyTransfer contract-level enforcement | Cannot be tested via integration | Defer to contract security review | — |
 
 ---
+
+## ✅ Resolved Notes
+
+✅ **Q9 RESOLVED (2026-07-22):**
+- `idempotency_key` format confirmed: `bot-safe-close:{botId}:{sessionId}` (from `buildIdempotencyKey()` in develop branch)
+- **`trigger_reason` does NOT exist in DB** — equivalent field is `reason` in SQS message payload (enum: `l2_evacuation | parked_escalation | admin`), logged to CloudWatch event `bot_safe_close_requested`
+- **Verification location for testers:** Check CloudWatch log event `bot_safe_close_requested`, NOT database
+- **Affected TCs:** TC_001, TC_003, TC_004, TC_020, TC_031
 
 ✅ **Q4 RESOLVED (2026-07-09):** "Close Worker" trong UC §1 là label cho ExBot Lambda — architecture component, không phải actor độc lập. 5 trigger conditions đã được xác nhận trong UC §1/FR-EXBOT-072. Actor list convention giữ nguyên.
 
