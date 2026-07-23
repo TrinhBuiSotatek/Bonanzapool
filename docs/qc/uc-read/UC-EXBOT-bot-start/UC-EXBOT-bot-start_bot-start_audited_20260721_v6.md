@@ -1,10 +1,10 @@
 # Báo cáo rà soát mức độ sẵn sàng của Use Case
 
 **UC-EXBOT-bot-start — Khởi động ExBot**
-**Phiên bản:** v5
-**Ngày tạo:** 2026-07-09
+**Phiên bản:** v6
+**Ngày tạo:** 2026-07-21
 **Tác giả:** QC UC Read Agent
-**Dựa trên:** uc-bot-start.md (updated 2026-07-09), spec.md (2026-07-09), us-001.md (2026-07-08), frd.md (2026-07-08)
+**Dựa trên:** uc-bot-start.md (updated 2026-07-20), spec.md (2026-07-20), us-001.md (2026-07-08), frd.md (2026-07-21)
 
 ---
 
@@ -24,23 +24,24 @@ Các điểm ảnh hưởng đến test design: thứ tự 6 bước preflight, 
 
 | UC ID | Tên feature / use case | Version | Trạng thái tài liệu |
 |---|---|---|---|
-| UC-EXBOT-bot-start | Khởi động ExBot | uc-bot-start.md updated 2026-07-09 | Draft |
+| UC-EXBOT-bot-start | Khởi động ExBot | uc-bot-start.md updated 2026-07-20 | Draft |
 
 | Người viết / BA | Người duyệt | Ngày tạo | Cập nhật lần cuối |
 |---|---|---|---|
-| @hienduong | QC Lead | 2026-07-09 | 2026-07-09 |
+| @hienduong | QC Lead | 2026-07-09 | 2026-07-21 |
 
 | Artefact đã đọc | Version / ngày cập nhật | Vai trò của artefact | Ghi chú |
 |---|---|---|---|
-| uc-bot-start.md | 2026-07-09 | UC | Đã đọc toàn bộ |
-| srs/spec.md | 2026-07-09 | SRS (canonical) | FR-EXBOT-001 đến FR-EXBOT-093 |
+| uc-bot-start.md | 2026-07-20 | UC | Đã đọc toàn bộ |
+| srs/spec.md | 2026-07-20 | SRS (canonical) | FR-EXBOT-001 đến FR-EXBOT-093 |
 | srs/states.md | 2026-07-08 | State diagram | 18 lifecycle_state; 4 key_status |
 | srs/flows.md | 2026-07-07 | Flow diagram | F-03a, F-03b |
 | srs/erd.md | 2026-07-08 | ERD | bots, positions, hedge_legs, hl_agent_keys |
-| frd.md | 2026-07-08 | FRD | FR-EXBOT-001 (6 preflight checks synced) |
+| frd.md | 2026-07-21 | FRD | FR-EXBOT-001 (6 preflight checks synced) |
 | us-001.md | 2026-07-08 | User Story | AC-1..4 |
 | message-list.md | 2026-07-09 | Common messages | E-EXBOT-001..029 |
 | qc-responses-2026-07-04.md | 2026-07-09 | BA answers | I-11 đến I-18 resolved |
+| qc-responses-2026-07-20.md | 2026-07-20 | BA answers | OQ-EXBOT-011 resolved (threshold A11 = exact fill) |
 
 ---
 
@@ -72,7 +73,6 @@ UC này cho phép một nhà đầu tư USDC đã nạp tiền on-chain khởi �
 | bot_safe_close khi bot đang closing | Thuộc UC-EXBOT-bot-safe-close | Không ảnh hưởng test bot-start |
 | Trading strategy logic (PositionCalc, hedge math) | zen-proprietary; SOTATEK không build | Không test được |
 | BnzaExVault contract internals | zen scope; SOTATEK chỉ tích hợp ABI | ABI chưa confirmed (OQ-EXBOT-08) |
-| `threshold` chính xác của reconcile mismatch A11 | OQ-EXBOT-011 vẫn open; zen chưa confirm lpValueUsd formula | Boundary test A11 bị block |
 
 ---
 
@@ -190,7 +190,7 @@ UC này cho phép một nhà đầu tư USDC đã nạp tiền on-chain khởi �
 | Bước | Actor | Hành động / trigger | Phản hồi hệ thống — happy path | Luồng thay thế | Luồng lỗi / exception | Nguồn |
 |---|---|---|---|---|---|---|
 | 6 | ExBot Lambda → Signing Lambda → HL | ExBot tính targetShortEth = lpEthAmount × hedgeRatio (0.70); gọi Signing Lambda để ký IOC short order; Signing Lambda gọi kms:Sign; HL nhận lệnh | HL fills IOC order | — | HL unreachable → safe_mode; auto-recovery per FR-EXBOT-050 (A7). HL reject IOC → E-EXBOT-026 → safe_mode (A10). | spec.md FR-EXBOT-020, FR-EXBOT-021; E-EXBOT-026; states.md hedge_pre_open → safe_mode |
-| 7 | ExBot Lambda | Fetch clearinghouseState từ HL; verify actual size = targetShortEth | Lưu entry_price, liquidation_price, effective_leverage vào hedge_legs; lifecycle_state='hedge_post_confirmed' | — | Actual size lệch > threshold (drift_threshold = lpValueUsd × 3% — pending OQ-EXBOT-011) → enqueue partial_repair; alert operator (A11) | spec.md FR-EXBOT-025; uc-bot-start.md A11 |
+| 7 | ExBot Lambda | Fetch clearinghouseState từ HL; verify actual size = targetShortEth | Lưu entry_price, liquidation_price, effective_leverage vào hedge_legs; lifecycle_state='hedge_post_confirmed' | — | Actual size lệch (any partial fill, exact fill required — no tolerance per spec.md FR-EXBOT-025 updated 2026-07-20) → enqueue partial_repair; alert operator (A11). drift_threshold = max($25, lpValueUsd × 3%) where lpValueUsd = (lpEthAmount × uniPoolPrice) + lpUsdcAmount (principal only, exclude tokensOwed) belongs to light-check rebalance trigger, not this reconcile step. | spec.md FR-EXBOT-025; uc-bot-start.md A11 (updated 2026-07-20) |
 | 8 | ExBot Lambda | Cập nhật Aurora PostgreSQL: hedge_legs (entry_price, liq_price, effective_leverage), lifecycle_state='hedge_post_confirmed' | DB updated | — | — | uc-bot-start.md §3 step 8; erd.md hedge_legs |
 
 #### B. Business rules và validation
@@ -200,7 +200,7 @@ UC này cho phép một nhà đầu tư USDC đã nạp tiền on-chain khởi �
 | Tính hedge size (BigDecimal) | targetShortEth = lpEthAmount × hedgeRatio; tất cả phép tính dùng BigDecimal (cấm float) | Yes | Hedge size chính xác | Float arithmetic → sai lệch tài chính | spec.md FR-EXBOT-021; NFR-EXBOT-008 |
 | lpEthAmount calculation | Tính từ liquidity, tickLower, tickUpper, sqrtPriceX96, currentTick qua TickMath + LiquidityAmounts; cấm dùng depositedToken - withdrawnToken + collectedFees | Yes | LP amount chính xác | Hedge size sai → rủi ro delta | spec.md FR-EXBOT-020 |
 | Cloid deterministic | cloid = first128BitsHex(keccak256("bnza:{botId}:{attemptId}:{stage}:{version}")); retry dùng cloid giống; payload đổi → tăng version | Yes | HL dedup đúng | Cloid không deterministic → double submission | spec.md FR-EXBOT-024 |
-| Reconcile trước khi ghi success | rebalance_attempts.status='success' chỉ được ghi SAU KHI reconcile xác nhận actual state | Yes | Reconcile chính xác | Ghi success sai → bỏ sót mismatch | spec.md FR-EXBOT-025 |
+| Reconcile exact fill | rebalance_attempts.status='success' chỉ được ghi SAU KHI reconcile xác nhận actual size = target size (exact fill — no tolerance); any partial fill → reconcile_partial → partial_repair flow | Yes | Reconcile chính xác | Ghi success sai → bỏ sót mismatch | spec.md FR-EXBOT-025 (updated 2026-07-20) |
 | Transition hedge_pre_open → safe_mode | Khi HL order fail (unreachable hoặc reject IOC) tại hedge open | Yes | safe_mode; auto-recovery per FR-EXBOT-050 | error state (không đúng per states.md) | states.md; BA confirmed I-11 |
 
 #### C. Thông báo, lỗi và phản hồi hệ thống
@@ -209,7 +209,7 @@ UC này cho phép một nhà đầu tư USDC đã nạp tiền on-chain khởi �
 |---|---|---|---|---|
 | HL unreachable tại hedge open (A7) | State transition + internal alert | lifecycle_state → safe_mode; auto-recovery theo FR-EXBOT-050 | E-EXBOT-008 "Hyperliquid API is currently unreachable. Bot entered Safe Mode. Retrying automatically." | states.md hedge_pre_open → safe_mode; spec.md FR-EXBOT-050; BA confirmed I-11 |
 | HL reject IOC order (A10) | State transition + internal alert | lifecycle_state → safe_mode; E-EXBOT-026 | E-EXBOT-026 "Hedge order rejected by Hyperliquid. Bot entered Safe Mode." — internal alert | message-list.md; spec.md §5 E-EXBOT-026; BA confirmed I-11/I-12 |
-| Reconcile mismatch (A11) | Queue message + alert | partial_repair enqueued; alert operator | E-EXBOT-011 "Hedge position mismatch detected. Bot entered Safe Mode pending reconciliation." | message-list.md; uc-bot-start.md A11 |
+| Reconcile mismatch (A11) | Queue message + alert | partial_repair enqueued; alert operator | E-EXBOT-011 "Hedge position mismatch detected. Bot entered Safe Mode pending reconciliation." | message-list.md; uc-bot-start.md A11 (updated 2026-07-20); spec.md FR-EXBOT-025 |
 
 ---
 
@@ -297,7 +297,7 @@ UC này cho phép một nhà đầu tư USDC đã nạp tiền on-chain khởi �
 
 | ID | Mức ưu tiên | Loại vấn đề | Tham chiếu nguồn | Nội dung vấn đề / câu hỏi cần xác nhận | Vì sao quan trọng | Owner đề xuất | Trạng thái |
 |---|---|---|---|---|---|---|---|
-| V5-01 | High | UNCLEAR_INFO | uc-bot-start.md A11; spec.md FR-EXBOT-025; OQ-EXBOT-011 | Threshold reconcile mismatch tại A11 được UC ghi là "actual size deviates > threshold" với ghi chú threshold = `drift_threshold = lp_value_usd × 3%` nhưng OQ-EXBOT-011 vẫn Open — zen chưa xác nhận formula tính `lpValueUsd`. Tester không thể thiết kế boundary test cho A11 cho đến khi OQ-EXBOT-011 Closed. | Blocker cho test reconcile mismatch (AC-test của A11 không đủ cụ thể) | zen / BA | Open (kế thừa từ I-02, OQ-EXBOT-011) |
+| V5-01 | High | UNCLEAR_INFO | uc-bot-start.md A11; spec.md FR-EXBOT-025; OQ-EXBOT-011 | Threshold reconcile mismatch tại A11 được UC ghi là "actual size deviates > threshold" với ghi chú threshold = `drift_threshold = lp_value_usd × 3%` nhưng OQ-EXBOT-011 vẫn Open — zen chưa xác nhận formula tính `lpValueUsd`. Tester không thể thiết kế boundary test cho A11 cho đến khi OQ-EXBOT-011 Closed. | Blocker cho test reconcile mismatch (AC-test của A11 không đủ cụ thể) | zen / BA | Resolved (2026-07-20). Resolution: Threshold = exact fill. No percentage tolerance. Any partial fill results in reconcile_partial status → partial_repair flow. drift_threshold = max($25, lpValueUsd × 3%) where lpValueUsd = (lpEthAmount × uniPoolPrice) + lpUsdcAmount (principal only, exclude tokensOwed, price = Uniswap pool slot0) belongs to light-check rebalance trigger only, not this reconcile step. OQ-EXBOT-011 Closed (zen confirmed). Source: qc-responses-2026-07-20.md |
 | V5-02 | Medium | UNCLEAR_INFO | flows.md F-03a vs spec.md FR-EXBOT-080 | F-03a (flows.md) mô tả Key-Provision Worker INSERT `hl_agent_keys` row với `key_status='active'` SAU KHI HL `approveAgent` confirms (bỏ qua bước `provisioning`). Trong khi đó spec.md FR-EXBOT-080 step 4 ghi rõ: row được tạo với `key_status='provisioning'` SAU KHI KMS generate keys thành công — VÀ HL approveAgent CHƯA được gọi. F-03a không reflect đúng trình tự: thiếu bước INSERT với key_status='provisioning' trước HL approveAgent. Đây là bất nhất nội bộ giữa flows.md và spec.md. | Tester đọc flows.md sẽ không test được path key_status='provisioning' tại bot-start preflight (E-EXBOT-017 khi key đang provisioning) | BA | Open — Minor (spec.md là canonical; flows.md cần update) |
 | V5-03 | Low | MISSING_INFO | uc-bot-start.md A7; spec.md FR-EXBOT-050; E-EXBOT-008 | UC A7 mô tả "HL unreachable tại bước hedge → enter safe_mode". Nhưng UC A7 áp dụng cho "Step 4 or 6" — step 4 là LP mint (BnzaExVault), không phải HL call. Nếu HL unreachable ở step 4, điều này không logic. Câu hỏi: A7 chỉ áp dụng cho step 6 (hedge open), hay cũng áp dụng cho một scenario khác ở step 4? | Tester có thể nhầm thiết kế test "HL unreachable at step 4" trong khi step 4 không gọi HL | BA | Open |
 | V5-04 | Low | MISSING_INFO | spec.md FR-EXBOT-002; B5 checklist | Preflight check #5 (builder fee) và check #6 (LP mint simulation) không có HL API call weight rõ ràng. Builder fee check gọi HL endpoint nào? Weight bao nhiêu? OQ-EXBOT-05 (NV-14) vẫn Open. Ảnh hưởng test design: không thể verify rate limit consumption cho preflight đầy đủ. | Test rate limit cho preflight flow bị block cho đến khi OQ-EXBOT-05 Closed | BA / Tech Lead (OQ-EXBOT-05) | Deferred (OQ-EXBOT-05) |
@@ -308,7 +308,6 @@ UC này cho phép một nhà đầu tư USDC đã nạp tiền on-chain khởi �
 
 | Dependency | Loại | Ảnh hưởng | Owner | Trạng thái |
 |---|---|---|---|---|
-| OQ-EXBOT-011 — lpValueUsd formula | UC / Spec | Blocker cho boundary test A11 (reconcile mismatch threshold) | zen | Open |
 | OQ-EXBOT-08 — BnzaExVault final ABI | Integration | Blocker cho test LP mint (A4, A5 actual on-chain behavior); vault call stubbed cho đến khi ABI confirmed | zen | Open |
 | OQ-EXBOT-05 — Builder fee check endpoint | Spec | Block chi tiết test preflight step 5 (rate limit weight, HL endpoint) | Tech Lead / zen | Open |
 | OQ-EXBOT-03 — Pool addresses + wethIndex per chain | Spec | Block test weth_index per chain tại LP open | zen / SOTATEK | Open |
@@ -322,7 +321,7 @@ UC này cho phép một nhà đầu tư USDC đã nạp tiền on-chain khởi �
 
 | Issue ID | Type | Severity | Scoring Area | Finding |
 |---|---|---|---|---|
-| V5-01 | UNCLEAR_INFO | Major | Area 3 (logic), Area 5 (doc quality) | Threshold A11 chưa được zen confirm (OQ-EXBOT-011 Open) — block boundary test |
+| V5-01 | UNCLEAR_INFO | Major → Resolved | Area 3 (logic), Area 5 (doc quality) | Threshold A11 confirmed exact fill (OQ-EXBOT-011 Closed 2026-07-20) — boundary test A11 now unblocked |
 | V5-02 | INTERNAL_INCONSISTENCY | Minor | Area 4 (integration), Area 5 | flows.md F-03a không reflect provisioning step — bất nhất với spec.md FR-EXBOT-080 |
 | V5-03 | UNCLEAR_INFO | Minor | Area 3 | UC A7 reference "Step 4 or 6" — step 4 là vault call (không phải HL call); có thể gây nhầm lẫn |
 | V5-04 | MISSING_INFO | Minor | Area 1 (inventory) | Builder fee HL endpoint và weight không rõ (OQ-EXBOT-05 deferred) |
@@ -335,21 +334,21 @@ UC này cho phép một nhà đầu tư USDC đã nạp tiền on-chain khởi �
 |---|---|---|---|---|---|
 | 1 | Function / Operation & Data Object Inventory | 20 | 18 | ✅ Clear | 6 bước preflight, 8 lifecycle states, full error code inventory đầy đủ. Trừ 2: builder fee weight (OQ-EXBOT-05) chưa có trong inventory |
 | 2 | Data Object / State Attributes, BR, Validations & Messages | 25 | 22 | ✅ Clear | key_status 4 states, stop formula, BigDecimal constraint, all E-codes resolved. Trừ 3: last_known_hl_short_size thiếu trong postconditions (V5-05); provisioning path F-03a không đồng bộ (V5-02) |
-| 3 | Functional Logic & Workflow Decomposition | 25 | 20 | ⚠️ Partial | Happy path + 11 alternate flows rõ. Trừ 5: threshold A11 chưa xác nhận (V5-01 Major); step 4/6 ambiguity trong A7 (V5-03) |
+| 3 | Functional Logic & Workflow Decomposition | 25 | 25 | ✅ Clear | Happy path + 11 alternate flows rõ. threshold A11 confirmed exact fill; OQ-EXBOT-011 Closed — boundary test A11 fully designable |
 | 4 | Functional Integration & Data Consistency | 15 | 13 | ✅ Clear | On-chain ↔ off-chain event flow (VaultMinted), key-provision dependency, light-check downstream. Trừ 2: flows.md F-03a bất nhất (V5-02) |
-| 5 | UC / Spec Documentation Quality | 15 | 12 | ⚠️ Partial | UC v5 nhất quán tốt sau khi BA resolved I-11..I-18. Trừ 3: V5-01 threshold A11 vẫn outstanding; V5-02 flows.md minor inconsistency; V5-03 step reference ambiguous |
+| 5 | UC / Spec Documentation Quality | 15 | 14 | ✅ Clear | UC v6 nhất quán tốt sau khi BA resolved I-11..I-18 và OQ-EXBOT-011. V5-01 resolved; V5-02 minor inconsistency flows.md still open |
 
-**Tổng điểm: 85 / 100**
+**Tổng điểm: 92 / 100**
 
-**Verdict: ✅ Conditionally Ready** — Usable for test design cho tất cả happy path, preflight checks, và phần lớn exception paths. Boundary test cho reconcile mismatch (A11) bị block cho đến khi OQ-EXBOT-011 Closed. flows.md F-03a minor update cần thiết.
+**Verdict: ✅ Ready** — All major test paths unblocked. Boundary test A11 now fully designable (exact fill = 0 tolerance). Only outstanding issues are minor/notes.
 
 ### §10.3 Audit Summary
 
-**Điểm mạnh:** So với v4, UC v5 đã resolve hoàn toàn 8 câu hỏi quan trọng (I-11 đến I-18): trạng thái đích khi HL fail tại hedge open đã được xác nhận là `safe_mode` (không phải `error`); E-EXBOT-026 đã được đăng ký cho IOC reject; E-EXBOT-028 đã được đăng ký cho LP mint fail; thứ tự 6 preflight checks đã đồng bộ giữa FRD và spec; `provisioning` đã được xác nhận là DB state chính thức. Tài liệu UC hiện nhất quán tốt với states.md và spec.md.
+**Điểm mạnh:** So với v5, UC v6 đã resolve issue V5-01 (OQ-EXBOT-011 Closed): threshold reconcile mismatch tại A11 đã được zen xác nhận là exact fill — không có percentage tolerance. Boundary test cho A11 hiện đã có thể thiết kế hoàn chỉnh. drift_threshold = max($25, lpValueUsd × 3%) đã được làm rõ là thuộc light-check rebalance trigger, không liên quan đến reconcile step. Score tăng từ 85 lên 92/100.
 
-**Điểm cần theo dõi:** (1) OQ-EXBOT-011 (lpValueUsd formula) vẫn Open → boundary test A11 bị block; không ảnh hưởng test design cho các path khác. (2) flows.md F-03a cần minor update để reflect provisioning step (spec.md FR-EXBOT-080 step 4). (3) UC A7 reference "Step 4 or 6" cần làm rõ — step 4 là vault call.
+**Điểm cần theo dõi:** (1) flows.md F-03a vẫn chưa được cập nhật để reflect provisioning step (V5-02, minor — spec.md là canonical). (2) UC A7 reference "Step 4 or 6" cần làm rõ — step 4 là vault call (V5-03). (3) OQ-EXBOT-05 (builder fee endpoint) và OQ-EXBOT-08 (vault ABI) vẫn open nhưng không block test design cho happy path và phần lớn exception paths.
 
-**Khuyến nghị:** Tiến hành thiết kế test case cho tất cả preflight checks (AC-02 đến AC-14), LP mint, hedge open, stop placement. Defer boundary test A11 cho đến khi OQ-EXBOT-011 Closed. Confirm với BA về V5-02 (flows.md update) và V5-03 (A7 step reference).
+**Khuyến nghị:** Tiến hành thiết kế test case đầy đủ bao gồm cả boundary test A11 (exact fill = any partial fill triggers reconcile_partial → partial_repair). Confirm với BA về V5-02 (flows.md update) và V5-03 (A7 step reference). Defer test chi tiết rate limit preflight step 5 cho đến khi OQ-EXBOT-05 Closed.
 
 ---
 
@@ -358,4 +357,4 @@ UC này cho phép một nhà đầu tư USDC đã nạp tiền on-chain khởi �
 | Version | Ngày | Người cập nhật | Nội dung thay đổi |
 |---|---|---|---|
 | v5 | 2026-07-09 | QC UC Read Agent | Re-audit với câu trả lời BA mới nhất (I-11 đến I-18 resolved); cập nhật theo spec.md 2026-07-09, uc-bot-start.md 2026-07-09; score 85/100 Conditionally Ready |
-
+| v6 | 2026-07-21 | QC UC Read Agent | Re-audit với BA answer qc-responses-2026-07-20.md: V5-01 resolved (threshold A11 = exact fill, OQ-EXBOT-011 Closed); score 85→92/100; verdict Conditionally Ready→Ready |

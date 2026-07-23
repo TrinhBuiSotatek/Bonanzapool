@@ -2,9 +2,9 @@
 
 > **UC ID:** UC-EXBOT-bot-start
 > **Ngày tạo:** 2026-06-30
-> **Cập nhật:** 2026-07-09
+> **Cập nhật:** 2026-07-21
 > **Nguồn:** `UC-EXBOT-bot-start_bot-start_audited_20260707_v4.md` §10.1
-> **Phiên bản:** v2 (updated 2026-07-07) — Thêm I-17, I-18 từ re-audit v4 (update UC 2026-07-07: user-initiated trigger; vault balance preflight; FRD stale)
+> **Phiên bản:** v2 (updated 2026-07-21) — Answered I-02 (reconcile threshold = exact fill confirmed, BA qc-responses-2026-07-20.md)
 
 Priority: High = block test design, Medium = ảnh hưởng scope/coverage, Low = nice-to-know
 Status: Open | Answered | Deferred
@@ -13,9 +13,7 @@ Status: Open | Answered | Deferred
 
 ## Open Questions
 
-| ID | Priority | Ref | Question | Why It Matters | Status |
-|----|----------|-----|----------|----------------|--------|
-| I-02 | High | UC §4 A11 vs FR-EXBOT-025 | UC mô tả A11 (reconcile mismatch) là "actual size deviates > threshold" nhưng không định nghĩa threshold cụ thể là bao nhiêu. FR-EXBOT-025 cũng không nêu threshold. FR-EXBOT-036 có nhắc drift_threshold và OQ-EXBOT-11 đề cập lpValueUsd × 3% nhưng đây là ứng viên chưa được zen xác nhận (OQ-EXBOT-11 vẫn Open). Tester cần biết ngưỡng deviation cụ thể để thiết kế test case kiểm tra boundary. | Blocker cho test reconcile mismatch. (Ghi chú 2026-07-02: BA xác nhận formula drift_threshold = lpValueUsd × 3% và behavior logic của A11 đã confirmed; tuy nhiên zen chưa confirm OQ-EXBOT-011 — boundary test vẫn bị block cho đến khi OQ-EXBOT-011 Closed.) | Open |
+*(Không còn câu hỏi nào đang mở.)*
 
 ---
 
@@ -37,6 +35,7 @@ Status: Open | Answered | Deferred
 | I-16 | Low | userstories/us-001.md Notes section vs srs/states.md | US-EXBOT-001 Notes ghi: "cooldown and parked lifecycle states map to status='active'". Nhưng srs/states.md (updated 2026-06-18) đã remove hoàn toàn cooldown và parked states khỏi state machine. US-001 Notes chưa được cập nhật theo. Mặc dù one-bot policy đúng (US-001 AC-2 dùng status IN ('active','paused','closing','safe_mode','error')), phần Notes vẫn đề cập states đã bị xóa gây nhầm lẫn. BA vui lòng cleanup Notes section của US-001. | `cooldown` và `parked` states đã bị remove từ 2026-06-18. Notes section của US-001 đã được cleanup — bỏ dòng tham chiếu 2 states này. One-bot policy vẫn đúng: `status IN ('active','paused','closing','safe_mode','error')`. | BA (qc-responses-2026-07-04.md) | 2026-07-04 | Answered |
 | I-17 | Minor | spec.md FR-EXBOT-080 KMS failure path vs states.md agent key states | spec.md FR-EXBOT-080 đề cập key_status='provisioning' trong KMS failure path ("key remains key_status='provisioning'; retry via key-provision queue"). Nhưng states.md chỉ định nghĩa 3 states chính thức: active / superseded / revoked — không có provisioning. Không rõ provisioning là: (a) trạng thái transient chưa được persist vào DB (chỉ là description of in-progress), hay (b) trạng thái chính thức cần thêm vào state machine và test case. BA vui lòng xác nhận: provisioning có phải là giá trị hợp lệ của hl_agent_keys.key_status không? Nếu có, cần update states.md và ERD. | Confirmed: `provisioning` là DB state chính thức. Row được tạo với `key_status='provisioning'` sau khi KMS generate keys thành công (trước khi gọi HL approveAgent) — để đảm bảo retry recovery nếu queue message bị lost. Đã update: `states.md` thêm `provisioning` vào state machine (4 states); `erd.md` update `key_status` constraint; `spec.md` FR-EXBOT-080 clarify flow; `spec.md` BR-EXBOT-012 confirm `provisioning` không vi phạm UNIQUE active constraint. | BA (qc-responses-2026-07-04.md) | 2026-07-04 | Answered |
 | I-18 | Major | frd.md FR-EXBOT-001 (5 preflight checks, không có vault balance) vs spec.md FR-EXBOT-002 (6 preflight checks, vault balance là step 2) | frd.md FR-EXBOT-001 liệt kê 5 preflight checks theo thứ tự: (1) one-bot, (2) HL margin, (3) key_status, (4) builder fee, (5) LP simulation — không có vault balance check. spec.md FR-EXBOT-002 (canonical) liệt kê 6 checks: (1) one-bot, (2) vault balance (E-EXBOT-025), (3) HL margin, (4) key_status (E-EXBOT-017), (5) builder fee, (6) LP simulation. FRD chưa được update sau khi UC được update ngày 2026-07-07. Ngoài ra, F-03b flow diagram trong flows.md cũng confirm vault balance là check thứ 2 (trước margin). BA vui lòng update FRD FR-EXBOT-001 để đồng bộ với spec.md FR-EXBOT-002 (6 checks). | FRD FR-EXBOT-001 đã được sync với spec.md FR-EXBOT-002 — thêm vault balance check (E-EXBOT-025) là check #2, renumber các checks tiếp theo từ #3-6. Thứ tự đúng: (1) one-bot → (2) vault balance → (3) HL margin → (4) key_status → (5) builder fee → (6) LP simulation. Nhất quán với F-03b flows.md. | BA (qc-responses-2026-07-04.md) | 2026-07-04 | Answered |
+| I-02 | High | UC §4 A11 vs FR-EXBOT-025 | UC mô tả A11 (reconcile mismatch) là "actual size deviates > threshold" nhưng không định nghĩa threshold cụ thể là bao nhiêu. FR-EXBOT-025 cũng không nêu threshold. FR-EXBOT-036 có nhắc drift_threshold và OQ-EXBOT-11 đề cập lpValueUsd × 3% nhưng đây là ứng viên chưa được zen xác nhận (OQ-EXBOT-11 vẫn Open). Tester cần biết ngưỡng deviation cụ thể để thiết kế test case kiểm tra boundary. | Threshold là **exact fill** — actual HL position size phải bằng đúng target size đã đặt lệnh. Không có vùng chấp nhận phần trăm (không phải ±3% hay bất kỳ % nào). Ví dụ: target = 100 ETH → actual phải = 100 ETH. Nếu HL chỉ fill được 99.9 ETH → A11 triggered → `reconcile_partial` → `partial_repair` được enqueue. **Lưu ý cho tester:** `drift_threshold = max($25, lpValueUsd × 3%)` là threshold của light-check (trigger hedge-sync theo thời gian), **không phải** threshold của bước reconcile này. | BA (qc-responses-2026-07-20.md) | 2026-07-20 | Answered |
 
 ---
 

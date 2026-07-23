@@ -1,9 +1,9 @@
 # Test Scenarios — UC-EXBOT-bot-start: Khởi động ExBot
 
-> **Source:** `docs/qc/uc-read/UC-EXBOT-bot-start/UC-EXBOT-bot-start_bot-start_audited_20260709_v5.md`
-> **Generated:** 2026-07-09
+> **Source:** `docs/qc/uc-read/UC-EXBOT-bot-start/UC-EXBOT-bot-start_bot-start_audited_20260721_v6.md`
+> **Generated:** 2026-07-22
 > **Domain/Architecture:** AWS Lambda (ExBot Lambda standalone, BR-EXBOT-010) + Aurora PostgreSQL + BnzaExVault (Solidity, Base/Optimism) + Hyperliquid (perpetual DEX) + AWS KMS (Signing Lambda) + SQS queue
-> **Version:** v5 (re-gen từ audit v5; v4 marked NOT READY 58/100; v5 audit 85/100 Conditionally Ready)
+> **Version:** v6 (re-gen từ audit v6; v6 audit 92/100 Ready — V5-01 resolved: exact fill threshold confirmed, OQ-EXBOT-011 Closed)
 
 ---
 
@@ -317,6 +317,8 @@
 **Description:** Khi preflight fail tại bước N (bất kỳ bước nào từ 1 đến 6), hệ thống không tiếp tục thực hiện các bước sau bước N và không gọi bất kỳ API bên ngoài (HL, KMS) nào của các bước chưa thực hiện. Ví dụ: nếu step 2 (vault balance) fail, step 3 đến 6 không được thực hiện — không có HL API call nào được gửi.
 **Test Focus:** Alternative flow
 
+
+
 ---
 
 
@@ -485,12 +487,42 @@
 ---
 
 ### Scenario ID: TS_UC-EXBOT-bot-start_047
-**Scenario Title:** Post-order reconcile — actual size lệch > drift_threshold: enqueue `partial_repair`, alert operator
+**Scenario Title:** Post-order reconcile — partial fill (actual size < target): `reconcile_partial`, enqueue `partial_repair`, alert operator
 **UC Reference:** UC-EXBOT-bot-start — Start ExBot
-**Req-ID:** spec.md FR-EXBOT-025, uc-bot-start.md A11
+**Req-ID:** spec.md FR-EXBOT-025, uc-bot-start.md A11 (updated 2026-07-20)
 **Test Type:** Integration
-**Description:** Sau khi lệnh short IOC khớp, ExBot Lambda phát hiện actual size lệch khỏi `targetShortEth` quá `drift_threshold` (formula: `lpValueUsd x 3%` — pending OQ-EXBOT-011, xem Out-of-Scope Flags). Hệ thống enqueue message `partial_repair`, gửi alert operator E-EXBOT-011 "Hedge position mismatch detected. Bot entered Safe Mode pending reconciliation." Bot giữ nguyên tại `lifecycle_state='hedge_post_confirmed'`.
+**Description:** Sau khi lệnh short IOC được submit lên HL, ExBot Lambda fetch `clearinghouseState` và phát hiện actual size nhỏ hơn `targetShortEth` (partial fill — HL chỉ fill được một phần lệnh). Hệ thống ghi `reconcile_partial` status, enqueue message `partial_repair`, gửi alert operator E-EXBOT-011 "Hedge position mismatch detected. Bot entered Safe Mode pending reconciliation." Bot giữ nguyên tại `lifecycle_state='hedge_post_confirmed'`. **Không có percentage tolerance**: bất kỳ sai lệch nào so với target (dù chỉ 0.000001 ETH) đều kích hoạt `reconcile_partial`. `drift_threshold = max($25, lpValueUsd × 3%)` là ngưỡng của light-check rebalance trigger — không liên quan đến reconcile step này.
 **Test Focus:** Error/Exception
+
+---
+
+### Scenario ID: TS_UC-EXBOT-bot-start_047a
+**Scenario Title:** Post-order reconcile — exact fill (actual = target exactly): `reconcile_success`, no partial_repair
+**UC Reference:** UC-EXBOT-bot-start — Start ExBot
+**Req-ID:** spec.md FR-EXBOT-025 (updated 2026-07-20 — exact fill definition)
+**Test Type:** Integration
+**Description:** Sau khi lệnh short IOC được submit lên HL, ExBot Lambda fetch `clearinghouseState` và xác nhận actual size bằng đúng `targetShortEth` (exact fill — không có sai lệch). Hệ thống ghi `reconcile_success` (hoặc `success`) status trong `rebalance_attempts`. KHÔNG enqueue `partial_repair`. KHÔNG gửi alert E-EXBOT-011. `lifecycle_state` tiếp tục chuyển sang `hedge_post_confirmed` bình thường. Đây là boundary: exact match = success path.
+**Test Focus:** Boundary
+
+---
+
+### Scenario ID: TS_UC-EXBOT-bot-start_047b
+**Scenario Title:** Post-order reconcile — actual size nhỏ hơn target dù chỉ 0.000001 ETH: `reconcile_partial` triggered (zero tolerance)
+**UC Reference:** UC-EXBOT-bot-start — Start ExBot
+**Req-ID:** spec.md FR-EXBOT-025 (updated 2026-07-20 — "No percentage tolerance is applied")
+**Test Type:** Integration
+**Description:** Sau khi lệnh short IOC fill, actual size = `targetShortEth − 0.000001 ETH` (sai lệch cực nhỏ). Theo exact fill rule (FR-EXBOT-025 cập nhật 2026-07-20): bất kỳ sai lệch nào so với target đều kích hoạt `reconcile_partial`. Hệ thống phải enqueue `partial_repair` và alert operator — không được coi đây là success. Đây là boundary: target − epsilon = fail path (reconcile_partial).
+**Test Focus:** Boundary
+
+---
+
+### Scenario ID: TS_UC-EXBOT-bot-start_047c
+**Scenario Title:** `drift_threshold = max($25, lpValueUsd × 3%)` KHÔNG áp dụng cho reconcile post-hedge-open — chỉ dùng cho light-check
+**UC Reference:** UC-EXBOT-bot-start — Start ExBot
+**Req-ID:** spec.md FR-EXBOT-025 (reconcile), spec.md FR-EXBOT-036 (partial_repair drift_threshold), uc-bot-start.md A11 note
+**Test Type:** Data/State
+**Description:** Xác nhận rằng `drift_threshold = max($25, lpValueUsd × 3%)` (formula từ FR-EXBOT-036 và light-check FR-EXBOT-012) KHÔNG được dùng làm ngưỡng tolerance cho bước reconcile tại bot-start (step 7). Tại bước này, ngưỡng là exact fill (0 tolerance). Nếu code dùng drift_threshold để quyết định có trigger `partial_repair` hay không tại reconcile step, đây là lỗi implementation — `partial_repair` phải trigger ngay khi actual ≠ target (bất kể delta so với drift_threshold).
+**Test Focus:** Data/State
 
 ---
 
@@ -521,6 +553,7 @@
 **Test Type:** Data/State
 **Description:** Xác nhận rằng từ `lifecycle_state='stop_placing'`, không có transition hợp lệ nào đến `error`. Khi stop placement fail, `lifecycle_state` phải chuyển sang `safe_mode` — không bao giờ chuyển sang `error` từ `stop_placing`.
 **Test Focus:** State transition
+
 
 ---
 
@@ -731,7 +764,7 @@
 | lp_opening | lp_opened | VaultMinted event nhan duoc thanh cong | lp_opening -> error (neu revert/timeout, E-EXBOT-028) |
 | lp_opened | hedge_pre_open | LP position duoc luu; chuan bi gui IOC | Khong co path loi tu lp_opened trong bot-start |
 | hedge_pre_open | hedge_post_confirmed | IOC khop; reconcile xac nhan actual size | hedge_pre_open -> safe_mode (HL fail/reject: A7/A10) |
-| hedge_post_confirmed | stop_placing | Tinh stop_trigger_px; bat dau gui stop order | A11: drift > threshold -> partial_repair, giu o hedge_post_confirmed |
+| hedge_post_confirmed | stop_placing | Tinh stop_trigger_px; bat dau gui stop order | A11: partial fill (actual ≠ target, 0 tolerance) -> reconcile_partial -> partial_repair; giu o hedge_post_confirmed |
 | stop_placing | stop_verified | Stop order duoc HL confirm | stop_placing -> safe_mode (A8: stop fail) |
 | stop_verified | active | All postconditions met | Khong co path loi tu stop_verified trong bot-start |
 | lp_opening | error | vaultMint() revert/timeout (E-EXBOT-028) | Funds khong di chuyen |
@@ -744,10 +777,9 @@
 
 | Khu vuc scenario | Ly do | Hanh dong de nghi |
 |---|---|---|
-| A11 — Boundary test reconcile mismatch (drift_threshold chinh xac) | BLOCKED: OQ-EXBOT-011 — zen chua xac nhan formula `lpValueUsd x 3%`. TS_UC-EXBOT-bot-start_047 cover behavior logic nhung khong test gia tri boundary cu the. | Resolve qua qc-qna khi zen confirm OQ-EXBOT-011; sau do add boundary scenarios. |
+| A11 — drift_threshold lpValueUsd formula for light-check (FR-EXBOT-012, FR-EXBOT-036) | OQ-EXBOT-011 Closed (2026-07-20, zen confirmed): lpValueUsd = (lpEthAmount × uniPoolPrice) + lpUsdcAmount. Boundary scenarios for light-check drift_threshold belong to UC-EXBOT-light-check scenarios. | No action needed for bot-start scope. |
 | weth_index per-chain test voi pool address cu the (Base/Optimism) | BLOCKED: OQ-EXBOT-03 — pool addresses chua duoc zen xac nhan. TS_037/038 cover intent nhung khong co gia tri test cu the. | Resolve khi OQ-EXBOT-03 Closed; sau do update scenarios voi pool address chinh xac. |
 | Builder fee HL endpoint weight va rate limit detail (preflight step 5) | BLOCKED: OQ-EXBOT-05 — HL endpoint va weight cho builder fee check chua duoc xac nhan. TS_024 cover functional block nhung khong verify rate limit. | Resolve khi OQ-EXBOT-05 Closed. |
 | BnzaExVault contract internals (fund return mechanism khi LP mint fail) | BLOCKED: OQ-EXBOT-08 — BnzaExVault ABI chua duoc zen confirm. TS_034/035 cover state transition sang error nhung khong verify co che refund on-chain. | Resolve khi OQ-EXBOT-08 Closed. |
 | Performance / load testing | Out-of-scope — khong thuoc functional/integration | Chuyen cho chuyen gia performance testing |
 | Security testing ngoai functional auth (penetration, OWASP) | Out-of-scope — vuot ngoai pham vi skill nay | Chuyen cho security specialist |
-
