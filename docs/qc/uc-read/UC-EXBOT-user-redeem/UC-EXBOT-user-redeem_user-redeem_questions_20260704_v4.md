@@ -3,7 +3,7 @@
 | UC ID | UC-EXBOT-user-redeem |
 |-------|----------------------|
 | Ngày tạo | 2026-07-01 |
-| Ngày cập nhật | 2026-07-15 |
+| Ngày cập nhật | 2026-07-23 |
 | Người tạo | QC UC Read ExBot Agent |
 | Version | v5 |
 | Nguồn audited | UC-EXBOT-user-redeem_user-redeem_audited_20260715_v5.md |
@@ -14,7 +14,8 @@
 
 | ID | Priority | Ref | Question | Why It Matters | Status |
 |----|----------|-----|----------|----------------|--------|
-| I-02a | High | uc-user-redeem.md §3 step 13; flows.md F-04 | **(a) HL-portion được tính như thế nào?** Tổng số tiền từ HL closing position là minus fees? minus funding? Công thức cụ thể chưa được định nghĩa trong bất kỳ tài liệu nào. | Không có công thức hoặc mô tả source of truth cho HL-portion amount → tester không thể verify số tiền nhà đầu tư nhận đúng không. | Open — ⏳ Pending BA/team confirm |
+
+_Không còn câu hỏi mở._
 
 ---
 
@@ -22,6 +23,7 @@
 
 | ID | Priority | Ref | Question | Answer | Answered By | Date | Status |
 |----|----------|-----|----------|--------|-------------|------|--------|
+| I-02a | High | uc-user-redeem.md §3 step 13; flows.md F-04 | **(a) HL-portion được tính như thế nào?** Tổng số tiền từ HL closing position là minus fees? minus funding? Công thức cụ thể chưa được định nghĩa trong bất kỳ tài liệu nào. | HL-portion investor nhận về được tính qua 3 bước trong `hl-withdraw` worker: (1) đọc `clearinghouseState.withdrawable` từ HL API trước khi rút (initial), (2) poll lại sau khi rút settled (final), (3) `principal_amount = initial − final`. Con số này đã net PnL short, funding, và trading fees vì HL API tự tính vào balance — không có breakdown riêng từng loại. Kết quả ghi vào `redemption_requests.principal_amount` và đây là số investor nhận on-chain qua `RedemptionQueue.fulfillRequest`. Lưu ý: `principal_amount` ≠ `hl_portion_usdc` (số USDC ban đầu bridge sang HL lúc mở bot = `ceil(totalUsdc / 2)`). Cả user_redeem lẫn bot_safe_close đều đi qua cùng chain: `lp_leg_exec → hedge_sync → hl_withdraw → hl_fulfill`. Tham khảo chi tiết flow withdraw và settlement tại: `docs/BA/plans/bnza-sotatek-260519-0000/03_modules/exbot/flow-withdraw-close-settlement-ba.md` | BA — docs/BA/qc-responses-2026-07-20.md | 2026-07-20 | Answered |
 | I-02bc | High | uc-user-redeem.md §3 step 13; flows.md F-04 | **(b) Ai thực sự là người thực hiện on-chain USDC transfer HL-portion — Worker gọi trực tiếp hay qua Operator Facade? (c) Transaction hash của HL-portion transfer có được lưu vào `close_operations.hedge_close_tx` không?** | **(b)** Người thực hiện on-chain USDC transfer HL-portion là **Worker và Operator address** — không phải qua facade trung gian riêng. **(c)** Transaction hash của HL-portion transfer **không** được lưu vào `close_operations.hedge_close_tx`. Lưu ý: sub-question **(a)** (công thức tính HL-portion amount) tách thành I-02a trong Open Questions — chờ BA/team confirm. | Tech Lead | 2026-07-14 | Answered |
 | I-03 | Medium | uc-user-redeem.md §3 step 8; FR-EXBOT-026; FR-EXBOT-092; flows.md F-04 | **Partially Resolved (2026-07-04):** flows.md F-04 sequence diagram không có participant Redlock/UserLock (trong khi F-02 hedge-sync hiển thị rõ lock acquire/release). Tester đọc F-04 không thể trace scenario lock contention trong user_redeem. | F-04 đã được cập nhật: thêm participant `User Lock (Redis Redlock)`. Lock được acquire sau khi tạo `close_operations` row (idempotency first), trước các HL operations. `acquired=false` → re-queue with delay; SLA clock tiếp tục chạy — tổng delay > 5 phút trigger A1 SLA breach alert. Lock release sau khi reconcile confirm size=0, hoặc khi hedge close failure trước khi chuyển sang `residual_hl_liability`. Notation `close_operations` cũng được sửa thành 3 transitions rõ ràng: `requested → lp_closed → funds_returned`. | BA — docs/BA/qc-responses-2026-07-14.md | 2026-07-14 | Answered |
 | I-N1 | Medium | uc-user-redeem.md §2 Preconditions; states.md State Registry | UC §2 mở rộng precondition: "Bot status='active' (or paused/safe_mode — user may redeem from any non-closed state)". Cần xác nhận: (a) Bot ở `hedge_stopped_cooldown` có thể được redeem không? (b) Bot ở `lp_rebalancing` có thể được redeem không? (c) Bot ở `error` có thể được redeem không? | **(a)** `hedge_stopped_cooldown` — **Allowed.** LP NFT vẫn đang do BnzaExVault giữ; on-chain contract không kiểm tra `lifecycle_state`. **(b)** `lp_rebalancing` — **Allowed.** `RedeemStrategyV1` chỉ validate tokenId ownership. Nếu user gọi `redeem(oldTokenId)` trong khi đang rebalance, tx revert an toàn; `redeem(newTokenId)` thành công sau khi rebalance hoàn thành. **(c)** `error` — **Allowed.** LP NFT vẫn trong vault; user có quyền redeem bất kể HL-side error state. Cả 3 states đều Allowed. UC Preconditions đã được cập nhật để liệt kê đủ 6 `lifecycle_state` values được phép. `states.md` State Registry đã được cập nhật thêm cột `user_redeem`. Đã verify với `RedeemStrategyV1.sol` và `BnzaExVaultImpl.sol` — không có `lifecycle_state` gate trên on-chain. | BA — docs/BA/qc-responses-2026-07-14.md | 2026-07-14 | Answered |
