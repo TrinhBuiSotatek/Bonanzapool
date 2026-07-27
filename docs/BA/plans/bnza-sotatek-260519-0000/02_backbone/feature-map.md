@@ -2,12 +2,18 @@
 type: feature-map
 status: in-review
 created: 2026-05-20
-updated: 2026-07-02
+updated: "2026-07-27"
 owner: "@hien.duong"
 lang: en
 links:
   - ../../02_backbone/backbone.md
 changelog:
+  - "2026-07-15 | /ba-impact | replace /api/admin/stats with /api/admin/dashboard/chart?metric={metric}&days={days}"
+  - "2026-07-15 | manual | coherence: PTL-IB → PTL-07 in portal matrix row and §3.8 header"
+  - "2026-07-13 | manual | rename PTL-07 → PTL-IB in portal table row and §3.8 section header"
+  - "2026-07-08 | /ba-do | FM-ADM-05: add chart period note (15d/30d/90d/ALL, default metric Users, default period 30d)"
+  - "2026-07-09 | manual | sync PTL-07 code, update Nav Schema, and resolve stash conflicts"
+  - "2026-07-08 | manual | Update UI layout to vertical sidebar and fix partner code logic"
   - "2026-07-02 | manual | update PTL-02 Navigation Schema description to match 5 Business Accordion items layout"
   - "2026-06-30 | manual | add FM-ADM-13, FM-ADM-14, FM-ADM-15 to feature map table and priority tiers"
   - "2026-06-30 | manual | FM-ADM-05: add Overall Revenue Dashboard alias; update revenue description to UNION (fee_collections + wl_bot_payouts)"
@@ -18,14 +24,15 @@ changelog:
   - "2026-06-08 | manual | scope correction per WL_SPEC_SOTATEK_EN_v1.1.md Appendix B: mark FM-WLA-01→07 and FM-MOB-01→11 OOS (Helix scope); mark PTL-01/PTL-06 and ACT-03/ACT-07 OOS; add §3.6 WL Smart Contracts (FM-WLC-01) and §3.7 BNZA-OPERATOR WL Backend (FM-OPW-01→07); update §4 deps and §5 tiers"
   - "2026-06-07 | manual | QC-C3: add FM-ADM-11 User Management (📋 Spec — admin SPEC.md Feature F, /users, useUsers, Step 8-5.6)"
   - "2026-06-04 | manual | fix FM-ADM-10: redefine as WL Bot Lifecycle Monitor (was incorrectly set to Audit Logs); move FM-ADM-10 from T2 to T1; priority P2→P1"
-  - 2026-06-03 | manual | resolve merge conflict; rewrite §3.1 BNZA-MOBILE FM-MOB-01→11 to reflect WL Mobile scope (SIWE, Reward Display, Claim, Bot Ops, LP Bot Status, Community, Branding, Chain Switching, Settings, PWA, i18n); update §4 deps and §5 priority tiers; add FM-ADM-10 Audit Logs
-  - 2026-06-02 | /ba-impact | update FM-WLA target artifact column → frd-wl-admin.md (Option B separate file)
-  - 2026-06-02 | manual | thêm PTL-06 vào §1 Portal Registry; thêm ACT-07 vào §2 Actor Registry; thêm §3.0 WL-ADMIN feature index (FM-WLA-01→07 với full scope/deps/artifact); rename §3.2 BNZA-ADMIN + thêm boundary note + rewrite FM-ADM-01 description
-  - 2026-06-01 | manual | fix external ref to STEP_6_SPEC.md → internal ref-step6-context.md
-  - 2026-05-27 | manual | added Markers section (⚡/📋 convention); added Source column to all FM tables
+  - "2026-06-03 | manual | resolve merge conflict; rewrite §3.1 BNZA-MOBILE FM-MOB-01→11 to reflect WL Mobile scope (SIWE, Reward Display, Claim, Bot Ops, LP Bot Status, Community, Branding, Chain Switching, Settings, PWA, i18n); update §4 deps and §5 priority tiers; add FM-ADM-10 Audit Logs"
+  - "2026-06-02 | /ba-impact | update FM-WLA target artifact column → frd-wl-admin.md (Option B separate file)"
+  - "2026-06-02 | manual | thêm PTL-06 vào §1 Portal Registry; thêm ACT-07 vào §2 Actor Registry; thêm §3.0 WL-ADMIN feature index (FM-WLA-01→07 với full scope/deps/artifact); rename §3.2 BNZA-ADMIN + thêm boundary note + rewrite FM-ADM-01 description"
+  - "2026-06-01 | manual | fix external ref to STEP_6_SPEC.md → internal ref-step6-context.md"
+  - "2026-05-27 | manual | added Markers section (⚡/📋 convention); added Source column to all FM tables"
   - "2026-05-26 | manual | sync client-docs: added FM-XB-07→FM-XB-13 (Router Extension, OPERATOR API, Phase A1/A2/A3, Envelope Encryption, Pre-launch Hotfixes); added Step 6 OOS note to §3.5; updated priority tiers and cross-deps"
-  - 2026-05-21 | manual | added FM-MOB-07 to FM-MOB-11 (Notification, Position, Margin Alert, Settings, Home Dashboard); promoted FM-MOB-11 to T0; updated cross-deps and priority tiers
-  - 2026-05-20 | /ba-start | initial feature-map from backbone
+  - "2026-07-13 | /ba-impact | add FM-IBP-06 (Participation-Route API) to IB Portal and T1 core dev"
+  - "2026-05-21 | manual | added FM-MOB-07 to FM-MOB-11 (Notification, Position, Margin Alert, Settings, Home Dashboard); promoted FM-MOB-11 to T0; updated cross-deps and priority tiers"
+  - "2026-05-20 | /ba-start | initial feature-map from backbone"
 ---
 
 # BNZA Ecosystem — Feature Map (System-Level Index)
@@ -48,11 +55,12 @@ changelog:
 | Portal ID | Domain         | Project          | Primary Actor            | Navigation Schema                                                     |
 | --------- | -------------- | ---------------- | ------------------------ | --------------------------------------------------------------------- |
 | PTL-01    | wl.bnza.io (TBD) | BNZA-MOBILE (WL Mobile) | ACT-03 (WL End User) | Bottom tab: Home / Bot / Earnings / Settings — **[OOS — Helix scope]** |
-| PTL-02    | ops.bnza.io    | BNZA-ADMIN       | ACT-04 (Admin/zen)       | Sidebar: Dashboard (TOP) link + POOL group (Users, Bots, WL Monitor, Plans, Op Log) + EX group (Builder Fee) + TOKEN group (Supply, Burn, Vesting, Treasury) + Business group (IB, WL, Escalations, Holds, Attribution history) + Settings standalone (PF, Access, System, Relayer) |
+| PTL-02    | ops.bnza.io    | BNZA-ADMIN       | ACT-04 (Admin/zen)       | Sidebar: Dashboard (TOP) link + POOL group (Users, Bots, WL Monitor, Plans, Op Log) + EX group (Builder Fee) + TOKEN group (Supply, Burn, Vesting, Treasury) + Business group (IB, WL, Escalations, Holds, Attribution history, Reports) + Settings standalone (PF, Access, System, Relayer) |
 | PTL-03    | ex.bnza.io     | BNZA-EX          | ACT-05 (Trader)          | Top nav: Chart / Trade / Positions / History                          |
 | PTL-04    | api.bnza.io    | BNZA-EXBOT Infra | ACT-06 (OPERATOR)        | N/A (backend, no UI)                                                  |
 | PTL-05    | pool.bnza.io   | BNZA-POOL        | ACT-01 (End User)        | Top nav: Dashboard / AI Bot / Portfolio / Settings                    |
 | PTL-06    | wl-admin.bnza.io (TBD) | WL Admin System | ACT-07 (WL Operator Admin) | Sidebar: Dashboard / Distribution Jobs / Users / Referral Tree / Distributor Contract / Reward Settings / Admins & Auth — **[OOS — Helix scope]** |
+| PTL-07    | ib.bnza.io     | IB Portal        | ACT-08 (IB Partner)      | Top nav: Dashboard / Users / Groups / Revenue                         |
 
 ---
 
@@ -115,10 +123,12 @@ changelog:
 | FM-ID | Name | Scope Description | Priority | Dependencies | Target Artifact | Source |
 |-------|-----|----------------|----------|-----------|---------------|--------|
 | FM-ADM-01 | WL Partner Onboarding | Create/edit/suspend/resume WL partner account records: name, logo (CF R2 upload), referral_code (auto 8-char alphanumeric or manual, unique), fixed_deposit_usd (1k/5k/10k), main_wallet, languages, status. View partner earnings summary + payout history. NOT the daily MLM ops (those are PTL-06 FM-WLA). | P0 | OPERATOR API `/api/wl-partners` | `03_modules/admin/bnza-admin/frd.md` § WL Partner Onboarding | 📋 Spec |
-| FM-ADM-02 | PF Distribution | Daily PF distribution dashboard (70/30), remittance trigger, history | P0 | OPERATOR API `/api/admin/pf/*`, daily-collector cron | `03_modules/admin/bnza-admin/frd.md` § PF Distribution | 📋 Spec |
-| FM-ADM-03 | IB Management | Replace mockIBs with real data, IB CRUD, commission tracking | P1 | OPERATOR API `/api/admin/ib/*` | `03_modules/admin/bnza-admin/frd.md` § IB Management | ⚡ Dev-built |
+| FM-PF-01 | Ops PF Configuration UI | Admin CRUD PF recipients on ops `/pf` page. Max 5 active recipients. Configures label, wallet, allocated points (1-30, always annotated as "n% out of the 30% PF" — D P-14; exactly 30 allowed with warning; zero-point unsavable), and channel scopes. | P1 | OPERATOR API `/api/admin/pf/*` | `03_modules/pf/frd.md` §1 | 📋 Spec |
+| FM-PF-02 | Daily Aggregation Batch | Batch cron running daily at 13:00 JST. Aggregates USDC transfers to pfCollector by channel. Dust transfers <$1.00 bypassed to carry_out. | P1 | daily-collector cron | `03_modules/pf/frd.md` §2 | 📋 Spec |
+| FM-PF-03 | PFDistributor Integration | Integrates with `PFDistributor` contract on OP and Base. Treasury allowance (kill switch). Cross-chain skew triggers ops alert/postponement. | P1 | — | `03_modules/pf/frd.md` §4 | 📋 Spec |
+| FM-ADM-03 | IB Management | Multi-group IB CRUD, bps-based distribution tracking, user assignments, IBSplitter on-chain integration | P1 | OPERATOR API `/api/admin/ib/*` | `03_modules/admin/bnza-admin/frd.md` § IB Management | 📋 Spec |
 | FM-ADM-04 | Bot Type Config | Deposit tiers, strategy parameters, limits, cooldown range 10-180 min | P1 | OPERATOR API `/api/admin/bot-types/*` | `03_modules/admin/bnza-admin/frd.md` § Bot Type Config | ⚡ Dev-built |
-| FM-ADM-05 | Dashboard *(alias: Overall Revenue Dashboard)* | Real metrics: TVL, active bots, revenue (UNION of fee_collections + wl_bot_payouts), user count | P2 | OPERATOR API `/api/admin/stats` | `03_modules/admin/bnza-admin/frd.md` § Dashboard | 📋 Spec |
+| FM-ADM-05 | Dashboard *(alias: Overall Revenue Dashboard)* | Real metrics: TVL, active bots, revenue (UNION of fee_collections + wl_bot_payouts), user count. Metric Chart: period tabs 15d/30d/90d/ALL (default **30d**), metric tabs Users/PF/opFee/TVL (default **Users**). | P2 | OPERATOR API `/api/admin/dashboard/chart?metric={metric}&days={days}` | `03_modules/admin/bnza-admin/frd.md` § Dashboard | 📋 Spec |
 | FM-ADM-06 | Reports *(alias: Fee Collection Report & Overall Revenue Dashboard)* | On-demand reports: fee collection (fee_collections + wl_bot_payouts UNION for full ecosystem PF), bot performance (via bot API); splits opFee, PF for total revenue | P2 | OPERATOR API `/api/admin/reports/*` | `03_modules/admin/bnza-admin/frd.md` § Reports | 📋 Spec |
 | FM-ADM-07 | TOKEN Management | Burn/supply/vesting/treasury/builder-fee (keep mock) | P3 | OPERATOR API (not yet available) | `03_modules/admin/bnza-admin/frd.md` § TOKEN Mgmt | ⚡ Dev-built |
 | FM-ADM-08 | System Settings | Configuration management: system_config, allowed/blocked addresses | P2 | OPERATOR API `/api/admin/config/*` | `03_modules/admin/bnza-admin/frd.md` § System Settings | ⚡ Dev-built |
@@ -129,6 +139,7 @@ changelog:
 | FM-ADM-13 | Escalations Dashboard | Provides admin visibility into WL SLA violations by surfacing `wl_escalations` records (migration 0029) that have been unresolved for > 24h. Admin and above can acknowledge open escalations. | P1 | OPERATOR API `/api/wl-admin/escalations` | `03_modules/admin/bnza-admin/frd.md` § Escalations Dashboard | 📋 Spec |
 | FM-ADM-14 | Holds / Corrections Review | Allows admin to monitor `wl_holds` records (migration 0026) generated by chain reorgs or corrections, ensuring zero-loss WL reconciliation. | P2 | OPERATOR API `/api/wl-admin/holds` | `03_modules/admin/bnza-admin/frd.md` § Holds / Corrections Review | 📋 Spec |
 | FM-ADM-15 | Attribution History Viewer | Provides a read-only audit trail of per-bot WL attribution intervals from `wl_token_attribution_history` (migration 0026). Shows which WL partner, membership epoch, and master wallet each bot was attributed to. | P2 | OPERATOR API `/api/admin/tokens/attribution-history` | `03_modules/admin/bnza-admin/frd.md` § Attribution History Viewer | 📋 Spec |
+| FM-ADM-16 | Wallet Detail Modal & Tx Hash Viewer | Unified Wallet Detail Modal and Tx Hash Display rendering across all screens. Click any wallet address to open full details. Renders 0x+64 tx_hash fields as chain-aware explorer links. | P2 | OPERATOR API `/api/users?wallet_address=<address>` | `03_modules/admin/bnza-admin/frd.md` § Shared Wallet & Tx Detail Viewer | 📋 Spec |
 
 ### 3.3 BNZA-EX (PTL-03)
 
@@ -148,9 +159,9 @@ changelog:
 | FM-XB-03 | Durable Objects | HLRateLimitDO, UserLockDO, MarketDataDO — lease, TTL, alarm config | P0 | OPERATOR DO patterns | `03_modules/exbot/frd.md` § Durable Objects | ⚡ Dev-built |
 | FM-XB-04 | Cron Jobs | deep-audit `*/360`, intervals TBD, error handling, alerting | P1 | zen interface specs | `03_modules/exbot/frd.md` § Cron Jobs | ⚡ Dev-built |
 | FM-XB-05 | HL Adapter | Rate limit (1200 req/min), cloid generation, error parser, reconcile glue | P1 | Hyperliquid API testnet | `03_modules/exbot/frd.md` § HL Adapter | ⚡ Dev-built |
-| FM-XB-06 | API Endpoints | start, stop, pause, status, agent-key-approval — request/response contracts | P1 | zen interface specs | `03_modules/exbot/frd.md` § API Endpoints | ⚡ Dev-built |
+| FM-XB-06 | API Endpoints | start, stop, pause, resume, status — request/response contracts (agent-key-approval + margin-deposit-confirmed RETIRED Change B v5.3) | P1 | zen interface specs | `03_modules/exbot/frd.md` § API Endpoints | ⚡ Dev-built |
 | FM-XB-07 | Router Extension (Solidity) | LP NFT custody by Router, rebalance/close/collect Operator-only, emergency multi-sig | P1 | zen interface specs, Solidity engineer | `03_modules/exbot/frd.md` § Router Extension | ⚡ Dev-built |
-| FM-XB-08 | OPERATOR API — EXBOT Endpoints | 7 endpoints: start/stop/pause/resume/status/agent-key-approval/margin-deposit-confirmed | P1 | FM-XB-01, FM-XB-02 | `03_modules/exbot/frd.md` § OPERATOR API Additions | ⚡ Dev-built |
+| FM-XB-08 | OPERATOR API — EXBOT Endpoints | 5 active endpoints: start/stop/pause/resume/status; agent-key-approval + margin-deposit-confirmed RETIRED (Change B v5.3) | P1 | FM-XB-01, FM-XB-02 | `03_modules/exbot/frd.md` § OPERATOR API Additions | ⚡ Dev-built |
 | FM-XB-09 | Phase A1 — Dry Run | Single-user dry-run, no live HL mutation, SOTATEK infra + zen strategy | P0 | FM-XB-01→FM-XB-06 | `03_modules/exbot/frd.md` § Phase Progression | ⚡ Dev-built |
 | FM-XB-10 | Phase A2 — Live $1k Test | Live test with zen's own funds, SOTATEK monitors infra | P1 | FM-XB-09 | `03_modules/exbot/frd.md` § Phase Progression | ⚡ Dev-built |
 | FM-XB-11 | Phase A3 — Closed Beta | 5-10 WL users via MOBILE, 4 weeks | P1 | FM-XB-10 | `03_modules/exbot/frd.md` § Phase Progression | ⚡ Dev-built |
@@ -192,9 +203,25 @@ changelog:
 | FM-OPW-06 | Reconcilers (Phase 1.5) | setBotWlMaster reconciler (retry failed on-chain calls, backoff 5/30/300/1800s, max 20 attempts). wlMaster invariant reconciler (chain↔DB divergence detection). | P1 | FM-OPW-01, FM-OPW-03 | `03_modules/operator/frd-wl.md` §6 | 📋 Spec |
 | FM-OPW-07 | fee_collections Exclusion | Update 7 OPERATOR files: add WL bot exclusion filter to fee_collections queries to prevent double-counting. Parallel to Phase 1. | P0 | FM-OPW-01 | `03_modules/operator/frd-wl.md` §7 | 📋 Spec |
 
+### 3.8 IB Partner Portal (PTL-07) — Actor: ACT-08
+
+> **Folder**: `03_modules/ib/` (dedicated folder — frd.md, srs/, usecases/, userstories/)
+> **Role**: Self-manage referral groups, recipients, and view downline statistics & rewards.
+
+| FM-ID | Name | Scope Description | Priority | Dependencies | Target Artifact | Source |
+|---|---|---|---|---|---|---|
+| FM-IBP-Auth | SIWE + 2FA Authentication | SIWE & 2FA login sequence with recovery fallback. | P1 | — | `03_modules/ib/ib_portal/frd.md` §1 | 📋 Spec |
+| FM-IBP-01 | Dashboard | Displays rewards KPI cards, dynamic referral-link QR codes, and recent distributions list. | P1 | — | `03_modules/ib/ib_portal/frd.md` §2 | 📋 Spec |
+| FM-IBP-02 | User Management | View downline users list with active status and group detail; reassign users to different groups. | P1 | — | `03_modules/ib/ib_portal/frd.md` §3 | 📋 Spec |
+| FM-IBP-03 | Group Management | Create, edit, and archive groups; mandatory setup wizard on first login. | P1 | — | `03_modules/ib/ib_portal/frd.md` §4 | 📋 Spec |
+| FM-IBP-04 | Revenue & Breakdowns | Displays rewards trend chart (period tabs 15 / 30 / 90 / ALL) and granular breakdowns (By group / By recipient / By user). | P1 | — | `03_modules/ib/ib_portal/frd.md` §5 | 📋 Spec |
+| FM-IBP-05 | IBSplitter Integration | Integrates with `IBSplitter` contract to query unclaimed balance. Claim execution is excluded. | P1 | — | `03_modules/ib/ib_portal/frd.md` §6 | 📋 Spec |
+| FM-IBP-06 | Participation-Route API | Handles user bind signatures, assignment sync states, rate limiting, and access gating for bot starts. | P0 | — | `03_modules/ib/ib_portal/frd.md` §7 | 📋 Spec |
+
 ---
 
 ## 4. Cross-Feature Dependencies (Quick Reference)
+
 
 | FM-ID | Blocked by | Blocks |
 |-------|----------|----------|
@@ -229,9 +256,10 @@ changelog:
 | Tier | FM-IDs |
 |------|--------|
 | T0 — WL Launch | FM-OPW-01, FM-OPW-02, FM-OPW-03, FM-OPW-04, FM-OPW-07, FM-WLC-01, FM-ADM-01, FM-ADM-02, FM-ADM-12, FM-XB-01, FM-XB-02, FM-XB-03, FM-XB-09, FM-XB-12, FM-XB-13 |
-| T1 — Core Dev | FM-OPW-05, FM-OPW-06, FM-ADM-03, FM-ADM-04, FM-ADM-10, FM-ADM-11, FM-ADM-13, FM-PL-01, FM-XB-04, FM-XB-05, FM-XB-06, FM-XB-07, FM-XB-08, FM-XB-10 |
+| T1 — Core Dev | FM-OPW-05, FM-OPW-06, FM-ADM-03, FM-ADM-04, FM-ADM-10, FM-ADM-11, FM-ADM-13, FM-PL-01, FM-XB-04, FM-XB-05, FM-XB-06, FM-XB-07, FM-XB-08, FM-XB-10, FM-IBP-Auth, FM-IBP-01, FM-IBP-02, FM-IBP-03, FM-IBP-04, FM-IBP-05, FM-IBP-06 |
 | T2 — Enhancement | FM-PL-02, FM-ADM-05, FM-ADM-06, FM-ADM-08, FM-ADM-09, FM-ADM-14, FM-ADM-15, FM-EX-01, FM-EX-02, FM-EX-03, FM-EX-04, FM-XB-11 |
 | T3 — Low Priority | FM-ADM-07, FM-PL-03 |
+
 
 ---
 

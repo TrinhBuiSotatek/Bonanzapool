@@ -3,10 +3,11 @@ type: use-case
 module: exbot
 status: draft
 created: 2026-06-12
-updated: 2026-07-20
+updated: 2026-07-25
 owner: "@hienduong"
 linked_stories: [US-EXBOT-006, US-EXBOT-008]
 changelog:
+  - 2026-07-25 | /ba-impact | OQ-13 zen override: delta=0 → skip HL order, proceed to stop replacement (step 5+A6); OQ-14/15: lock→weight→call ordering note (step 3)
   - 2026-07-20 | manual | OQ-EXBOT-013 closed: fix Step 5 note + A6 — delta=0 returns no_op_dust immediately, no stop replacement or reconcile (confirmed from develop branch rebalance.ts + handler-impl.ts)
   - 2026-07-13 | manual | Q12 fix: replace generic Mermaid placeholder with reference to flows.md F-02
   - 2026-07-13 | manual | Q-N1 fix: add FR-EXBOT-092 to §7 FR Trace (missing after arc-migration 2026-07-03)
@@ -36,10 +37,10 @@ hedge-sync Worker dequeues a message from the hedge-sync queue. Message is enque
 ## 3. Main Success Scenario
 1. Worker inserts `message_id` into `queue_idempotency` (started); UNIQUE conflict → skip
 2. Worker reads Aurora PostgreSQL `bots.state_version`; if mismatch with message `stateVersion` → discard (status='skipped'); Worker rechecks `circuit_breakers.state` at execution time; if `open` → discard (status='skipped'); no HL order submitted
-3. Worker calls `User Lock.acquire(holderToken, ttl=90s, idempotencyKey=hedge-sync:{botId}:{stateVersion})`
+3. Worker calls `User Lock.acquire(holderToken, ttl=90s, idempotencyKey=hedge-sync:{botId}:{stateVersion})`. All decision inputs (including `marginSummary`) must be fetched inside this lock critical section (OQ-EXBOT-14). Rate-limit weight must be consumed after lock acquisition — ordering: lock → weight → call; on rate-limit hit, release lock and retry with backoff (OQ-EXBOT-15)
 4. Fetch actual HL position via `clearinghouseState` (weight=2)
 5. Compute `delta = BigDecimal(targetShortEth).sub(actualShortEth)` (BigDecimal only, no float)
-   - Note: if delta=0, returns `no_op_dust` immediately — no HL order, no reconcile, no stop replacement; entry_price/liq_price/stop unchanged. (OQ-EXBOT-013 closed: confirmed from develop branch rebalance.ts)
+   - If delta=0: skip HL order submission, proceed directly to stop replacement (step 8). delta=0 means position size is correct — stop level may still have moved with price and must be refreshed (OQ-EXBOT-13 zen confirmed). No reconcile needed; entry_price/liq_price unchanged.
 6. Submit delta-only adjustment via `adjustShortDelta(delta, cloid)` (increase or reduce-only)
 7. Enqueue `reconcile` message: `{botId, attemptId, expectedAbsSize, hedgeLegId}`
 8. Execute stop replacement via INV-STOP protocol (§19.5): `stop_replacing_started_at` set, protected cancel→place
@@ -58,7 +59,7 @@ hedge-sync Worker dequeues a message from the hedge-sync queue. Message is enque
 - **A3 (HL order rejection):** Step 6 — record rebalance_attempts (status='failed'); call `incrementCircuitBreaker`; enqueue notification
 - **A4 (partial fill):** Step 11 — reconcile detects partial mismatch; enqueue `partial_repair` message; `incrementCircuitBreaker` is NOT called (partial fill is not a failure — repair path handles remaining delta)
 - **A5 (stop_replacing_started_at stuck > 60s):** Primary detection by light-check (FR-EXBOT-033, ≤5 min). deep-audit is secondary backstop only. Enter SAFE_MODE.
-- **A6 (delta=0, no HL order):** Step 5 — returns `no_op_dust` immediately; no reconcile, no stop replacement, no entry_price/liq_price update. Stop and position data unchanged. reason = original RebalanceReason[] from message payload
+- **A6 (delta=0, no HL order):** Step 5 — skip HL order, proceed to stop replacement (step 8). Stop freshness is independent of position-size delta (OQ-EXBOT-13 zen confirmed). No reconcile, entry_price/liq_price unchanged. reason = original RebalanceReason[] from message payload.
 
 ## 5. Postconditions
 - `hedge_legs` updated: `stop_price`, `entry_price`, `effective_leverage`, `stop_replacing_started_at=NULL`

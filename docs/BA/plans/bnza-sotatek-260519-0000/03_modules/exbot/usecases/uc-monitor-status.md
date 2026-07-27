@@ -3,10 +3,11 @@ type: use-case
 module: exbot
 status: draft
 created: 2026-06-18
-updated: 2026-07-20
+updated: 2026-07-24
 owner: "@hienduong"
 linked_stories: [US-EXBOT-002]
 changelog:
+  - 2026-07-24 | manual | add response body detail to v1 gap note in Preconditions: { "reason": "forbidden" } (no E-EXBOT code)
   - 2026-07-21 | manual | register E-EXBOT-031 for status='paused' UI label; cite in A10
   - 2026-07-20 | manual | fix endpoint URL to /api/exbot/status/{botId}; add v1 gap note to Preconditions (isAdmin guard blocks Investor); add A10 for status='paused'
   - 2026-07-13 | manual | N-003 fix: add FR-EXBOT-050, FR-EXBOT-060, FR-EXBOT-093 to FR Trace
@@ -38,7 +39,7 @@ Investor navigates to the ExBot status screen in the POOL UI.
 - Operator Facade validates `X-Wallet-Address`: missing → 401; blocked → 403; not in whitelist (when `access_mode=whitelist`) → 403
 - Operator Facade forwards request to ExBot Lambda via API Gateway; HMAC Lambda Authorizer validates the request signature; invalid/missing signature → 401
 - Operator Facade service is available with a valid API Gateway route to ExBot Lambda
-- **v1 gap:** ExBot Lambda has a hard `isAdmin` guard — non-Admin callers (Investor) receive 403 before any business logic runs. Investor path is pending implementation; all Investor scenarios in this UC are not testable in v1.
+- **v1 gap:** ExBot Lambda has a hard `isAdmin` guard — non-Admin callers (Investor) receive 403 with body `{ "reason": "forbidden" }` (no E-EXBOT code). Investor path is pending implementation; all Investor scenarios in this UC are not testable in v1.
 
 ## 3. Main Success Scenario
 1. POOL UI calls `GET /api/exbot/status/{botId}` via Operator Facade

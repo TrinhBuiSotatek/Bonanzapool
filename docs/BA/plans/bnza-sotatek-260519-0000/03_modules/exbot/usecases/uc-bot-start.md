@@ -3,10 +3,12 @@ type: use-case
 module: exbot
 status: draft
 created: 2026-06-12
-updated: 2026-07-20
+updated: 2026-07-24
 owner: "@hienduong"
 linked_stories: [US-EXBOT-001]
 changelog:
+  - 2026-07-25 | /ba-impact | Change B: precondition #2 + step 2 preflight → hl_custodial_wallets
+  - 2026-07-24 | /ba-do | Change B: fix precondition — "user has HL account with isolated margin balance" → "bot custodial HL wallet (BNZP-managed) has margin ≥ required × 2.0"
   - 2026-07-20 | manual | A11 fix: replace incorrect drift_threshold reference with exact-fill threshold confirmed from develop branch; note drift_threshold belongs to light-check only; close OQ-EXBOT-11 dependency
   - 2026-07-09 | manual | P2 fix: remove builder fee from Preconditions — runtime check in preflight step 2, not a pre-assumed condition
   - 2026-07-08 | /ba-do | I-13: add FR-EXBOT-003/011/081/091 to FR Trace §7; I-11: A7/A10 error state → safe_mode; I-12: register E-EXBOT-026
@@ -31,14 +33,14 @@ User-initiated: USDC Investor calls `POST /api/exbot/start` via POOL UI after co
 
 ## 2. Preconditions
 - User has completed an on-chain deposit; `BnzaExVault` balance > 0 for this user
-- Key-provision has completed: `hl_agent_keys.key_status='active'` for this user
+- Key-provision has completed: `hl_custodial_wallets.key_status='active'` for this user
 - User has no existing ExBot with `status IN ('active','paused','closing','safe_mode','error')`
-- User has HL account with isolated margin balance ≥ required × 2.0
+- Bot custodial HL wallet (BNZP-managed) has isolated margin balance ≥ required × 2.0
 - Native gas: User wallet holds sufficient ETH/native token for vault tx gas
 
 ## 3. Main Success Scenario
 1. Investor calls `POST /api/exbot/start` → ExBot Lambda receives request
-2. ExBot Lambda runs preflight: one-bot check → vault balance check (block with E-EXBOT-025 if no deposit) → margin check → `hl_agent_keys.key_status='active'` check (block with E-EXBOT-017 if not active) → builder fee check → LP mint simulation
+2. ExBot Lambda runs preflight: one-bot check → vault balance check (block with E-EXBOT-025 if no deposit) → margin check → `hl_custodial_wallets.key_status='active'` check (block with E-EXBOT-017 if not active) → builder fee check → LP mint simulation
 3. ExBot Lambda creates bot record (`lifecycle_state='preflight'`)
 4. ExBot Lambda calls `BnzaExVault.vaultMint(...)` → receives `VaultMinted` event with `tokenId`
 5. Aurora PostgreSQL `positions` updated with `tokenId`, `tickLower`, `tickUpper`, `wethIndex`, `lifecycle_state='lp_opened'`

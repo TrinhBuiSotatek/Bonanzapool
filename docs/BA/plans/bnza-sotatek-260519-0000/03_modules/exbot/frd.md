@@ -3,7 +3,7 @@ type: frd
 module: exbot
 status: draft
 created: 2026-06-12
-updated: 2026-07-21
+updated: 2026-07-27
 owner: "@hienduong"
 version: 0.1.0
 sources:
@@ -11,6 +11,8 @@ sources:
   - Google Doc: EXBOT System & Smart Contract Overview (Daniel, June 2026)
   - Google Sheet: BNZA ExBot Feature Tracker
 changelog:
+  - 2026-07-27 | manual | Change B: hl_agent_keys → hl_custodial_wallets (preflight step 4, D1 table ref, FR-EXBOT-080 step 5); E-EXBOT-017 description updated
+  - 2026-07-24 | manual | fix endpoint path GET /api/exbot/status → GET /api/exbot/status/{botId} in FR-EXBOT-100
   - 2026-07-21 | manual | FR-EXBOT-073 line 390: expand settlement chain to hl_withdraw → hl_fulfill → fulfillRequest (automated, replaces "Operator fulfillRequest" wording)
   - 2026-07-14 | manual | add funding_rolling_metrics to §FR-EXBOT-080 state_db_shard_xx table listing (per lead review comment)
   - 2026-07-14 | manual | I-N4 fix (complete): renumber FR-EXBOT-090→091 (HL Rate Limiter), FR-EXBOT-091→092 (User Lock), FR-EXBOT-092→093 (Pool Slot0 Cache) to align with spec.md numbering
@@ -91,7 +93,7 @@ Before starting an ExBot, the system MUST run preflight checks in this order:
 3. HL margin sufficiency: expected post-deposit margin balance ≥ `required_margin × preflight_buffer (2.0x)`
    - `required_margin = (lpEthAmount × hedgeRatio × hlOraclePrice) / leverage`
    - If insufficient: block start, display "Required HL margin: $X (with 100% buffer). Current: $Y. Please deposit $Z to HL."
-4. `hl_agent_keys.key_status='active'` for this user (provisioned automatically by key-provision worker on deposit — if not active, block with E-EXBOT-017)
+4. `hl_custodial_wallets.key_status='active'` for this user (provisioned automatically by key-provision worker on deposit — if not active, block with E-EXBOT-017)
 5. Builder fee approval confirmed (5bps)
 6. LP mint simulation passes (slippage within tolerance)
 
@@ -410,7 +412,7 @@ Two physically separate databases:
 | `users` | User profiles + HL account references |
 | `bot_registry` | All bots cross-shard; status, chain, bot_type |
 | `shard_registry` | Shard-to-DB binding |
-| `hl_agent_keys` | Per-user key metadata; private keys generated and retained in AWS KMS (never stored here — see FR-EXBOT-081) |
+| `hl_custodial_wallets` | Per-user custodial wallet metadata; private keys generated and retained in AWS KMS (never stored here — see FR-EXBOT-080) |
 
 **state_db_shard_xx** (Phase A: 1 shard; Phase B: 4; Phase C: 16 — deferred):
 | Table | Purpose |
@@ -444,7 +446,7 @@ On user on-chain deposit, the key-provision worker automatically provisions a pe
 2. KMS generates per-user **agent key** (trade-only — signs orders, cannot withdraw)
 3. Private keys **never leave KMS** — all signing goes through the Signing Lambda (IAM role `kms:Sign` only)
 4. Key-provision worker calls HL `approveAgent` API to register the agent address as an authorized delegate of the master key (HL user address)
-5. Only after HL confirms registration: worker sets `hl_agent_keys.key_status='active'`
+5. Only after HL confirms registration: worker sets `hl_custodial_wallets.key_status='active'`
 6. Bot start is enqueued automatically
 
 **KMS failure handling:**
@@ -489,7 +491,7 @@ OPERATOR exposes `/api/exbot/*` which proxies to ExBot Lambda via API Gateway + 
 | Endpoint | Method | Action | Actor |
 |----------|--------|--------|-------|
 | `/api/exbot/start` | POST | Start a new ExBot for user | System (key-provision worker) |
-| `/api/exbot/status` | GET | Get ExBot status for user | Admin |
+| `/api/exbot/status/{botId}` | GET | Get ExBot status for user | Admin |
 | `/api/exbot/close` | POST | Initiate close (bot_safe_close path) | Admin |
 | `/api/exbot/margin` | POST | Adjust margin parameters | Admin |
 

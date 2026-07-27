@@ -3,9 +3,10 @@ type: srs-states
 module: exbot
 status: draft
 created: 2026-06-12
-updated: 2026-07-14
+updated: 2026-07-27
 owner: "@hienduong"
 changelog:
+  - 2026-07-27 | manual | rename hl_agent_keys section → hl_custodial_wallets (Change B v5.3)
   - 2026-07-14 | manual | I-N1 fix: add user_redeem column to State Registry — enumerate allowed/blocked states with on-chain rationale; verified against RedeemStrategyV1.sol and BnzaExVaultImpl.sol
   - 2026-07-08 | /ba-do | I-17: add provisioning as official key_status DB state — row created after KMS succeeds, before HL approveAgent; blocked at bot-start preflight (E-EXBOT-017)
   - 2026-07-03 | /ba-do | Q7: clarify paused row — pause only allowed from lifecycle_state='active'; hedge_stopped_cooldown and lp_rebalancing cannot be paused
@@ -114,7 +115,7 @@ stateDiagram-v2
 | `residual_hl_liability` | if hedge close fails | if hedge close fails |
 | `done` | ✓ | ✓ |
 
-## Agent Key Status (`hl_agent_keys.key_status`)
+## Custodial Wallet Status (`hl_custodial_wallets.key_status`)
 
 ```mermaid
 stateDiagram-v2

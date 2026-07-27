@@ -2,13 +2,22 @@
 type: message-list
 status: draft
 created: 2026-06-02
-updated: 2026-07-09
+updated: "2026-07-27"
 module: bnza-backbone
 owner: "@hien.duong"
 changelog:
-  - "2026-07-09 | manual | register E-EXBOT-029: status='error' UI display message (uc-monitor-status A7)"
-  - "2026-07-09 | manual | register E-EXBOT-028: LP mint on-chain tx reverted/timeout → lifecycle_state='error', no funds moved"
-  - "2026-07-08 | /ba-do | register E-EXBOT-026 (HL order rejection) and E-EXBOT-027 (KMS provisioning failure)"
+  - "2026-07-24 | manual | sync E-EXBOT-030 and E-EXBOT-031 into EXBOT mirror section"
+  - "2026-07-17 | /ba-impact | P1: register MSG-ERR-111 (fee-distribution skip-batch PATCH failure); P2: sync MSG-WRN-05 + MSG-SUC-107 text to screen §6 canonical wording (drop {batch_id} interpolation, align with CR-BEH-76)"
+  - "2026-07-16 | /pr-review | A4 fix: add cross-module blockquote note to MSG-ERR-16 (BR-IBP-068 → E-IBP-013 → SCR-POOL-01 trace)"
+  - "2026-07-16 | /ba-do | resolve OQ-PF-003: register MSG-SUC-107 (batch skipped), MSG-WRN-05 (skip irreversible warning)"
+  - "2026-07-15 | manual | resolve OQ-IBP-017: register E-IBP-013 (409 route_conflict_wl) and MSG-ERR-16 for WL/IB mutual exclusivity"
+  - "2026-07-15 | /ba-content-audit | fix B-90f304/B-b0f805/B-0cd783/W-894646: register MSG-ERR-110 (PF overflow), MSG-SUC-106 (recipient deleted), MSG-ERR-70b (blocked address); fix MSG-ERR-103 text to 0.01–30"
+  - "2026-07-13 | manual | replace PTL-IB with PTL-07 and sync 4 IB statuses"
+  - "2026-07-10 | manual | register missing E-ADM-020..025 and E-ADM-029..038"
+  - "2026-07-10 | /ba-impact | Q&A CSV resolutions: add E-IBP-011, E-IBP-012, MSG-ERR-157, MSG-INF-160, MSG-SUC-103"
+  - "2026-07-10 | /ba-impact | terminology sync: revert MSG-SUC-65, MSG-SUC-66, MSG-ERR-101 back to 'IB code'"
+  - "2026-07-09 | /ba-content-audit | register missing MSG-EX section for BNZA Exchange UI Messages to comply with rule 5 format requirements"
+  - "2026-07-08 | /ba-do | register MSG-ERR-101 for Wallet Detail Modal rich-section fetch failure (UC-wallet-detail-modal EF1-01)"
   - "2026-07-07 | /ba-content-audit | fix W-07aed5/W-ab41b6/W-3ac998/W-6e9b17/W-aa9912: register MSG-ERR-101 (IB dup wallet), MSG-SUC-102, MSG-ERR-102..04 (PF on-chain); align MSG-SUC-63/65/66 text + screen refs to v0.9.0; sync PF MSG text with fee-distribution §6 canonical"
   - "2026-07-03 | manual | add MSG-ERR-100 for concurrent rotation block (EF-08); add {bot_list} format spec to MSG-WRN-03"
   - "2026-07-03 | manual | update MSG-ERR-96 and MSG-WRN-03 to reflect client rotation decisions"
@@ -116,10 +125,25 @@ changelog:
 | E-ADM-017 | 409 | Optimistic locking state check failure | "The operation failed due to a state mismatch. The page will reload. Please retry." |
 | E-ADM-018 | 409 | A master wallet already exists for this chain | "A master wallet already exists for this chain." |
 | E-ADM-019 | 409 | This wallet is already active in another Whitelabel partner program | "This wallet is already active in another Whitelabel partner program." |
+| E-ADM-020 | 400 | `wl_code` and wallet address are missing | "WL code and wallet address are required." |
+| E-ADM-021 | 400 | Invalid wallet address format | "Wallet address is invalid. Must be a valid EVM address (0x…)." |
+| E-ADM-022 | 400 | Invalid member ID | "Invalid member ID. Must be a positive integer." |
+| E-ADM-023 | 400 | Invalid action on WL member | "Invalid action. Allowed: start_leaving, mark_left, cancel_leaving." |
+| E-ADM-024 | 404 | WL code not found during member update | "WL code not found." |
 | E-ADM-025 | 409 | Member or wl_code not active | "Member or wl_code not active - retry not allowed" |
 | E-ADM-026 | 401 | SIWE signature verification fails | "Invalid signature. Please try again." |
 | E-ADM-027 | 401 | 2FA code is invalid or expired | "Invalid 2FA code. Please try again." |
 | E-ADM-028 | 401 | JWT session has expired or been revoked | "Session expired. Please log in again." |
+| E-ADM-029 | 400 | No fields provided for WL update | "No fields to update. Provide at least one of: status, wl_name." |
+| E-ADM-030 | 409 | WL code already exists | "A WL code with this identifier already exists." |
+| E-ADM-031 | 404 | WL code not found | "WL code not found." |
+| E-ADM-032 | 400 | Missing chain ID or master wallet | "WL code, chain ID, and master wallet address are required." |
+| E-ADM-033 | 400 | Unsupported chain | "Chain not supported. Allowed chains: Base (8453), OP (10)." |
+| E-ADM-034 | 400 | Master wallet address is invalid | "Master wallet address is invalid. Must be a valid EVM address (0x…)." |
+| E-ADM-035 | 400 | Invalid master wallet ID | "Invalid master wallet ID. Must be a positive integer." |
+| E-ADM-036 | 400 | Invalid master wallet status | "Invalid status. Allowed values: active, inactive." |
+| E-ADM-037 | 404 | WL code not found for master wallet | "WL code not found." |
+| E-ADM-038 | 404 | Master wallet record not found | "Master wallet record not found." |
 
 
 ---
@@ -146,6 +170,25 @@ changelog:
 | E-WLA-016 | 400 | Attempt to change read-only `wl_code` after init | "Cannot modify wl_code after initialization" |
 | E-WLA-017 | 409 | Snapshot regeneration on already-snapshotted job | "Snapshot already exists for this job" |
 | E-WLA-018 | 503 | Slack webhook call fails (audit log still written) | "Slack mirror failed; retry queued" |
+
+---
+
+### IBP / IB Portal (PTL-07)
+
+| E-ID | HTTP | Trigger | User-Facing Message |
+|---|---|---|---|
+| E-IBP-001 | 403 | Wallet not in `ib_partners` | Access denied. Wallet address not registered as an IB Partner. |
+| E-IBP-002 | 401 | Invalid SIWE signature or used nonce | Invalid signature. Please try again. |
+| E-IBP-003 | 401 | Invalid 2FA TOTP code | Invalid verification code. Please check and try again. |
+| E-IBP-004 | 401 | Session expired (24h idle or 7d absolute) | Session expired. Please sign in again. |
+| E-IBP-005 | 403 | Cross-account reassignment attempt | Cannot reassign to a group from another account. |
+| E-IBP-006 | 400 | `allocation_bps` sum > 10000 | Wallet allocations cannot exceed 100%. |
+| E-IBP-007 | 400 | More than 10 wallets in group | Maximum 10 recipient wallets per group. |
+| E-IBP-008 | 409 | Archive group with active user assignments | Cannot archive — reassign all users first. |
+| E-IBP-009 | 503 | Contract paused or RPC failure | Contract temporarily unavailable. Please try again later. |
+| E-IBP-011 | 409 | Try to archive default group | Default group cannot be archived. |
+| E-IBP-012 | 403 | Account suspended > 60 days | This account has been suspended and the 60-day view-only period has ended. Contact ib-support@bnza.io. |
+| E-IBP-013 | 409 | Wallet has active WL route on /api/ib/bind | "route_conflict_wl" |
 
 ---
 
@@ -194,6 +237,10 @@ changelog:
 | MSG-ERR-14 | ERR | bot (SCR-POOL-03) | "Pool resolution failed. Please try again or select a different pool." |
 | MSG-ERR-14 | ERR | buy (SCR-POOL-10) | "Purchase failed. Please try again." |
 | MSG-ERR-15 | ERR | bot-create (SCR-POOL-01) | "A master wallet rotation is currently in progress for this chain. Please try again in a few minutes." |
+| MSG-ERR-16 | ERR | bot-create (SCR-POOL-01) | "This wallet is already active in a Whitelabel program. To join the IB program, you must connect a fresh wallet." |
+
+> *MSG-ERR-16 — Cross-module: triggered by BR-IBP-068 (WL/IB mutual exclusivity). Backend returns E-IBP-013 (HTTP 409 `route_conflict_wl`); POOL frontend (SCR-POOL-01) maps to this message.*
+
 | MSG-WRN-01 | WRN | bot (SCR-POOL-03) | "You have reached the maximum of 10 bots on this chain." |
 | MSG-WRN-01 | WRN | bot-monitor (SCR-POOL-02) | "Your position is out of range. The bot is not earning fees." |
 | MSG-WRN-01 | WRN | bot-create (SCR-POOL-01) | "You have reached the maximum of 10 bots on this chain." |
@@ -290,12 +337,18 @@ changelog:
 | MSG-ERR-98 | ERR | attribution-history (SCR-ADM-23) | "Bot Config ID must be a positive integer." |
 | MSG-ERR-99 | ERR | attribution-history (SCR-ADM-23) | "Position ID must be a valid numeric token ID." |
 | MSG-ERR-100 | ERR | whitelabel (SCR-ADM-02) | "A master wallet rotation is already in progress on this chain. Please wait for it to complete before initiating a new rotation." |
-| MSG-ERR-101 | ERR | ib (SCR-ADM-16) | "This wallet address is already registered as an IB account." |
-| MSG-SUC-102 | SUC | fee-distribution (SCR-ADM-06) | "Distribution triggered successfully." |
+| MSG-ERR-101 | ERR | ib (SCR-ADM-16) | "This wallet address is already registered as an IB code." |
 | MSG-ERR-102 | ERR | fee-distribution (SCR-ADM-06) | "Distribution failed. Transaction reverted. Retry next cycle." |
-| MSG-ERR-103 | ERR | fee-distribution (SCR-ADM-06) | "Points must be between 1 and 30." |
+| MSG-ERR-103 | ERR | fee-distribution (SCR-ADM-06) | "Points must be between 0.01 and 30." |
 | MSG-ERR-104 | ERR | fee-distribution (SCR-ADM-06) | "Maximum 5 active recipients reached. Deactivate an existing recipient first." |
 | MSG-ERR-105 | ERR | fee-distribution (SCR-ADM-06) | "Monthly allowance cap reached. Distribution disabled until next cycle." |
+| MSG-ERR-106 | ERR | shared — Wallet Detail Modal (UC-wallet-detail-modal) | "Failed to load data. Please retry." |
+| MSG-ERR-107 | ERR | layout-shell header (SCR-ADM-SHELL) — Relayer balance indicator | "Relayer failed to load. Reload site to try again." |
+| MSG-ERR-108 | ERR | ib (SCR-ADM-16) | "Failed to initiate rescue. Please try again." |
+| MSG-ERR-109 | ERR | fee-distribution (SCR-ADM-06) | "Cross-chain balance skew detected. Batch postponed." |
+| MSG-ERR-110 | ERR | fee-distribution (SCR-ADM-06) | "Points total exceeds 30 for channel: {channel_name}. Reduce allocation before saving." |
+| MSG-ERR-111 | ERR | fee-distribution (SCR-ADM-06) | "Failed to skip batch. Please retry. If the problem persists, contact support." |
+| MSG-ERR-70b | ERR | fee-distribution (SCR-ADM-06) | "This address is not allowed as a recipient." |
 | MSG-INF-70 | INF | dashboard (SCR-ADM-01) | "Dashboard data updates every 30s." |
 | MSG-INF-71 | INF | escalations (SCR-ADM-21) | "This escalation has already been acknowledged." |
 | MSG-INF-97 | INF | reports debug bar (SCR-ADM-07) | `"Last request: {endpoint path with params}"` |
@@ -316,8 +369,8 @@ changelog:
 | MSG-SUC-62 | SUC | fee-distribution (SCR-ADM-06) | "Recipient saved." |
 | MSG-SUC-63 | SUC | fee-distribution (SCR-ADM-06) | "Recipient deactivated." |
 | MSG-SUC-64 | SUC | bot (SCR-ADM-20) | [Deprecated — superseded by MSG-SUC-74] |
-| MSG-SUC-65 | SUC | ib (SCR-ADM-16) | "IB account created." |
-| MSG-SUC-66 | SUC | ib (SCR-ADM-16) | "IB account status updated." |
+| MSG-SUC-65 | SUC | ib (SCR-ADM-16) | "IB code created." |
+| MSG-SUC-66 | SUC | ib (SCR-ADM-16) | "IB code status updated." |
 | MSG-SUC-67 | SUC | ib (SCR-ADM-16) | [Deprecated — superseded by deactivation flow] |
 | MSG-SUC-68 | SUC | wl-monitor (SCR-ADM-18) | "Retry queued." |
 | MSG-SUC-69 | SUC | wl-monitor (SCR-ADM-18) | "Force-normalize initiated." |
@@ -331,9 +384,17 @@ changelog:
 | MSG-SUC-77 | SUC | plans (SCR-ADM-03) | "Version {version} created" |
 | MSG-SUC-79 | SUC | whitelabel (SCR-ADM-02) | "Master wallet deactivated." |
 | MSG-SUC-80 | SUC | whitelabel (SCR-ADM-02) | "Master wallet activated." |
+| MSG-SUC-102 | SUC | fee-distribution (SCR-ADM-06) | "Distribution triggered successfully." |
+| MSG-SUC-103 | SUC | ib (SCR-ADM-16) | "IB 2FA reset successfully." |
+| MSG-SUC-104 | SUC | ib (SCR-ADM-16) | "Rescue ticket submitted. Awaiting multisig approval." |
+| MSG-SUC-105 | SUC | ib (SCR-ADM-16) | "Payout rescued successfully." |
+| MSG-SUC-106 | SUC | fee-distribution (SCR-ADM-06) | "Recipient deleted." |
+| MSG-SUC-107 | SUC | fee-distribution (SCR-ADM-06) | "Batch skipped." |
 | MSG-WRN-01 | WRN | whitelabel (SCR-ADM-02) | "Bots are still being unset. Please wait before confirming leave." *(tooltip on disabled [Confirm Leave] — GAP-ITEM-02)* |
 | MSG-WRN-02 | WRN | relayer (SCR-ADM-12) | "Balance data may be stale — last synced {timestamp}" |
 | MSG-WRN-03 | WRN | whitelabel (SCR-ADM-02) | "Rotation initiated. Active bots will be rotated; bots in transient/error/leaving states are skipped: {bot_list}." `{bot_list}` = comma-separated `bot_config_id` values (e.g. `"42, 107, 203"`). |
+| MSG-WRN-04 | WRN | fee-distribution (SCR-ADM-06) | "⚠ WARNING: You are assigning the maximum 30 points for {channel_name}. BNZA will receive 0% of the Performance Fee from this channel. Do you wish to proceed?" |
+| MSG-WRN-05 | WRN | fee-distribution (SCR-ADM-06) | "⚠ This action is irreversible. The batch will be permanently marked as skipped. Ensure on-chain verification has been completed before proceeding." |
 
 ---
 
@@ -361,6 +422,27 @@ changelog:
 
 ---
 
+## MSG-IB_PORTAL — IB Portal UI Messages (ib_portal)
+
+> Screen-local display codes defined in each screen file §6. Same code number may carry different text depending on the originating screen. `Screen` column identifies the canonical source.
+
+| Code | Type | Screen | Text |
+|------|------|--------|------|
+| MSG-ERR-152 | ERR | groups (SCR-IB-05), setup-wizard (SCR-IB-02) | "Group name is required." |
+| MSG-ERR-154 | ERR | dashboard (SCR-IB-03) | "Transaction cancelled." |
+| MSG-ERR-157 | ERR | dashboard (SCR-IB-03) | "Network switch required. Please approve switching to [Chain] in your wallet." |
+| MSG-WRN-156 | WRN | dashboard (SCR-IB-03) | "Contract temporarily unavailable. Please try again later." |
+| MSG-INF-151 | INF | users (SCR-IB-04) | "Wallet copied to clipboard." |
+| MSG-INF-152 | INF | dashboard (SCR-IB-03), revenue (SCR-IB-06) | "TVL is a live on-chain read and may take a moment to load." |
+| MSG-INF-160 | INF | login (SCR-IB-01) | "Session refreshed — please sign again." |
+| MSG-SUC-151 | SUC | dashboard (SCR-IB-03) | "Referral URL copied to clipboard." |
+| MSG-SUC-152 | SUC | groups (SCR-IB-05) | "Link copied to clipboard." |
+| MSG-SUC-154 | SUC | groups (SCR-IB-05) | "Group archived." |
+| MSG-SUC-157 | SUC | users (SCR-IB-04) | "User reassigned successfully." |
+| MSG-SUC-158 | SUC | groups (SCR-IB-05) | "Settings saved." |
+
+---
+
 ## EXBOT — ExBot Module (bnza-exbot)
 
 > E-EXBOT codes are API-level error codes returned by ExBot Worker via OPERATOR Facade. Canonical source: `03_modules/exbot/srs/spec.md §5`.
@@ -383,18 +465,20 @@ changelog:
 | ~~E-EXBOT-014~~ | ~~Submit agent key while existing key is pending~~ *(deprecated — manual key submission flow removed)* | ~~"Your agent key is awaiting admin approval. You cannot submit a new key until the current one is reviewed."~~ | ~~409~~ |
 | ~~E-EXBOT-015~~ | ~~Submit agent key while existing key is approved~~ *(deprecated — manual key submission flow removed)* | ~~"You already have an active agent key. You can only submit a new key after your current key has expired."~~ | ~~409~~ |
 | ~~E-EXBOT-016~~ | ~~Approve agent key that has already expired~~ *(deprecated — admin approval flow removed)* | ~~"This agent key has already expired and cannot be approved. Please ask the investor to submit a new key."~~ | ~~409~~ |
-| E-EXBOT-017 | Bot start preflight — no `hl_agent_keys` row with `key_status='active'` for this user | "Bot cannot start: agent key not yet provisioned. Please complete an on-chain deposit to trigger automatic setup." | 400 |
+| E-EXBOT-017 | Bot start preflight — no `hl_custodial_wallets` row with `key_status='active'` for this user | "Bot cannot start: agent key not yet provisioned. Please complete an on-chain deposit to trigger automatic setup." | 400 |
 | E-EXBOT-018 | bot_safe_close hedge close failed after 3 retries — `close_operations.state='residual_hl_liability'` | "Bot safe close failed: HL hedge could not be closed after 3 attempts. Manual intervention required. Bot held at residual_hl_liability." | — (internal alert) |
 | E-EXBOT-019 | `stop_trigger_crossed_at` stuck > 30 minutes — deep-audit backstop detection; bot enters SAFE_MODE | "Stop trigger marker stuck for over 30 minutes. Bot entered Safe Mode. Manual review required." | — (internal alert) |
 | E-EXBOT-020 | `stop_replacing_started_at` stuck > 60 seconds — deep-audit backstop detection; bot enters SAFE_MODE | "Stop replacement marker stuck for over 60 seconds. Bot entered Safe Mode. Manual review required." | — (internal alert) |
 | E-EXBOT-021 | `lifecycle_state='lp_closing'` — bot_safe_close in progress, close not yet complete | "Bot close is in progress. Please wait." | 200 |
 | E-EXBOT-022 | `lifecycle_state='closed'` after bot_safe_close — close complete, funds returned | "Bot safely closed. Funds have been returned to your wallet." | 200 |
-| E-EXBOT-023 | No bot record found for user — `GET /api/exbot/status` returns 404 | "No active bot found for this account." | 404 |
+| E-EXBOT-023 | No bot record found for user — `GET /api/exbot/status/{botId}` returns 404 | "No active bot found for this account." | 404 |
 | E-EXBOT-024 | user_redeem hedge close failed — `close_operations.state='residual_hl_liability'` | "User redemption hedge close failed. Manual intervention required." | — (internal alert) |
 | E-EXBOT-026 | HL rejects IOC order at bot-start hedge open | "Hedge order rejected by Hyperliquid. Bot entered Safe Mode." | — (internal alert) |
 | E-EXBOT-027 | Key-provision failed after max 3 retries (KMS or HL approveAgent) | "Key-provision failed for user {wallet_address} after 3 retries. Manual re-trigger required via admin panel." | — (internal alert) |
 | E-EXBOT-028 | LP mint on-chain tx reverted or timed out at bot-start — `bots.lifecycle_state='error'`; no funds moved | "Bot startup failed: LP mint transaction did not complete. No funds were moved. Please try again or contact support." | 502 |
 | E-EXBOT-029 | `bots.status='error'` — bot requires admin intervention; displayed on status screen | "Bot encountered a critical error. Admin intervention required. You may close the bot via emergency close." | 200 |
+| E-EXBOT-030 | GET /status — Investor wallet_address does not match bot.user_wallet_address | "Access denied: this bot does not belong to your account." | 403 |
+| E-EXBOT-031 | `bots.status='paused'` — bot is paused; displayed on status screen | "Bot Paused. Hedge and LP are maintained. You may still redeem." | 200 |
 | Symbol not found | Symbol removed from Hyperliquid | "Symbol not found" (chart) | User can search another symbol |
 
 ---

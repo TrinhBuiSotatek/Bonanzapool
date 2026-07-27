@@ -125,6 +125,13 @@ curl --request POST \
 Expected success: <code>200</code> with a non-empty <code>bot_id</code> and
 <code>lifecycle_state: "idle"</code>.
 
+#### Chain gate (Base mainnet only)
+
+<code>create-bot</code> enforces <code>chain_id=8453</code>. Any other value is rejected with
+<code>400 INVALID_CHAIN</code> with <code>{ allowed_chain_id, received }</code> in the body. Sending a
+non-number or omitting <code>chain_id</code> returns <code>400 INVALID_BODY</code>. These are
+distinct reasons so the OPERATOR can tell "wrong chain" from "malformed body".
+
 #### Postman post-response
 
 ~~~javascript
@@ -506,10 +513,30 @@ curl --request POST \
 With the current source deployed and its dependencies configured, expected success is an immediate
 HTTP <code>200</code> after Start completes these synchronous steps:
 
-1. read Vault unspent USDC for <code>userAddress</code> and <code>botIdBytes32</code>;
-2. split the amount 50/50 between LP and Hyperliquid portions;
-3. persist the runtime amounts and move the bot to <code>lp_opening</code>;
-4. enqueue the open request to <code>hedge-sync</code>.
+1. read the active on-chain LP position for <code>userAddress</code> + <code>botId</code>
+   (hard blocker — see <code>LP_ALREADY_ACTIVE</code> below);
+2. read Vault unspent USDC for <code>userAddress</code> and <code>botIdBytes32</code>;
+3. split the amount <strong>20% HL / 80% LP</strong> by default; the live value is read from
+   <code>system_config.hl_portion_ratio</code> so ops can retune without redeploying. Values
+   outside the open interval <code>(0, 1)</code> fall back to the 20/80 default;
+4. derive <code>lpEthAmount</code> via spot-quote of the LP portion against the pool snapshot,
+   then run viability + margin preflight;
+5. persist runtime amounts and move the bot to <code>lp_opening</code>;
+6. enqueue the open request via <code>initiateFlow(action='open')</code> with
+   <code>expectedTargetSize: '0'</code> (intentional — the LP hasn't minted yet, so
+   <code>hedge-sync</code> recomputes the target after <code>vaultMint</code>).
+
+Success body:
+
+~~~json
+{
+  "bot_id": "<id>",
+  "status": "<status>",
+  "custody_address": "<userAddress>",
+  "total_usdc": "<raw USDC string>",
+  "dry_run": <boolean>
+}
+~~~
 
 The <code>200</code> confirms the database work and SQS enqueue completed; it does **not** prove the LP
 or Hyperliquid position is open. Those steps are asynchronous. The lifecycle should subsequently
@@ -517,9 +544,21 @@ advance through queue-owned LP, hedge, reconcile, and stop states toward <code>a
 Status after Start and investigate any stalled or failed state before retrying or taking another
 action.
 
-Start creates the live Vault client with <code>onlyRead: true</code>, so it does not need an operator
-mnemonic. RPC/contract read configuration can still fail, and this guide has not verified which
-revision or configuration is currently deployed in AWS.
+Start may fail synchronously. The handler returns these errors before any DB transition:
+
+| Status | Reason | When |
+|---|---|---|
+| 400 | <code>INVALID_BODY</code> | body is not JSON / <code>bot_id</code> missing or non-string |
+| 401 | <code>INVALID_AUTH_CONTEXT</code> | auth-context header missing or malformed |
+| 403 | <code>FORBIDDEN</code> | bot owner ≠ <code>userAddress</code> |
+| 404 | <code>BOT_NOT_FOUND</code> | unknown <code>bot_id</code> |
+| 409 | <code>BOT_NOT_IDLE</code> <code>{ current_state }</code> | bot not in <code>idle</code> |
+| 409 | <code>LP_ALREADY_ACTIVE</code> <code>{ active_token_id }</code> | on-chain LP exists; close it first |
+| 409 | <code>INSUFFICIENT_HL_MARGIN</code> <code>{ margin_required_usd, margin_required_with_buffer_usd, margin_available_after_deposit_usd }</code> | HL margin preflight fails |
+| 409 | <code>FLOW_ALREADY_ACTIVE</code> <code>{ existing_flow_id }</code> | another flow is already running for this bot |
+| 422 | <code>INSUFFICIENT_VAULT_BALANCE</code> <code>{ unspent_balance, topUpUsdc }</code> | top up USDC; <code>topUpUsdc</code> is human-formatted (USDC, 6 dp) |
+| 503 | <code>LP_POOL_NOT_CONFIGURED</code> / <code>LP_POOL_SNAPSHOT_UNAVAILABLE</code> / <code>USDC_TOKEN_NOT_CONFIGURED</code> | environment/chain not configured |
+| 503 | <code>QUEUE_UNAVAILABLE</code> | SQS enqueue failed after <code>lp_opening</code> was persisted — do not retry blindly, check Status |
 
 > If Start returns <code>QUEUE_UNAVAILABLE</code>, the bot may already be
 > <code>lp_opening</code>. Do not blindly retry. Check Status and ask the EXBOT operator to recover
@@ -569,7 +608,8 @@ The intended sequence is:
 1. API provisions the KMS custody wallet.
 2. API creates the idle bot.
 3. The matching user wallet approves USDC and deposits it into BnzaExVault.
-4. API Start reads the deposit, splits it 50/50, moves the lifecycle to <code>lp_opening</code>, and
+4. API Start reads the deposit, splits it **20% HL / 80% LP** (default; live value in
+   <code>system_config.hl_portion_ratio</code>), moves the lifecycle to <code>lp_opening</code>, and
    enqueues an open message with <code>expectedTargetSize: "0"</code>.
 5. The SQS event source automatically invokes <code>hedge-sync</code>. Its LP leg mints the position;
    operator signer credentials sign the underlying Vault transaction. No backend operator manually
@@ -596,12 +636,39 @@ The source and infrastructure template show a live-capable <code>hedge-sync</cod
 consumer mapping, but they do not establish what is running in AWS. Do not bypass these checks or
 infer credential readiness from the repository.
 
-## 8. Close is unsupported
+## 8. Close
 
-Do not call <code>/internal/exbot/close</code>. No executable Close request is included.
+<code>POST /internal/exbot/close</code> initiates an asynchronous close flow. The synchronous
+part only flips the bot to <code>lifecycle_state='lp_closing'</code> +
+<code>status='closing'</code> and enqueues the close flow; the actual LP exit, hedge unwind,
+HL withdrawal, and HL fulfillment happen in the 4-step queue chain
+<code>lp_leg_exec</code> → <code>hedge_sync</code> → <code>hl_withdraw</code> →
+<code>hl_fulfill</code>.
 
-The route does not safely implement the approved user-owned <code>user_redeem</code> flow. A
-<code>close_requested</code> response is not proof that funds were returned or safely parked.
+~~~bash
+curl --request POST \
+  --url 'https://clt2zj884m.execute-api.ap-northeast-1.amazonaws.com/internal/exbot/close' \
+  --header 'Content-Type: application/json' \
+  --header 'X-Exbot-Internal-Auth: {{exbotInternalAuth}}' \
+  --header 'X-Exbot-Auth-Context: {"user_address":"{{userAddress}}","role":"operator"}' \
+  --data-raw '{"bot_id":"{{botId}}"}'
+~~~
+
+Expected success: <code>200</code> with body
+<code>{ bot_id, status: "close_flow_initiated", flow_id }</code>. A <code>200</code> confirms
+the DB transition and the flow was queued; it does **not** prove funds have been returned or
+safely parked. Poll Status after Close and investigate any stalled or failed lifecycle state
+before retrying or taking another action.
+
+Close returns these errors synchronously:
+
+| Status | Reason | When |
+|---|---|---|
+| 400 | <code>MISSING_BOT_ID</code> | body missing or <code>bot_id</code> is not a string |
+| 401 | <code>UNAUTHORIZED_INTERNAL_CALL</code> / <code>INVALID_AUTH_CONTEXT</code> | auth gate failed |
+| 409 | <code>INVALID_STATE_FOR_CLOSE</code> | bot is already <code>closed</code>, <code>lp_closing</code>, or <code>error</code> |
+| 409 | <code>CLOSE_ALREADY_IN_PROGRESS</code> <code>{ existing_flow_id }</code> | a close flow is already running for this bot |
+| 500 | <code>INTERNAL</code> | unexpected — inspect Lambda logs |
 
 ## 9. Troubleshooting
 
@@ -619,6 +686,15 @@ The route does not safely implement the approved user-owned <code>user_redeem</c
 | Start <code>200</code> but positions are not yet visible | Expected asynchronous behavior immediately after enqueue; poll Status for lifecycle progress toward <code>active</code> |
 | Start <code>QUEUE_UNAVAILABLE</code> | Stop retries; bot may already be <code>lp_opening</code> |
 | Status reports zero after a verified deposit | Use direct <code>unspentBalance(userAddress, botIdBytes32)</code>; Status currently uses the custody address |
+| Create <code>400 INVALID_CHAIN</code> | <code>chain_id</code> must be <code>8453</code> (Base mainnet); use <code>INVALID_CHAIN.allowed_chain_id</code> to confirm |
+| <code>409 LP_ALREADY_ACTIVE</code> | bot already has an on-chain LP position; close that bot before starting a new one |
+| <code>422 INSUFFICIENT_VAULT_BALANCE</code> | top up Vault USDC; <code>topUpUsdc</code> is the additional raw amount needed |
+| <code>409 INSUFFICIENT_HL_MARGIN</code> | HL margin preflight failed; either top up vault USDC or wait for lower leverage/mark |
+| <code>409 BOT_NOT_IDLE</code> | bot is mid-lifecycle (<code>current_state</code> field); wait for it to reach <code>active</code> or <code>idle</code> before starting |
+| <code>409 FLOW_ALREADY_ACTIVE</code> | a flow is already running for this bot (<code>existing_flow_id</code>); do not retry |
+| Close <code>409 INVALID_STATE_FOR_CLOSE</code> | bot already <code>closed</code> / <code>lp_closing</code> / <code>error</code>; poll Status before retrying |
+| Close <code>409 CLOSE_ALREADY_IN_PROGRESS</code> | a close flow is already in flight (<code>existing_flow_id</code>); poll Status |
+| Close <code>400 MISSING_BOT_ID</code> | body missing <code>bot_id</code> or wrong type |
 
 ## 10. References
 
